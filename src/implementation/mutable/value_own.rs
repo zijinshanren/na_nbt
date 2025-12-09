@@ -344,10 +344,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_short(&self) -> bool {
-        match self {
-            OwnedValue::Short(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::Short(_))
     }
 
     #[inline]
@@ -360,10 +357,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_int(&self) -> bool {
-        match self {
-            OwnedValue::Int(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::Int(_))
     }
 
     #[inline]
@@ -376,10 +370,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_long(&self) -> bool {
-        match self {
-            OwnedValue::Long(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::Long(_))
     }
 
     #[inline]
@@ -392,10 +383,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_float(&self) -> bool {
-        match self {
-            OwnedValue::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::Float(_))
     }
 
     #[inline]
@@ -408,14 +396,11 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_double(&self) -> bool {
-        match self {
-            OwnedValue::Double(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::Double(_))
     }
 
     #[inline]
-    pub fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]> {
+    pub fn as_byte_array(&self) -> Option<&[i8]> {
         match self {
             OwnedValue::ByteArray(value) => Some(value),
             _ => None,
@@ -424,10 +409,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_byte_array(&self) -> bool {
-        match self {
-            OwnedValue::ByteArray(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::ByteArray(_))
     }
 
     #[inline]
@@ -442,10 +424,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_string(&self) -> bool {
-        match self {
-            OwnedValue::String(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::String(_))
     }
 
     #[inline]
@@ -461,10 +440,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_list(&self) -> bool {
-        match self {
-            OwnedValue::List(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::List(_))
     }
 
     #[inline]
@@ -480,14 +456,11 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_compound(&self) -> bool {
-        match self {
-            OwnedValue::Compound(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::Compound(_))
     }
 
     #[inline]
-    pub fn as_int_array<'a>(&'a self) -> Option<&'a [byteorder::I32<O>]> {
+    pub fn as_int_array(&self) -> Option<&[byteorder::I32<O>]> {
         match self {
             OwnedValue::IntArray(value) => Some(value),
             _ => None,
@@ -496,14 +469,11 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_int_array(&self) -> bool {
-        match self {
-            OwnedValue::IntArray(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::IntArray(_))
     }
 
     #[inline]
-    pub fn as_long_array<'a>(&'a self) -> Option<&'a [byteorder::I64<O>]> {
+    pub fn as_long_array(&self) -> Option<&[byteorder::I64<O>]> {
         match self {
             OwnedValue::LongArray(value) => Some(value),
             _ => None,
@@ -512,10 +482,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn is_long_array(&self) -> bool {
-        match self {
-            OwnedValue::LongArray(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedValue::LongArray(_))
     }
 
     #[inline]
@@ -536,7 +503,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
 impl<O: ByteOrder> OwnedValue<O> {
     #[inline]
-    pub fn as_byte_mut<'a>(&'a mut self) -> Option<&'a mut i8> {
+    pub fn as_byte_mut(&mut self) -> Option<&mut i8> {
         match self {
             OwnedValue::Byte(value) => Some(value),
             _ => None,
@@ -566,7 +533,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     }
 
     #[inline]
-    pub fn as_short_mut<'a>(&'a mut self) -> Option<&'a mut byteorder::I16<O>> {
+    pub fn as_short_mut(&mut self) -> Option<&mut byteorder::I16<O>> {
         match self {
             OwnedValue::Short(value) => Some(value),
             _ => None,
@@ -596,7 +563,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     }
 
     #[inline]
-    pub fn as_int_mut<'a>(&'a mut self) -> Option<&'a mut byteorder::I32<O>> {
+    pub fn as_int_mut(&mut self) -> Option<&mut byteorder::I32<O>> {
         match self {
             OwnedValue::Int(value) => Some(value),
             _ => None,
@@ -626,7 +593,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     }
 
     #[inline]
-    pub fn as_long_mut<'a>(&'a mut self) -> Option<&'a mut byteorder::I64<O>> {
+    pub fn as_long_mut(&mut self) -> Option<&mut byteorder::I64<O>> {
         match self {
             OwnedValue::Long(value) => Some(value),
             _ => None,
@@ -656,7 +623,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     }
 
     #[inline]
-    pub fn as_float_mut<'a>(&'a mut self) -> Option<&'a mut byteorder::F32<O>> {
+    pub fn as_float_mut(&mut self) -> Option<&mut byteorder::F32<O>> {
         match self {
             OwnedValue::Float(value) => Some(value),
             _ => None,
@@ -686,7 +653,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     }
 
     #[inline]
-    pub fn as_double_mut<'a>(&'a mut self) -> Option<&'a mut byteorder::F64<O>> {
+    pub fn as_double_mut(&mut self) -> Option<&mut byteorder::F64<O>> {
         match self {
             OwnedValue::Double(value) => Some(value),
             _ => None,
@@ -957,6 +924,11 @@ impl<O: ByteOrder> OwnedList<O> {
         value.list_push(&mut data);
     }
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     pub unsafe fn push_unchecked<V: IntoOwnedValue<O>>(&mut self, value: V) {
         let mut data =
             unsafe { VecViewMut::new(&mut self.data.ptr, &mut self.data.len, &mut self.data.cap) };
@@ -970,6 +942,11 @@ impl<O: ByteOrder> OwnedList<O> {
         value.list_insert(&mut data, index);
     }
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     pub unsafe fn insert_unchecked<V: IntoOwnedValue<O>>(&mut self, index: usize, value: V) {
         let mut data =
             unsafe { VecViewMut::new(&mut self.data.ptr, &mut self.data.len, &mut self.data.cap) };
@@ -1129,6 +1106,8 @@ mod tests {
     type BE = BigEndian;
 
     mod owned_value_tests {
+        use std::{f32, f64};
+
         use super::*;
 
         #[test]
@@ -1194,17 +1173,17 @@ mod tests {
 
         #[test]
         fn test_from_f32() {
-            let v: OwnedValue<BE> = 3.14f32.into();
+            let v: OwnedValue<BE> = f32::consts::PI.into();
             assert!(v.is_float());
-            assert!((v.as_float().unwrap() - 3.14).abs() < 0.001);
+            assert!((v.as_float().unwrap() - f32::consts::PI).abs() < 0.001);
             assert_eq!(v.tag(), 5);
         }
 
         #[test]
         fn test_from_f64() {
-            let v: OwnedValue<BE> = 3.14159265f64.into();
+            let v: OwnedValue<BE> = f64::consts::PI.into();
             assert!(v.is_double());
-            assert!((v.as_double().unwrap() - 3.14159265).abs() < 0.0000001);
+            assert!((v.as_double().unwrap() - f64::consts::PI).abs() < 0.0000001);
             assert_eq!(v.tag(), 6);
         }
 
@@ -1339,9 +1318,9 @@ mod tests {
 
         #[test]
         fn test_set_float() {
-            let mut v: OwnedValue<BE> = 3.14f32.into();
-            assert!(v.set_float(2.71));
-            assert!((v.as_float().unwrap() - 2.71).abs() < 0.001);
+            let mut v: OwnedValue<BE> = f32::consts::PI.into();
+            assert!(v.set_float(f32::consts::E));
+            assert!((v.as_float().unwrap() - f32::consts::E).abs() < 0.001);
         }
 
         #[test]
@@ -1353,9 +1332,9 @@ mod tests {
 
         #[test]
         fn test_set_double() {
-            let mut v: OwnedValue<BE> = 3.14159f64.into();
-            assert!(v.set_double(2.71828));
-            assert!((v.as_double().unwrap() - 2.71828).abs() < 0.00001);
+            let mut v: OwnedValue<BE> = f64::consts::PI.into();
+            assert!(v.set_double(f64::consts::E));
+            assert!((v.as_double().unwrap() - f64::consts::E).abs() < 0.00001);
         }
 
         #[test]

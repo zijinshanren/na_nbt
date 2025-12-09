@@ -901,7 +901,7 @@ impl Eq for StringViewMut<'_> {}
 
 impl PartialOrd for StringViewMut<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.as_str().partial_cmp(other.as_str())
+        Some(self.cmp(other))
     }
 }
 
@@ -1871,7 +1871,7 @@ impl Eq for StringViewOwn {}
 
 impl PartialOrd for StringViewOwn {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.as_str().partial_cmp(other.as_str())
+        Some(self.cmp(other))
     }
 }
 

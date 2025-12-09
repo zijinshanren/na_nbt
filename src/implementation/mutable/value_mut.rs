@@ -36,6 +36,11 @@ pub enum MutableValue<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> MutableValue<'s, O> {
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     pub unsafe fn read(tag_id: u8, data: *mut u8) -> Self {
         unsafe {
             macro_rules! get {
@@ -90,10 +95,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_end(&self) -> bool {
-        match self {
-            MutableValue::End => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::End)
     }
 
     #[inline]
@@ -106,10 +108,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_byte(&self) -> bool {
-        match self {
-            MutableValue::Byte(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::Byte(_))
     }
 
     #[inline]
@@ -122,10 +121,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_short(&self) -> bool {
-        match self {
-            MutableValue::Short(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::Short(_))
     }
 
     #[inline]
@@ -138,10 +134,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_int(&self) -> bool {
-        match self {
-            MutableValue::Int(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::Int(_))
     }
 
     #[inline]
@@ -154,10 +147,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_long(&self) -> bool {
-        match self {
-            MutableValue::Long(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::Long(_))
     }
 
     #[inline]
@@ -170,10 +160,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_float(&self) -> bool {
-        match self {
-            MutableValue::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::Float(_))
     }
 
     #[inline]
@@ -186,10 +173,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_double(&self) -> bool {
-        match self {
-            MutableValue::Double(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::Double(_))
     }
 
     #[inline]
@@ -205,10 +189,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_byte_array(&self) -> bool {
-        match self {
-            MutableValue::ByteArray(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::ByteArray(_))
     }
 
     #[inline]
@@ -226,10 +207,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_string(&self) -> bool {
-        match self {
-            MutableValue::String(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::String(_))
     }
 
     #[inline]
@@ -248,10 +226,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_list(&self) -> bool {
-        match self {
-            MutableValue::List(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::List(_))
     }
 
     #[inline]
@@ -270,10 +245,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_compound(&self) -> bool {
-        match self {
-            MutableValue::Compound(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::Compound(_))
     }
 
     #[inline]
@@ -289,10 +261,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_int_array(&self) -> bool {
-        match self {
-            MutableValue::IntArray(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::IntArray(_))
     }
 
     #[inline]
@@ -308,10 +277,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
     #[inline]
     pub fn is_long_array(&self) -> bool {
-        match self {
-            MutableValue::LongArray(_) => true,
-            _ => false,
-        }
+        matches!(self, MutableValue::LongArray(_))
     }
 
     #[inline]
@@ -691,6 +657,11 @@ impl<'s, O: ByteOrder> MutableList<'s, O> {
         value.list_push(&mut self.data);
     }
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     pub unsafe fn push_unchecked<V: IntoOwnedValue<O>>(&mut self, value: V) {
         unsafe { value.list_push_unchecked(&mut self.data) };
     }
@@ -699,6 +670,11 @@ impl<'s, O: ByteOrder> MutableList<'s, O> {
         value.list_insert(&mut self.data, index);
     }
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     pub unsafe fn insert_unchecked<V: IntoOwnedValue<O>>(&mut self, index: usize, value: V) {
         unsafe { value.list_insert_unchecked(&mut self.data, index) };
     }
@@ -782,6 +758,8 @@ mod tests {
     type BE = BigEndian;
 
     mod mutable_value_tests {
+        use std::{f32, f64};
+
         use super::*;
 
         fn create_test_compound() -> OwnedCompound<BE> {
@@ -790,8 +768,8 @@ mod tests {
             compound.insert("short", 1000i16);
             compound.insert("int", 100000i32);
             compound.insert("long", 9999999999i64);
-            compound.insert("float", 3.14f32);
-            compound.insert("double", 3.14159265f64);
+            compound.insert("float", f32::consts::PI);
+            compound.insert("double", f64::consts::PI);
             compound.insert("string", "hello");
             compound.insert("byte_array", vec![1i8, 2, 3]);
             compound
@@ -834,7 +812,7 @@ mod tests {
             let mut compound = create_test_compound();
             let v = compound.get_mut("float").unwrap();
             assert!(v.is_float());
-            assert!((v.as_float().unwrap() - 3.14).abs() < 0.001);
+            assert!((v.as_float().unwrap() - f32::consts::PI).abs() < 0.001);
         }
 
         #[test]
@@ -842,7 +820,7 @@ mod tests {
             let mut compound = create_test_compound();
             let v = compound.get_mut("double").unwrap();
             assert!(v.is_double());
-            assert!((v.as_double().unwrap() - 3.14159265).abs() < 0.0000001);
+            assert!((v.as_double().unwrap() - f64::consts::PI).abs() < 0.0000001);
         }
 
         #[test]
@@ -866,7 +844,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("byte").unwrap();
             assert!(v.set_byte(100));
-            drop(v);
             assert_eq!(compound.get("byte").and_then(|v| v.as_byte()), Some(100));
         }
 
@@ -875,7 +852,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("byte").unwrap();
             assert!(v.update_byte(|x| x * 2));
-            drop(v);
             assert_eq!(compound.get("byte").and_then(|v| v.as_byte()), Some(84));
         }
 
@@ -884,7 +860,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("short").unwrap();
             assert!(v.set_short(2000));
-            drop(v);
             assert_eq!(compound.get("short").and_then(|v| v.as_short()), Some(2000));
         }
 
@@ -893,7 +868,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("short").unwrap();
             assert!(v.update_short(|x| x + 500));
-            drop(v);
             assert_eq!(compound.get("short").and_then(|v| v.as_short()), Some(1500));
         }
 
@@ -902,7 +876,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("int").unwrap();
             assert!(v.set_int(200000));
-            drop(v);
             assert_eq!(compound.get("int").and_then(|v| v.as_int()), Some(200000));
         }
 
@@ -911,7 +884,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("int").unwrap();
             assert!(v.update_int(|x| x * 2));
-            drop(v);
             assert_eq!(compound.get("int").and_then(|v| v.as_int()), Some(200000));
         }
 
@@ -920,7 +892,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("long").unwrap();
             assert!(v.set_long(1111111111));
-            drop(v);
             assert_eq!(
                 compound.get("long").and_then(|v| v.as_long()),
                 Some(1111111111)
@@ -932,7 +903,6 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("long").unwrap();
             assert!(v.update_long(|x| x / 1000));
-            drop(v);
             assert_eq!(
                 compound.get("long").and_then(|v| v.as_long()),
                 Some(9999999)
@@ -943,10 +913,10 @@ mod tests {
         fn test_set_float() {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("float").unwrap();
-            assert!(v.set_float(2.71));
-            drop(v);
+            assert!(v.set_float(f32::consts::E));
             assert!(
-                (compound.get("float").and_then(|v| v.as_float()).unwrap() - 2.71).abs() < 0.001
+                (compound.get("float").and_then(|v| v.as_float()).unwrap() - f32::consts::E).abs()
+                    < 0.001
             );
         }
 
@@ -955,9 +925,10 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("float").unwrap();
             assert!(v.update_float(|x| x * 2.0));
-            drop(v);
             assert!(
-                (compound.get("float").and_then(|v| v.as_float()).unwrap() - 6.28).abs() < 0.01
+                (compound.get("float").and_then(|v| v.as_float()).unwrap() - f32::consts::TAU)
+                    .abs()
+                    < 0.01
             );
         }
 
@@ -965,10 +936,10 @@ mod tests {
         fn test_set_double() {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("double").unwrap();
-            assert!(v.set_double(2.71828));
-            drop(v);
+            assert!(v.set_double(f64::consts::E));
             assert!(
-                (compound.get("double").and_then(|v| v.as_double()).unwrap() - 2.71828).abs()
+                (compound.get("double").and_then(|v| v.as_double()).unwrap() - f64::consts::E)
+                    .abs()
                     < 0.00001
             );
         }
@@ -978,9 +949,9 @@ mod tests {
             let mut compound = create_test_compound();
             let mut v = compound.get_mut("double").unwrap();
             assert!(v.update_double(|x| x * 2.0));
-            drop(v);
             assert!(
-                (compound.get("double").and_then(|v| v.as_double()).unwrap() - 6.2831853).abs()
+                (compound.get("double").and_then(|v| v.as_double()).unwrap() - f64::consts::TAU)
+                    .abs()
                     < 0.0001
             );
         }

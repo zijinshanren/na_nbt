@@ -2,7 +2,7 @@ pub mod error;
 mod implementation;
 pub mod index;
 pub mod util;
-pub mod value_trait;
+// pub mod value_trait;
 pub mod view;
 
 pub use implementation::immutable::{BorrowedValue, SharedValue};

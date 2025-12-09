@@ -32,6 +32,11 @@ pub enum ImmutableValue<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     pub unsafe fn read(tag_id: u8, data: *const u8) -> Self {
         unsafe {
             macro_rules! get {
@@ -87,10 +92,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_end(&self) -> bool {
-        match self {
-            ImmutableValue::End => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::End)
     }
 
     #[inline]
@@ -103,10 +105,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_byte(&self) -> bool {
-        match self {
-            ImmutableValue::Byte(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Byte(_))
     }
 
     #[inline]
@@ -119,10 +118,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_short(&self) -> bool {
-        match self {
-            ImmutableValue::Short(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Short(_))
     }
 
     #[inline]
@@ -135,10 +131,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_int(&self) -> bool {
-        match self {
-            ImmutableValue::Int(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Int(_))
     }
 
     #[inline]
@@ -151,10 +144,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_long(&self) -> bool {
-        match self {
-            ImmutableValue::Long(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Long(_))
     }
 
     #[inline]
@@ -167,10 +157,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_float(&self) -> bool {
-        match self {
-            ImmutableValue::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Float(_))
     }
 
     #[inline]
@@ -183,10 +170,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_double(&self) -> bool {
-        match self {
-            ImmutableValue::Double(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Double(_))
     }
 
     #[inline]
@@ -202,10 +186,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_byte_array(&self) -> bool {
-        match self {
-            ImmutableValue::ByteArray(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::ByteArray(_))
     }
 
     #[inline]
@@ -221,10 +202,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_string(&self) -> bool {
-        match self {
-            ImmutableValue::String(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::String(_))
     }
 
     #[inline]
@@ -240,10 +218,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_list(&self) -> bool {
-        match self {
-            ImmutableValue::List(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::List(_))
     }
 
     #[inline]
@@ -259,10 +234,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_compound(&self) -> bool {
-        match self {
-            ImmutableValue::Compound(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Compound(_))
     }
 
     #[inline]
@@ -278,10 +250,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_int_array(&self) -> bool {
-        match self {
-            ImmutableValue::IntArray(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::IntArray(_))
     }
 
     #[inline]
@@ -297,10 +266,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn is_long_array(&self) -> bool {
-        match self {
-            ImmutableValue::LongArray(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::LongArray(_))
     }
 
     #[inline]
@@ -326,7 +292,7 @@ pub struct Name<'s> {
 
 impl<'s> Name<'s> {
     #[inline]
-    pub fn raw_bytes<'a>(&'a self) -> &'a [u8] {
+    pub fn raw_bytes(&self) -> &[u8] {
         self.data
     }
 
@@ -343,7 +309,7 @@ pub struct ImmutableString<'s> {
 
 impl<'s> ImmutableString<'s> {
     #[inline]
-    pub fn raw_bytes<'a>(&'a self) -> &'a [u8] {
+    pub fn raw_bytes(&self) -> &[u8] {
         self.data.as_bytes()
     }
 
@@ -444,6 +410,8 @@ mod tests {
     type BE = BigEndian;
 
     mod immutable_value_tests {
+        use std::{f32, f64};
+
         use super::*;
 
         fn create_test_compound() -> OwnedCompound<BE> {
@@ -452,8 +420,8 @@ mod tests {
             compound.insert("short", 1000i16);
             compound.insert("int", 100000i32);
             compound.insert("long", 9999999999i64);
-            compound.insert("float", 3.14f32);
-            compound.insert("double", 3.14159265f64);
+            compound.insert("float", f32::consts::PI);
+            compound.insert("double", f64::consts::PI);
             compound.insert("string", "hello");
             compound.insert("byte_array", vec![1i8, 2, 3]);
             compound
@@ -496,7 +464,7 @@ mod tests {
             let compound = create_test_compound();
             let v = compound.get("float").unwrap();
             assert!(v.is_float());
-            assert!((v.as_float().unwrap() - 3.14).abs() < 0.001);
+            assert!((v.as_float().unwrap() - f32::consts::PI).abs() < 0.001);
         }
 
         #[test]
@@ -504,7 +472,7 @@ mod tests {
             let compound = create_test_compound();
             let v = compound.get("double").unwrap();
             assert!(v.is_double());
-            assert!((v.as_double().unwrap() - 3.14159265).abs() < 0.0000001);
+            assert!((v.as_double().unwrap() - f64::consts::PI).abs() < 0.0000001);
         }
 
         #[test]

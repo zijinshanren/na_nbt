@@ -47,7 +47,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
             macro_rules! get_composite {
                 ($t:tt, $s:tt) => {
                     ImmutableValue::$t($s {
-                        data: data,
+                        data,
                         mark: mark.add(1),
                         doc,
                         _marker: PhantomData,
@@ -86,10 +86,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_end(&self) -> bool {
-        match self {
-            ImmutableValue::End => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::End)
     }
 
     #[inline]
@@ -102,10 +99,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_byte(&self) -> bool {
-        match self {
-            ImmutableValue::Byte(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Byte(_))
     }
 
     #[inline]
@@ -118,10 +112,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_short(&self) -> bool {
-        match self {
-            ImmutableValue::Short(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Short(_))
     }
 
     #[inline]
@@ -134,10 +125,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_int(&self) -> bool {
-        match self {
-            ImmutableValue::Int(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Int(_))
     }
 
     #[inline]
@@ -150,10 +138,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_long(&self) -> bool {
-        match self {
-            ImmutableValue::Long(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Long(_))
     }
 
     #[inline]
@@ -166,10 +151,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_float(&self) -> bool {
-        match self {
-            ImmutableValue::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Float(_))
     }
 
     #[inline]
@@ -182,10 +164,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_double(&self) -> bool {
-        match self {
-            ImmutableValue::Double(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Double(_))
     }
 
     #[inline]
@@ -201,10 +180,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_byte_array(&self) -> bool {
-        match self {
-            ImmutableValue::ByteArray(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::ByteArray(_))
     }
 
     #[inline]
@@ -220,10 +196,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_string(&self) -> bool {
-        match self {
-            ImmutableValue::String(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::String(_))
     }
 
     #[inline]
@@ -239,10 +212,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_list(&self) -> bool {
-        match self {
-            ImmutableValue::List(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::List(_))
     }
 
     #[inline]
@@ -258,10 +228,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_compound(&self) -> bool {
-        match self {
-            ImmutableValue::Compound(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::Compound(_))
     }
 
     #[inline]
@@ -277,10 +244,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_int_array(&self) -> bool {
-        match self {
-            ImmutableValue::IntArray(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::IntArray(_))
     }
 
     #[inline]
@@ -296,10 +260,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
     #[inline]
     pub fn is_long_array(&self) -> bool {
-        match self {
-            ImmutableValue::LongArray(_) => true,
-            _ => false,
-        }
+        matches!(self, ImmutableValue::LongArray(_))
     }
 
     #[inline]
@@ -338,7 +299,7 @@ type ImmutableString<'doc, D> = ImmutableArray<'doc, u8, D>;
 
 impl<'doc, D: Document> ImmutableString<'doc, D> {
     #[inline]
-    pub fn raw_bytes<'a>(&'a self) -> &'a [u8] {
+    pub fn raw_bytes(&self) -> &[u8] {
         self.data
     }
 

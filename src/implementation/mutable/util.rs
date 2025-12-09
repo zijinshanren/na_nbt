@@ -601,7 +601,7 @@ pub fn compound_get<'s, O: ByteOrder>(data: *const u8, key: &str) -> Option<Immu
 #[inline]
 pub fn compound_iter<'s, O: ByteOrder>(data: *const u8) -> ImmutableCompoundIter<'s, O> {
     ImmutableCompoundIter {
-        data: data,
+        data,
         _marker: PhantomData,
     }
 }
@@ -638,7 +638,7 @@ pub fn compound_get_mut<'s, O: ByteOrder>(data: *mut u8, key: &str) -> Option<Mu
 #[inline]
 pub fn compound_iter_mut<'s, O: ByteOrder>(data: *mut u8) -> MutableCompoundIter<'s, O> {
     MutableCompoundIter {
-        data: data,
+        data,
         _marker: PhantomData,
     }
 }
