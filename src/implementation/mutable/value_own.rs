@@ -92,7 +92,7 @@ impl<O: ByteOrder> From<i8> for OwnedValue<O> {
 
 impl<O: ByteOrder> From<u8> for OwnedValue<O> {
     fn from(value: u8) -> Self {
-        (value as i16).into()
+        (value as i8).into()
     }
 }
 
@@ -110,7 +110,7 @@ impl<O: ByteOrder> From<byteorder::I16<O>> for OwnedValue<O> {
 
 impl<O: ByteOrder> From<u16> for OwnedValue<O> {
     fn from(value: u16) -> Self {
-        (value as i32).into()
+        (value as i16).into()
     }
 }
 
@@ -122,7 +122,7 @@ impl<O: ByteOrder> From<i32> for OwnedValue<O> {
 
 impl<O: ByteOrder> From<u32> for OwnedValue<O> {
     fn from(value: u32) -> Self {
-        (value as i64).into()
+        (value as i32).into()
     }
 }
 
@@ -135,6 +135,12 @@ impl<O: ByteOrder> From<byteorder::I32<O>> for OwnedValue<O> {
 impl<O: ByteOrder> From<i64> for OwnedValue<O> {
     fn from(value: i64) -> Self {
         OwnedValue::Long(value.into())
+    }
+}
+
+impl<O: ByteOrder> From<u64> for OwnedValue<O> {
+    fn from(value: u64) -> Self {
+        (value as i64).into()
     }
 }
 
@@ -1129,8 +1135,8 @@ mod tests {
         #[test]
         fn test_from_u8() {
             let v: OwnedValue<BE> = 200u8.into();
-            assert!(v.is_short());
-            assert_eq!(v.as_short(), Some(200));
+            assert!(v.is_byte());
+            assert_eq!(v.as_byte(), Some(200u8 as i8));
         }
 
         #[test]
@@ -1144,8 +1150,8 @@ mod tests {
         #[test]
         fn test_from_u16() {
             let v: OwnedValue<BE> = 50000u16.into();
-            assert!(v.is_int());
-            assert_eq!(v.as_int(), Some(50000));
+            assert!(v.is_short());
+            assert_eq!(v.as_short(), Some(50000u16 as i16));
         }
 
         #[test]
@@ -1159,8 +1165,8 @@ mod tests {
         #[test]
         fn test_from_u32() {
             let v: OwnedValue<BE> = 3000000000u32.into();
-            assert!(v.is_long());
-            assert_eq!(v.as_long(), Some(3000000000));
+            assert!(v.is_int());
+            assert_eq!(v.as_int(), Some(3000000000u32 as i32));
         }
 
         #[test]
