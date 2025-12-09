@@ -1,0 +1,16 @@
+[package]
+name = "na_nbt"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+nightly = ["simd_cesu8/nightly"]
+
+[dependencies]
+simd_cesu8 = "1.1"
+bytes = "1.11"
+zerocopy = "0.8"
+
+[dev-dependencies]
+criterion = "0.5"
