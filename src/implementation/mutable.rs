@@ -1,12 +1,15 @@
 mod into_owned_value;
 mod iter;
 mod trait_impl;
+mod trait_impl_mut;
+mod trait_impl_own;
 mod util;
 mod value;
 mod value_mut;
 mod value_own;
 mod write;
 
+pub use into_owned_value::IntoOwnedValue;
 pub use value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, Name};
 pub use value_mut::{MutableCompound, MutableList, MutableValue};
 pub use value_own::{OwnedCompound, OwnedList, OwnedValue};

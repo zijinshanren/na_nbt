@@ -16,9 +16,9 @@ use std::{
 use zerocopy::Unalign;
 
 pub struct VecViewMut<'a, T> {
-    ptr: &'a mut Unalign<usize>,
-    len: &'a mut Unalign<usize>,
-    cap: &'a mut Unalign<usize>,
+    pub(crate) ptr: &'a mut Unalign<usize>,
+    pub(crate) len: &'a mut Unalign<usize>,
+    pub(crate) cap: &'a mut Unalign<usize>,
     _marker: PhantomData<T>,
 }
 
@@ -585,9 +585,9 @@ impl Write for VecViewMut<'_, u8> {
 ///
 /// This is similar to `VecView<u8>` but maintains String's UTF-8 invariants.
 pub struct StringViewMut<'a> {
-    ptr: &'a mut Unalign<usize>,
-    len: &'a mut Unalign<usize>,
-    cap: &'a mut Unalign<usize>,
+    pub(crate) ptr: &'a mut Unalign<usize>,
+    pub(crate) len: &'a mut Unalign<usize>,
+    pub(crate) cap: &'a mut Unalign<usize>,
 }
 
 // SAFETY: StringView is Send/Sync because the underlying data is UTF-8 bytes.

@@ -779,7 +779,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 }
 
 pub struct OwnedList<O: ByteOrder> {
-    data: VecViewOwn<u8>,
+    pub(crate) data: VecViewOwn<u8>,
     _marker: PhantomData<O>,
 }
 
@@ -973,7 +973,7 @@ impl<O: ByteOrder> OwnedList<O> {
 }
 
 pub struct OwnedCompound<O: ByteOrder> {
-    data: VecViewOwn<u8>,
+    pub(crate) data: VecViewOwn<u8>,
     _marker: PhantomData<O>,
 }
 

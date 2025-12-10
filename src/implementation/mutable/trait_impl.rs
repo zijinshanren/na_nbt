@@ -300,7 +300,6 @@ impl<'doc, O: ByteOrder> ReadableValue<'doc> for ImmutableValue<'doc, O> {
 
 impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for ImmutableList<'doc, O> {
     type Config = Config<O>;
-    type IterValue = ImmutableValue<'doc, O>;
 
     fn get_scoped<'a>(&'a self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where
@@ -331,7 +330,6 @@ impl<'doc, O: ByteOrder> ReadableList<'doc> for ImmutableList<'doc, O> {
 
 impl<'doc, O: ByteOrder> ScopedReadableCompound<'doc> for ImmutableCompound<'doc, O> {
     type Config = Config<O>;
-    type IterValue = ImmutableValue<'doc, O>;
 
     #[inline]
     fn get_scoped<'a>(&'a self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'a>>

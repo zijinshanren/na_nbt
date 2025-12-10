@@ -2,7 +2,7 @@ use zerocopy::byteorder;
 
 use crate::{
     index::Index,
-    value_trait::{ReadableConfig, ReadableValue, ValueScoped},
+    value_trait::{ReadableConfig, ValueScoped},
 };
 
 pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
@@ -78,11 +78,8 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
         'doc: 'a;
 }
 
-pub trait ScopedReadableList<'doc>:
-    IntoIterator<Item = Self::IterValue> + Send + Sync + Sized
-{
+pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
     type Config: ReadableConfig;
-    type IterValue: ReadableValue<'doc, Config = Self::Config>;
 
     fn get_scoped<'a>(
         &'a self,
@@ -96,18 +93,8 @@ pub trait ScopedReadableList<'doc>:
         'doc: 'a;
 }
 
-pub trait ScopedReadableCompound<'doc>:
-    IntoIterator<
-        Item = (
-            <Self::Config as ReadableConfig>::Name<'doc>,
-            Self::IterValue,
-        ),
-    > + Send
-    + Sync
-    + Sized
-{
+pub trait ScopedReadableCompound<'doc>: IntoIterator + Send + Sync + Sized {
     type Config: ReadableConfig;
-    type IterValue: ReadableValue<'doc, Config = Self::Config>;
 
     fn get_scoped<'a>(&'a self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where
