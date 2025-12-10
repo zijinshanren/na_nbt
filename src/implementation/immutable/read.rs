@@ -1,7 +1,7 @@
 use zerocopy::{ByteOrder, byteorder};
 
 use crate::{
-    Error,
+    Error, Result,
     implementation::immutable::mark::{Cache, Mark},
     util::cold_path,
 };
@@ -10,7 +10,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
     mut current_pos: *const u8,
     len: usize,
     f: impl FnOnce(Vec<Mark>) -> R,
-) -> Result<R, Error> {
+) -> Result<R> {
     // Size in bytes of each primitive tag type's payload
     const TAG_SIZE: [usize; 13] = [
         0, // End

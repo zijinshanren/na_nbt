@@ -4,7 +4,7 @@ use bytes::Bytes;
 use zerocopy::byteorder;
 
 use crate::{
-    Error,
+    Result,
     util::{ByteOrder, cold_path},
 };
 
@@ -16,9 +16,8 @@ mod value;
 
 pub type BorrowedValue<'s, O> = value::ImmutableValue<'s, O, ()>;
 
-pub fn read_borrowed<'s, O: ByteOrder>(
-    source: &'s [u8],
-) -> Result<BorrowedDocument<'s, O>, Error> {
+#[inline]
+pub fn read_borrowed<'s, O: ByteOrder>(source: &'s [u8]) -> Result<BorrowedDocument<'s, O>> {
     unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| BorrowedDocument {
             mark,
@@ -62,7 +61,8 @@ unsafe impl<'s, O: ByteOrder> Sync for BorrowedDocument<'s, O> {}
 
 pub type SharedValue<O> = value::ImmutableValue<'static, O, Arc<SharedDocument>>;
 
-pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>, Error> {
+#[inline]
+pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
     Ok(unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {
             Arc::new(SharedDocument { mark, source })

@@ -1,5 +1,6 @@
 mod into_owned_value;
 mod iter;
+mod read;
 mod trait_impl;
 mod trait_impl_mut;
 mod trait_impl_own;
@@ -9,6 +10,8 @@ mod value_mut;
 mod value_own;
 mod write;
 
+use std::any::TypeId;
+
 pub(crate) use into_owned_value::IntoOwnedValue;
 pub use value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue};
 pub use value_mut::{MutableCompound, MutableList, MutableValue};
@@ -17,14 +20,15 @@ pub use value_own::{OwnedCompound, OwnedList, OwnedValue};
 use zerocopy::{IntoBytes as _, byteorder};
 
 use crate::{
-    Error,
-    implementation::mutable::write::{
-        write_byte_array, write_compound, write_head, write_list, write_string,
+    Error, Result,
+    implementation::mutable::{
+        read::{read_unsafe, read_unsafe_fallback},
+        write::{write_byte_array, write_compound, write_head, write_list, write_string},
     },
-    util::ByteOrder,
+    util::{ByteOrder, cold_path},
 };
 
-pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>, Error> {
+pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>> {
     let mut result = Vec::new();
     unsafe {
         match value {
@@ -84,7 +88,7 @@ pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>, 
     Ok(result)
 }
 
-pub fn write_owned<O: ByteOrder>(value: &OwnedValue<O>) -> Result<Vec<u8>, Error> {
+pub fn write_owned<O: ByteOrder>(value: &OwnedValue<O>) -> Result<Vec<u8>> {
     let mut result = Vec::new();
     unsafe {
         match value {
@@ -142,4 +146,36 @@ pub fn write_owned<O: ByteOrder>(value: &OwnedValue<O>) -> Result<Vec<u8>, Error
         }
     }
     Ok(result)
+}
+
+#[inline]
+pub fn read_owned<SOURCE: ByteOrder, TARGET: ByteOrder>(
+    source: &[u8],
+) -> Result<OwnedValue<TARGET>> {
+    unsafe {
+        let mut current_pos = source.as_ptr();
+        let end_pos = source.as_ptr().add(source.len());
+
+        let tag_id = *current_pos;
+        current_pos = current_pos.add(1);
+
+        let name_len = byteorder::U16::<SOURCE>::from_bytes(*current_pos.cast()).get();
+        current_pos = current_pos.add(2 + name_len as usize);
+
+        let value = if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+            let result = read_unsafe::<SOURCE>(tag_id, &mut current_pos, end_pos)?;
+            Ok(std::mem::transmute::<OwnedValue<SOURCE>, OwnedValue<TARGET>>(result))
+        } else {
+            read_unsafe_fallback::<SOURCE, TARGET>(tag_id, &mut current_pos, end_pos)
+        }?;
+
+        if current_pos < end_pos {
+            cold_path();
+            return Err(Error::TrailingData(
+                end_pos.byte_offset_from_unsigned(current_pos),
+            ));
+        }
+
+        Ok(value)
+    }
 }
