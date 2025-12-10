@@ -3,13 +3,8 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ImmutableString,
-    implementation::mutable::{
-        util::tag_size,
-        value::ImmutableValue,
-        value_mut::MutableValue,
-        value_own::{OwnedCompound, OwnedList, OwnedValue},
-    },
+    ImmutableString, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue,
+    implementation::mutable::util::tag_size,
     util::{ByteOrder, cold_path},
     view::{StringViewOwn, VecViewOwn},
 };

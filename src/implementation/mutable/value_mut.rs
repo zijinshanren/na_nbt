@@ -3,16 +3,14 @@ use std::{hint::unreachable_unchecked, marker::PhantomData};
 use zerocopy::byteorder;
 
 use crate::{
+    ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue, OwnedValue,
     implementation::mutable::{
-        into_owned_value::IntoOwnedValue,
         iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
         util::{
             SIZE_USIZE, compound_get, compound_get_mut, compound_iter, compound_iter_mut,
             compound_remove, list_get, list_get_mut, list_is_empty, list_iter, list_iter_mut,
             list_len, list_pop, list_remove, list_tag_id,
         },
-        value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue},
-        value_own::OwnedValue,
     },
     index::Index,
     util::ByteOrder,

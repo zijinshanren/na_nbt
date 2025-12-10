@@ -3,12 +3,9 @@ use std::{iter::repeat_n, marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    implementation::mutable::{
-        OwnedCompound, OwnedList,
-        iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
-        value::ImmutableValue,
-        value_mut::MutableValue,
-        value_own::OwnedValue,
+    ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue,
+    implementation::mutable::iter::{
+        ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
     },
     util::{ByteOrder, cold_path},
     view::{StringViewOwn, VecViewMut, VecViewOwn},

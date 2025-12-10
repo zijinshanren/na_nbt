@@ -1,16 +1,12 @@
 use std::marker::PhantomData;
 
 use crate::{
-    implementation::mutable::{
-        iter::{ImmutableCompoundIter, ImmutableListIter},
-        value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue},
-    },
+    ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, ReadableCompound,
+    ReadableConfig, ReadableList, ReadableString, ReadableValue, ScopedReadableCompound,
+    ScopedReadableList, ScopedReadableValue, Value, ValueScoped,
+    implementation::mutable::iter::{ImmutableCompoundIter, ImmutableListIter},
     index::Index,
     util::ByteOrder,
-    value_trait::{
-        ReadableCompound, ReadableConfig, ReadableList, ReadableString, ReadableValue,
-        ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Value, ValueScoped,
-    },
 };
 
 impl<'doc> ReadableString<'doc> for ImmutableString<'doc> {

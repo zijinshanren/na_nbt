@@ -3,8 +3,9 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, mem::ManuallyDrop, p
 use zerocopy::{Unalign, byteorder};
 
 use crate::{
+    ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
+    MutableCompound, MutableList, MutableValue,
     implementation::mutable::{
-        into_owned_value::IntoOwnedValue,
         iter::{
             ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
             OwnedCompoundIter, OwnedListIter,
@@ -14,8 +15,6 @@ use crate::{
             compound_remove, list_get, list_get_mut, list_is_empty, list_iter, list_iter_mut,
             list_len, list_pop, list_remove, list_tag_id, tag_size,
         },
-        value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue},
-        value_mut::{MutableCompound, MutableList, MutableValue},
     },
     index::Index,
     util::{ByteOrder, cold_path},
