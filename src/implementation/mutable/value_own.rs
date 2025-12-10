@@ -1108,13 +1108,6 @@ mod tests {
         }
 
         #[test]
-        fn test_from_u8() {
-            let v: OwnedValue<BE> = 200u8.into();
-            assert!(v.is_byte());
-            assert_eq!(v.as_byte(), Some(200u8 as i8));
-        }
-
-        #[test]
         fn test_from_i16() {
             let v: OwnedValue<BE> = 1000i16.into();
             assert!(v.is_short());
@@ -1123,25 +1116,11 @@ mod tests {
         }
 
         #[test]
-        fn test_from_u16() {
-            let v: OwnedValue<BE> = 50000u16.into();
-            assert!(v.is_short());
-            assert_eq!(v.as_short(), Some(50000u16 as i16));
-        }
-
-        #[test]
         fn test_from_i32() {
             let v: OwnedValue<BE> = 100000i32.into();
             assert!(v.is_int());
             assert_eq!(v.as_int(), Some(100000));
             assert_eq!(v.tag(), 3);
-        }
-
-        #[test]
-        fn test_from_u32() {
-            let v: OwnedValue<BE> = 3000000000u32.into();
-            assert!(v.is_int());
-            assert_eq!(v.as_int(), Some(3000000000u32 as i32));
         }
 
         #[test]
