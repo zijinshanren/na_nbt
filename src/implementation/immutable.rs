@@ -10,6 +10,7 @@ use crate::{
 
 mod mark;
 mod read;
+mod trait_impl;
 mod util;
 mod value;
 

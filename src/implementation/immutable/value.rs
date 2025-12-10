@@ -295,7 +295,7 @@ impl<'doc, T, D: Document> ImmutableArray<'doc, T, D> {
     }
 }
 
-type ImmutableString<'doc, D> = ImmutableArray<'doc, u8, D>;
+pub type ImmutableString<'doc, D> = ImmutableArray<'doc, u8, D>;
 
 impl<'doc, D: Document> ImmutableString<'doc, D> {
     #[inline]

@@ -1,5 +1,6 @@
 mod into_owned_value;
 mod iter;
+mod trait_impl;
 mod util;
 mod value;
 mod value_mut;

@@ -2,7 +2,7 @@ pub mod error;
 mod implementation;
 pub mod index;
 pub mod util;
-// pub mod value_trait;
+pub mod value_trait;
 pub mod view;
 
 pub use implementation::immutable::{BorrowedValue, SharedValue};
@@ -15,3 +15,5 @@ pub use implementation::mutable::{
 };
 
 pub use error::NbtError;
+
+pub use value_trait::*;
