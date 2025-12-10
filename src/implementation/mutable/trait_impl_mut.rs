@@ -208,7 +208,7 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
             MutableValue::Double(value) => match_fn(ValueScoped::Double(value.get())),
             MutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
             MutableValue::String(value) => match_fn(ValueScoped::String(ImmutableString {
-                data: value.as_str(),
+                data: value.as_mutf8_bytes(),
             })),
             MutableValue::List(value) => match_fn(ValueScoped::List(ImmutableList {
                 data: value.data.as_ptr(),

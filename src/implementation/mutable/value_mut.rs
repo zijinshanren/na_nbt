@@ -11,7 +11,7 @@ use crate::{
             compound_remove, list_get, list_get_mut, list_is_empty, list_iter, list_iter_mut,
             list_len, list_pop, list_remove, list_tag_id,
         },
-        value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, Name},
+        value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue},
         value_own::OwnedValue,
     },
     index::Index,
@@ -199,7 +199,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
     {
         match self {
             MutableValue::String(value) => Some(ImmutableString {
-                data: value.as_str(),
+                data: value.as_mutf8_bytes(),
             }),
             _ => None,
         }
@@ -694,7 +694,7 @@ pub struct MutableCompound<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> IntoIterator for MutableCompound<'s, O> {
-    type Item = (Name<'s>, MutableValue<'s, O>);
+    type Item = (ImmutableString<'s>, MutableValue<'s, O>);
     type IntoIter = MutableCompoundIter<'s, O>;
 
     #[inline]

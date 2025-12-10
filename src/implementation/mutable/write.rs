@@ -11,7 +11,7 @@ use crate::{
 #[inline]
 pub unsafe fn write_string<O: ByteOrder>(data: &[u8], out: &mut Vec<u8>) -> Result<(), NbtError> {
     out.extend_from_slice(&byteorder::U16::<O>::from(data.len() as u16).to_bytes());
-    out.extend_from_slice(data.as_bytes());
+    out.extend_from_slice(data);
     Ok(())
 }
 

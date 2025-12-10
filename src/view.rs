@@ -71,21 +71,6 @@ impl<'a, T> VecViewMut<'a, T> {
         result
     }
 
-    /// Temporarily reconstructs a Vec for read-only operations.
-    #[inline]
-    #[allow(dead_code)]
-    fn with_vec_ref<R>(&self, f: impl FnOnce(&Vec<T>) -> R) -> R {
-        // SAFETY: caller guarantees valid raw parts
-        let vec = unsafe {
-            ManuallyDrop::new(Vec::from_raw_parts(
-                self.as_ptr().cast_mut(),
-                self.len.get(),
-                self.cap.get(),
-            ))
-        };
-        f(&vec)
-    }
-
     // ============ Basic accessors ============
 
     /// Returns the number of elements in the vector.
@@ -601,9 +586,9 @@ impl<'a> StringViewMut<'a> {
     /// # Safety
     ///
     /// The caller must ensure:
-    /// - `*ptr` points to a valid UTF-8 allocation from the global allocator (or dangling if `*cap == 0`)
+    /// - `*ptr` points to a valid mutf8-encoded allocation from the global allocator (or dangling if `*cap == 0`)
     /// - `*len <= *cap`
-    /// - The first `*len` bytes pointed to by `*ptr` are valid UTF-8
+    /// - The first `*len` bytes pointed to by `*ptr` are valid mutf8
     /// - The allocation has space for `*cap` bytes
     #[inline]
     pub unsafe fn new(
@@ -615,45 +600,63 @@ impl<'a> StringViewMut<'a> {
         Self { ptr, len, cap }
     }
 
-    /// Temporarily reconstructs a String, calls a closure on it, then writes back the fields.
+    /// Temporarily decodes mutf8 to a String, calls a closure on it, then encodes back to mutf8.
     #[inline]
     fn with_string<R>(&mut self, f: impl FnOnce(&mut String) -> R) -> R {
-        // SAFETY: caller guarantees valid raw parts with UTF-8 content
-        let mut string = unsafe {
-            ManuallyDrop::new(String::from_raw_parts(
-                self.as_mut_ptr(),
-                self.len.get(),
-                self.cap.get(),
-            ))
-        };
-        let result = f(&mut string);
-        // Write back potentially changed fields
-        // SAFETY: We have exclusive access to the String through ManuallyDrop
-        let vec = unsafe { string.as_mut_vec() };
-        self.ptr.set(vec.as_mut_ptr().expose_provenance());
-        self.len.set(vec.len());
-        self.cap.set(vec.capacity());
-        result
-    }
+        use std::borrow::Cow;
 
-    /// Temporarily reconstructs a String for read-only operations.
-    #[inline]
-    #[allow(dead_code)]
-    fn with_string_ref<R>(&self, f: impl FnOnce(&String) -> R) -> R {
-        // SAFETY: caller guarantees valid raw parts with UTF-8 content
-        let string = unsafe {
-            ManuallyDrop::new(String::from_raw_parts(
-                self.as_ptr().cast_mut(),
-                self.len.get(),
-                self.cap.get(),
-            ))
+        let old_ptr = self.as_mut_ptr();
+        let old_len = self.len.get();
+        let old_cap = self.cap.get();
+
+        let data = unsafe { slice::from_raw_parts(old_ptr, old_len) };
+        let decoded = simd_cesu8::mutf8::decode_lossy(data);
+
+        let mut string = match decoded {
+            Cow::Borrowed(_) => {
+                // Data is valid UTF-8, we can use it directly as a String
+                // SAFETY: We're taking ownership of the buffer that was valid UTF-8
+                unsafe { String::from_raw_parts(old_ptr, old_len, old_cap) }
+            }
+            Cow::Owned(s) => {
+                // Data needed decoding, free old buffer
+                unsafe {
+                    drop(Vec::<u8>::from_raw_parts(old_ptr, old_len, old_cap));
+                }
+                s
+            }
         };
-        f(&string)
+
+        let result = f(&mut string);
+
+        // Encode back to mutf8
+        let encoded = simd_cesu8::mutf8::encode(&string);
+
+        match encoded {
+            Cow::Borrowed(_) => {
+                // String's UTF-8 bytes are valid mutf8, reuse the String's buffer
+                let mut string = ManuallyDrop::new(string);
+                let vec = unsafe { string.as_mut_vec() };
+                self.ptr.set(vec.as_mut_ptr().expose_provenance());
+                self.len.set(vec.len());
+                self.cap.set(vec.capacity());
+            }
+            Cow::Owned(vec) => {
+                // Need new allocation for mutf8 encoding
+                drop(string);
+                let mut vec = ManuallyDrop::new(vec);
+                self.ptr.set(vec.as_mut_ptr().expose_provenance());
+                self.len.set(vec.len());
+                self.cap.set(vec.capacity());
+            }
+        }
+
+        result
     }
 
     // ============ Basic accessors ============
 
-    /// Returns the length of this String, in bytes.
+    /// Returns the length of this String, in bytes (mutf8 encoded).
     #[inline]
     pub fn len(&self) -> usize {
         self.len.get()
@@ -671,32 +674,17 @@ impl<'a> StringViewMut<'a> {
         self.cap.get()
     }
 
-    /// Returns a byte slice of this String's contents.
+    /// Returns a byte slice of this String's contents (mutf8 encoded).
     #[inline]
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_mutf8_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
     }
 
-    /// Extracts a string slice containing the entire String.
+    /// Decodes the mutf8 content and returns the decoded string.
     #[inline]
-    pub fn as_str(&self) -> &str {
-        // SAFETY: ptr is valid for len bytes and contains valid UTF-8
-        unsafe {
-            std::str::from_utf8_unchecked(slice::from_raw_parts(self.as_ptr(), self.len.get()))
-        }
-    }
-
-    /// Converts a String into a mutable string slice.
-    #[inline]
-    pub fn as_mut_str(&mut self) -> &mut str {
-        // SAFETY: ptr is valid for len bytes and contains valid UTF-8
-        unsafe {
-            std::str::from_utf8_unchecked_mut(slice::from_raw_parts_mut(
-                self.as_mut_ptr(),
-                self.len.get(),
-            ))
-        }
+    pub fn decode(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy(self.as_mutf8_bytes())
     }
 
     /// Returns a raw pointer to the String's buffer.
@@ -843,57 +831,41 @@ impl<'a> StringViewMut<'a> {
     }
 }
 
-// ============ Trait Implementations for StringView ============
-
-impl Deref for StringViewMut<'_> {
-    type Target = str;
-
-    #[inline]
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl DerefMut for StringViewMut<'_> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut str {
-        self.as_mut_str()
-    }
-}
+// ============ Trait Implementations for StringViewMut ============
 
 impl fmt::Debug for StringViewMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self.as_str(), f)
+        fmt::Debug::fmt(&*self.decode(), f)
     }
 }
 
 impl fmt::Display for StringViewMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self.as_str(), f)
+        fmt::Display::fmt(&*self.decode(), f)
     }
 }
 
 impl PartialEq for StringViewMut<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_str() == other.as_str()
+        self.as_mutf8_bytes() == other.as_mutf8_bytes()
     }
 }
 
 impl PartialEq<String> for StringViewMut<'_> {
     fn eq(&self, other: &String) -> bool {
-        self.as_str() == other.as_str()
+        &*self.decode() == other.as_str()
     }
 }
 
 impl PartialEq<str> for StringViewMut<'_> {
     fn eq(&self, other: &str) -> bool {
-        self.as_str() == other
+        &*self.decode() == other
     }
 }
 
 impl PartialEq<&str> for StringViewMut<'_> {
     fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
+        &*self.decode() == *other
     }
 }
 
@@ -907,43 +879,19 @@ impl PartialOrd for StringViewMut<'_> {
 
 impl Ord for StringViewMut<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.as_str().cmp(other.as_str())
+        self.as_mutf8_bytes().cmp(other.as_mutf8_bytes())
     }
 }
 
 impl Hash for StringViewMut<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_str().hash(state);
-    }
-}
-
-impl Borrow<str> for StringViewMut<'_> {
-    fn borrow(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl BorrowMut<str> for StringViewMut<'_> {
-    fn borrow_mut(&mut self) -> &mut str {
-        self.as_mut_str()
-    }
-}
-
-impl AsRef<str> for StringViewMut<'_> {
-    fn as_ref(&self) -> &str {
-        self.as_str()
+        self.as_mutf8_bytes().hash(state);
     }
 }
 
 impl AsRef<[u8]> for StringViewMut<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.as_bytes()
-    }
-}
-
-impl AsMut<str> for StringViewMut<'_> {
-    fn as_mut(&mut self) -> &mut str {
-        self.as_mut_str()
+        self.as_mutf8_bytes()
     }
 }
 
@@ -1029,21 +977,6 @@ impl<T> VecViewOwn<T> {
         self.len.set(vec.len());
         self.cap.set(vec.capacity());
         result
-    }
-
-    /// Temporarily reconstructs a Vec for read-only operations.
-    #[inline]
-    #[allow(dead_code)]
-    fn with_vec_ref<R>(&self, f: impl FnOnce(&Vec<T>) -> R) -> R {
-        // SAFETY: caller guarantees valid raw parts
-        let vec = unsafe {
-            ManuallyDrop::new(Vec::from_raw_parts(
-                self.as_ptr().cast_mut(),
-                self.len.get(),
-                self.cap.get(),
-            ))
-        };
-        f(&vec)
     }
 
     // ============ Basic accessors ============
@@ -1580,9 +1513,9 @@ impl StringViewOwn {
     /// # Safety
     ///
     /// The caller must ensure:
-    /// - `*ptr` points to a valid UTF-8 allocation from the global allocator (or dangling if `*cap == 0`)
+    /// - `*ptr` points to a valid mutf8-encoded allocation from the global allocator (or dangling if `*cap == 0`)
     /// - `*len <= *cap`
-    /// - The first `*len` bytes pointed to by `*ptr` are valid UTF-8
+    /// - The first `*len` bytes pointed to by `*ptr` are valid mutf8
     /// - The allocation has space for `*cap` bytes
     #[inline]
     pub unsafe fn new(ptr: Unalign<usize>, len: Unalign<usize>, cap: Unalign<usize>) -> Self {
@@ -1590,45 +1523,63 @@ impl StringViewOwn {
         Self { ptr, len, cap }
     }
 
-    /// Temporarily reconstructs a String, calls a closure on it, then writes back the fields.
+    /// Temporarily decodes mutf8 to a String, calls a closure on it, then encodes back to mutf8.
     #[inline]
     fn with_string<R>(&mut self, f: impl FnOnce(&mut String) -> R) -> R {
-        // SAFETY: caller guarantees valid raw parts with UTF-8 content
-        let mut string = unsafe {
-            ManuallyDrop::new(String::from_raw_parts(
-                self.as_mut_ptr(),
-                self.len.get(),
-                self.cap.get(),
-            ))
-        };
-        let result = f(&mut string);
-        // Write back potentially changed fields
-        // SAFETY: We have exclusive access to the String through ManuallyDrop
-        let vec = unsafe { string.as_mut_vec() };
-        self.ptr.set(vec.as_mut_ptr().expose_provenance());
-        self.len.set(vec.len());
-        self.cap.set(vec.capacity());
-        result
-    }
+        use std::borrow::Cow;
 
-    /// Temporarily reconstructs a String for read-only operations.
-    #[inline]
-    #[allow(dead_code)]
-    fn with_string_ref<R>(&self, f: impl FnOnce(&String) -> R) -> R {
-        // SAFETY: caller guarantees valid raw parts with UTF-8 content
-        let string = unsafe {
-            ManuallyDrop::new(String::from_raw_parts(
-                self.as_ptr().cast_mut(),
-                self.len.get(),
-                self.cap.get(),
-            ))
+        let old_ptr = self.as_mut_ptr();
+        let old_len = self.len.get();
+        let old_cap = self.cap.get();
+
+        let data = unsafe { slice::from_raw_parts(old_ptr, old_len) };
+        let decoded = simd_cesu8::mutf8::decode_lossy(data);
+
+        let mut string = match decoded {
+            Cow::Borrowed(_) => {
+                // Data is valid UTF-8, we can use it directly as a String
+                // SAFETY: We're taking ownership of the buffer that was valid UTF-8
+                unsafe { String::from_raw_parts(old_ptr, old_len, old_cap) }
+            }
+            Cow::Owned(s) => {
+                // Data needed decoding, free old buffer
+                unsafe {
+                    drop(Vec::<u8>::from_raw_parts(old_ptr, old_len, old_cap));
+                }
+                s
+            }
         };
-        f(&string)
+
+        let result = f(&mut string);
+
+        // Encode back to mutf8
+        let encoded = simd_cesu8::mutf8::encode(&string);
+
+        match encoded {
+            Cow::Borrowed(_) => {
+                // String's UTF-8 bytes are valid mutf8, reuse the String's buffer
+                let mut string = ManuallyDrop::new(string);
+                let vec = unsafe { string.as_mut_vec() };
+                self.ptr.set(vec.as_mut_ptr().expose_provenance());
+                self.len.set(vec.len());
+                self.cap.set(vec.capacity());
+            }
+            Cow::Owned(vec) => {
+                // Need new allocation for mutf8 encoding
+                drop(string);
+                let mut vec = ManuallyDrop::new(vec);
+                self.ptr.set(vec.as_mut_ptr().expose_provenance());
+                self.len.set(vec.len());
+                self.cap.set(vec.capacity());
+            }
+        }
+
+        result
     }
 
     // ============ Basic accessors ============
 
-    /// Returns the length of this String, in bytes.
+    /// Returns the length of this String, in bytes (mutf8 encoded).
     #[inline]
     pub fn len(&self) -> usize {
         self.len.get()
@@ -1646,32 +1597,17 @@ impl StringViewOwn {
         self.cap.get()
     }
 
-    /// Returns a byte slice of this String's contents.
+    /// Returns a byte slice of this String's contents (mutf8 encoded).
     #[inline]
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_mutf8_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
     }
 
-    /// Extracts a string slice containing the entire String.
+    /// Decodes the mutf8 content and returns the decoded string.
     #[inline]
-    pub fn as_str(&self) -> &str {
-        // SAFETY: ptr is valid for len bytes and contains valid UTF-8
-        unsafe {
-            std::str::from_utf8_unchecked(slice::from_raw_parts(self.as_ptr(), self.len.get()))
-        }
-    }
-
-    /// Converts a String into a mutable string slice.
-    #[inline]
-    pub fn as_mut_str(&mut self) -> &mut str {
-        // SAFETY: ptr is valid for len bytes and contains valid UTF-8
-        unsafe {
-            std::str::from_utf8_unchecked_mut(slice::from_raw_parts_mut(
-                self.as_mut_ptr(),
-                self.len.get(),
-            ))
-        }
+    pub fn decode(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy(self.as_mutf8_bytes())
     }
 
     /// Returns a raw pointer to the String's buffer.
@@ -1813,57 +1749,41 @@ impl StringViewOwn {
     }
 }
 
-// ============ Trait Implementations for StringView ============
-
-impl Deref for StringViewOwn {
-    type Target = str;
-
-    #[inline]
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl DerefMut for StringViewOwn {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut str {
-        self.as_mut_str()
-    }
-}
+// ============ Trait Implementations for StringViewOwn ============
 
 impl fmt::Debug for StringViewOwn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self.as_str(), f)
+        fmt::Debug::fmt(&*self.decode(), f)
     }
 }
 
 impl fmt::Display for StringViewOwn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self.as_str(), f)
+        fmt::Display::fmt(&*self.decode(), f)
     }
 }
 
 impl PartialEq for StringViewOwn {
     fn eq(&self, other: &Self) -> bool {
-        self.as_str() == other.as_str()
+        self.as_mutf8_bytes() == other.as_mutf8_bytes()
     }
 }
 
 impl PartialEq<String> for StringViewOwn {
     fn eq(&self, other: &String) -> bool {
-        self.as_str() == other.as_str()
+        &*self.decode() == other.as_str()
     }
 }
 
 impl PartialEq<str> for StringViewOwn {
     fn eq(&self, other: &str) -> bool {
-        self.as_str() == other
+        &*self.decode() == other
     }
 }
 
 impl PartialEq<&str> for StringViewOwn {
     fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
+        &*self.decode() == *other
     }
 }
 
@@ -1877,43 +1797,19 @@ impl PartialOrd for StringViewOwn {
 
 impl Ord for StringViewOwn {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.as_str().cmp(other.as_str())
+        self.as_mutf8_bytes().cmp(other.as_mutf8_bytes())
     }
 }
 
 impl Hash for StringViewOwn {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_str().hash(state);
-    }
-}
-
-impl Borrow<str> for StringViewOwn {
-    fn borrow(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl BorrowMut<str> for StringViewOwn {
-    fn borrow_mut(&mut self) -> &mut str {
-        self.as_mut_str()
-    }
-}
-
-impl AsRef<str> for StringViewOwn {
-    fn as_ref(&self) -> &str {
-        self.as_str()
+        self.as_mutf8_bytes().hash(state);
     }
 }
 
 impl AsRef<[u8]> for StringViewOwn {
     fn as_ref(&self) -> &[u8] {
-        self.as_bytes()
-    }
-}
-
-impl AsMut<str> for StringViewOwn {
-    fn as_mut(&mut self) -> &mut str {
-        self.as_mut_str()
+        self.as_mutf8_bytes()
     }
 }
 
@@ -1951,23 +1847,35 @@ impl Write for StringViewOwn {
 
 impl From<&str> for StringViewOwn {
     fn from(value: &str) -> Self {
-        value.to_string().into()
+        let mut encoded = ManuallyDrop::new(simd_cesu8::mutf8::encode(value).into_owned());
+        StringViewOwn {
+            ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
+            len: Unalign::new(encoded.len()),
+            cap: Unalign::new(encoded.capacity()),
+        }
     }
 }
 
 impl From<String> for StringViewOwn {
     fn from(value: String) -> Self {
-        let mut me = ManuallyDrop::new(value);
+        let mut encoded = ManuallyDrop::new(simd_cesu8::mutf8::encode(&value).into_owned());
         StringViewOwn {
-            ptr: Unalign::new(me.as_mut_ptr().expose_provenance()),
-            len: Unalign::new(me.len()),
-            cap: Unalign::new(me.capacity()),
+            ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
+            len: Unalign::new(encoded.len()),
+            cap: Unalign::new(encoded.capacity()),
         }
     }
 }
 
 impl Drop for StringViewOwn {
     fn drop(&mut self) {
-        unsafe { String::from_raw_parts(self.as_mut_ptr(), self.len.get(), self.cap.get()) };
+        // Drop as Vec<u8> since internal format is mutf8, not UTF-8
+        unsafe {
+            drop(Vec::<u8>::from_raw_parts(
+                self.as_mut_ptr(),
+                self.len.get(),
+                self.cap.get(),
+            ));
+        }
     }
 }

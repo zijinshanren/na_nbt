@@ -68,7 +68,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
                     let ptr = ptr::with_exposed_provenance::<u8>(addr);
                     let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
                     ImmutableValue::String(ImmutableString {
-                        data: str::from_utf8_unchecked(slice::from_raw_parts(ptr, len)),
+                        data: slice::from_raw_parts(ptr, len),
                     })
                 }
                 9 => get!(List, ImmutableList),
@@ -286,11 +286,11 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 }
 
 #[derive(Clone)]
-pub struct Name<'s> {
+pub struct ImmutableString<'s> {
     pub(crate) data: &'s [u8],
 }
 
-impl<'s> Name<'s> {
+impl<'s> ImmutableString<'s> {
     #[inline]
     pub fn raw_bytes(&self) -> &[u8] {
         self.data
@@ -299,23 +299,6 @@ impl<'s> Name<'s> {
     #[inline]
     pub fn decode<'a>(&'a self) -> Cow<'a, str> {
         simd_cesu8::mutf8::decode_lossy(self.data)
-    }
-}
-
-#[derive(Clone)]
-pub struct ImmutableString<'s> {
-    pub(crate) data: &'s str,
-}
-
-impl<'s> ImmutableString<'s> {
-    #[inline]
-    pub fn raw_bytes(&self) -> &[u8] {
-        self.data.as_bytes()
-    }
-
-    #[inline]
-    pub fn decode<'a>(&'a self) -> Cow<'a, str> {
-        Cow::Borrowed(self.data)
     }
 }
 
@@ -379,7 +362,7 @@ unsafe impl<'s, O: ByteOrder> Send for ImmutableCompound<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for ImmutableCompound<'s, O> {}
 
 impl<'s, O: ByteOrder> IntoIterator for ImmutableCompound<'s, O> {
-    type Item = (Name<'s>, ImmutableValue<'s, O>);
+    type Item = (ImmutableString<'s>, ImmutableValue<'s, O>);
     type IntoIter = ImmutableCompoundIter<'s, O>;
 
     #[inline]

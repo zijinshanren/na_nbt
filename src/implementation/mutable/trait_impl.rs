@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use crate::{
     implementation::mutable::{
-        Name,
         iter::{ImmutableCompoundIter, ImmutableListIter},
         value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue},
     },
@@ -26,18 +25,6 @@ impl<'doc> ReadableString<'doc> for ImmutableString<'doc> {
     }
 }
 
-impl<'doc> ReadableString<'doc> for Name<'doc> {
-    #[inline]
-    fn raw_bytes(&self) -> &[u8] {
-        self.raw_bytes()
-    }
-
-    #[inline]
-    fn decode(&self) -> std::borrow::Cow<'_, str> {
-        self.decode()
-    }
-}
-
 pub struct Config<O: ByteOrder> {
     _marker: PhantomData<O>,
 }
@@ -46,7 +33,6 @@ impl<O: ByteOrder> ReadableConfig for Config<O> {
     type ByteOrder = O;
     type Value<'doc> = ImmutableValue<'doc, O>;
     type String<'doc> = ImmutableString<'doc>;
-    type Name<'doc> = Name<'doc>;
     type List<'doc> = ImmutableList<'doc, O>;
     type ListIter<'doc> = ImmutableListIter<'doc, O>;
     type Compound<'doc> = ImmutableCompound<'doc, O>;

@@ -193,7 +193,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
             OwnedValue::Double(value) => match_fn(ValueScoped::Double(value.get())),
             OwnedValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
             OwnedValue::String(value) => match_fn(ValueScoped::String(ImmutableString {
-                data: value.as_str(),
+                data: value.as_mutf8_bytes(),
             })),
             OwnedValue::List(value) => match_fn(ValueScoped::List(ImmutableList {
                 data: value.data.as_ptr(),

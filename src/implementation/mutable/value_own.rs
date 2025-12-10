@@ -422,7 +422,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     pub fn as_string<'a>(&'a self) -> Option<ImmutableString<'a>> {
         match self {
             OwnedValue::String(value) => Some(ImmutableString {
-                data: value.as_str(),
+                data: value.as_mutf8_bytes(),
             }),
             _ => None,
         }

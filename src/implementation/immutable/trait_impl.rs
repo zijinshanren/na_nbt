@@ -33,7 +33,6 @@ impl<O: ByteOrder, D: Document> ReadableConfig for Config<O, D> {
     type ByteOrder = O;
     type Value<'doc> = ImmutableValue<'doc, O, D>;
     type String<'doc> = ImmutableString<'doc, D>;
-    type Name<'doc> = ImmutableString<'doc, D>;
     type List<'doc> = ImmutableList<'doc, O, D>;
     type ListIter<'doc> = ImmutableListIter<'doc, O, D>;
     type Compound<'doc> = ImmutableCompound<'doc, O, D>;

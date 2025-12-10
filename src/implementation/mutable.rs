@@ -10,7 +10,7 @@ mod value_own;
 mod write;
 
 pub use into_owned_value::IntoOwnedValue;
-pub use value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, Name};
+pub use value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue};
 pub use value_mut::{MutableCompound, MutableList, MutableValue};
 pub use value_own::{OwnedCompound, OwnedList, OwnedValue};
 
@@ -75,6 +75,66 @@ pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>, 
                 result.extend_from_slice(value.as_bytes());
             }
             ImmutableValue::LongArray(value) => {
+                write_head::<O>(12, "", &mut result)?;
+                result.extend_from_slice(&byteorder::U32::<O>::from(value.len() as u32).to_bytes());
+                result.extend_from_slice(value.as_bytes());
+            }
+        }
+    }
+    Ok(result)
+}
+
+pub fn write_owned<O: ByteOrder>(value: &OwnedValue<O>) -> Result<Vec<u8>, NbtError> {
+    let mut result = Vec::new();
+    unsafe {
+        match value {
+            OwnedValue::End => result.push(0),
+            OwnedValue::Byte(value) => {
+                write_head::<O>(1, "", &mut result)?;
+                result.push(*value as u8);
+            }
+            OwnedValue::Short(value) => {
+                write_head::<O>(2, "", &mut result)?;
+                result.extend_from_slice(&value.to_bytes());
+            }
+            OwnedValue::Int(value) => {
+                write_head::<O>(3, "", &mut result)?;
+                result.extend_from_slice(&value.to_bytes());
+            }
+            OwnedValue::Long(value) => {
+                write_head::<O>(4, "", &mut result)?;
+                result.extend_from_slice(&value.to_bytes());
+            }
+            OwnedValue::Float(value) => {
+                write_head::<O>(5, "", &mut result)?;
+                result.extend_from_slice(&value.to_bytes());
+            }
+            OwnedValue::Double(value) => {
+                write_head::<O>(6, "", &mut result)?;
+                result.extend_from_slice(&value.to_bytes());
+            }
+            OwnedValue::ByteArray(value) => {
+                write_head::<O>(7, "", &mut result)?;
+                write_byte_array::<O>(value, &mut result)?;
+            }
+            OwnedValue::String(value) => {
+                write_head::<O>(8, "", &mut result)?;
+                write_string::<O>(value.as_mutf8_bytes(), &mut result)?;
+            }
+            OwnedValue::List(value) => {
+                write_head::<O>(9, "", &mut result)?;
+                write_list::<O>(value.data.as_ptr(), &mut result)?;
+            }
+            OwnedValue::Compound(value) => {
+                write_head::<O>(10, "", &mut result)?;
+                write_compound::<O>(value.data.as_ptr(), &mut result)?;
+            }
+            OwnedValue::IntArray(value) => {
+                write_head::<O>(11, "", &mut result)?;
+                result.extend_from_slice(&byteorder::U32::<O>::from(value.len() as u32).to_bytes());
+                result.extend_from_slice(value.as_bytes());
+            }
+            OwnedValue::LongArray(value) => {
                 write_head::<O>(12, "", &mut result)?;
                 result.extend_from_slice(&byteorder::U32::<O>::from(value.len() as u32).to_bytes());
                 result.extend_from_slice(value.as_bytes());

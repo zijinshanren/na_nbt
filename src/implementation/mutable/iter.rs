@@ -3,9 +3,10 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, slice};
 use zerocopy::byteorder;
 
 use crate::{
+    ImmutableString,
     implementation::mutable::{
         util::tag_size,
-        value::{ImmutableValue, Name},
+        value::ImmutableValue,
         value_mut::MutableValue,
         value_own::{OwnedCompound, OwnedList, OwnedValue},
     },
@@ -61,7 +62,7 @@ unsafe impl<'s, O: ByteOrder> Send for ImmutableCompoundIter<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for ImmutableCompoundIter<'s, O> {}
 
 impl<'s, O: ByteOrder> Iterator for ImmutableCompoundIter<'s, O> {
-    type Item = (Name<'s>, ImmutableValue<'s, O>);
+    type Item = (ImmutableString<'s>, ImmutableValue<'s, O>);
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
@@ -73,7 +74,7 @@ impl<'s, O: ByteOrder> Iterator for ImmutableCompoundIter<'s, O> {
             }
 
             let name_len = byteorder::U16::<O>::from_bytes(*self.data.add(1).cast()).get();
-            let name = Name {
+            let name = ImmutableString {
                 data: slice::from_raw_parts(self.data.add(3), name_len as usize),
             };
 
@@ -132,7 +133,7 @@ unsafe impl<'s, O: ByteOrder> Send for MutableCompoundIter<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for MutableCompoundIter<'s, O> {}
 
 impl<'s, O: ByteOrder> Iterator for MutableCompoundIter<'s, O> {
-    type Item = (Name<'s>, MutableValue<'s, O>);
+    type Item = (ImmutableString<'s>, MutableValue<'s, O>);
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
@@ -144,7 +145,7 @@ impl<'s, O: ByteOrder> Iterator for MutableCompoundIter<'s, O> {
             }
 
             let name_len = byteorder::U16::<O>::from_bytes(*self.data.add(1).cast()).get();
-            let name = Name {
+            let name = ImmutableString {
                 data: slice::from_raw_parts(self.data.add(3), name_len as usize),
             };
 
@@ -556,7 +557,7 @@ mod tests {
         #[test]
         fn test_into_iter_size_hint() {
             let mut list: OwnedList<BE> = OwnedList::default();
-                list.push(1i32);
+            list.push(1i32);
             list.push(2i32);
 
             let iter = list.into_iter();
