@@ -3,8 +3,8 @@ use std::{iter::repeat_n, marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    OwnedCompound, OwnedList,
     implementation::mutable::{
+        OwnedCompound, OwnedList,
         iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
         value::ImmutableValue,
         value_mut::MutableValue,
