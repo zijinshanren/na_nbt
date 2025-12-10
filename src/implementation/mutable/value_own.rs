@@ -89,12 +89,6 @@ impl<O: ByteOrder> From<i8> for OwnedValue<O> {
     }
 }
 
-impl<O: ByteOrder> From<u8> for OwnedValue<O> {
-    fn from(value: u8) -> Self {
-        (value as i8).into()
-    }
-}
-
 impl<O: ByteOrder> From<i16> for OwnedValue<O> {
     fn from(value: i16) -> Self {
         OwnedValue::Short(value.into())
@@ -107,21 +101,9 @@ impl<O: ByteOrder> From<byteorder::I16<O>> for OwnedValue<O> {
     }
 }
 
-impl<O: ByteOrder> From<u16> for OwnedValue<O> {
-    fn from(value: u16) -> Self {
-        (value as i16).into()
-    }
-}
-
 impl<O: ByteOrder> From<i32> for OwnedValue<O> {
     fn from(value: i32) -> Self {
         OwnedValue::Int(value.into())
-    }
-}
-
-impl<O: ByteOrder> From<u32> for OwnedValue<O> {
-    fn from(value: u32) -> Self {
-        (value as i32).into()
     }
 }
 
@@ -134,12 +116,6 @@ impl<O: ByteOrder> From<byteorder::I32<O>> for OwnedValue<O> {
 impl<O: ByteOrder> From<i64> for OwnedValue<O> {
     fn from(value: i64) -> Self {
         OwnedValue::Long(value.into())
-    }
-}
-
-impl<O: ByteOrder> From<u64> for OwnedValue<O> {
-    fn from(value: u64) -> Self {
-        (value as i64).into()
     }
 }
 

@@ -5,8 +5,6 @@ mod util;
 mod value_trait;
 mod view;
 
+pub use error::*;
 pub use implementation::*;
-
-pub use error::NbtError;
-
 pub use value_trait::*;

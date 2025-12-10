@@ -31,44 +31,11 @@ use crate::{
 };
 
 mod private {
-    use zerocopy::byteorder;
 
-    use crate::{
-        implementation::mutable::{OwnedCompound, OwnedList, OwnedValue},
-        util::ByteOrder,
-    };
+    use crate::{implementation::mutable::OwnedValue, util::ByteOrder};
 
     pub trait Sealed<O: ByteOrder> {}
-    impl<O: ByteOrder> Sealed<O> for () {}
-    impl<O: ByteOrder> Sealed<O> for i8 {}
-    impl<O: ByteOrder> Sealed<O> for u8 {}
-    impl<O: ByteOrder> Sealed<O> for byteorder::I16<O> {}
-    impl<O: ByteOrder> Sealed<O> for i16 {}
-    impl<O: ByteOrder> Sealed<O> for u16 {}
-    impl<O: ByteOrder> Sealed<O> for byteorder::I32<O> {}
-    impl<O: ByteOrder> Sealed<O> for i32 {}
-    impl<O: ByteOrder> Sealed<O> for u32 {}
-    impl<O: ByteOrder> Sealed<O> for byteorder::I64<O> {}
-    impl<O: ByteOrder> Sealed<O> for i64 {}
-    impl<O: ByteOrder> Sealed<O> for u64 {}
-    impl<O: ByteOrder> Sealed<O> for byteorder::F32<O> {}
-    impl<O: ByteOrder> Sealed<O> for f32 {}
-    impl<O: ByteOrder> Sealed<O> for byteorder::F64<O> {}
-    impl<O: ByteOrder> Sealed<O> for f64 {}
-    impl<O: ByteOrder> Sealed<O> for &[i8] {}
-    impl<O: ByteOrder, const N: usize> Sealed<O> for [i8; N] {}
-    impl<O: ByteOrder> Sealed<O> for Vec<i8> {}
-    impl<O: ByteOrder> Sealed<O> for &str {}
-    impl<O: ByteOrder> Sealed<O> for String {}
-    impl<O: ByteOrder> Sealed<O> for OwnedList<O> {}
-    impl<O: ByteOrder> Sealed<O> for OwnedCompound<O> {}
-    impl<O: ByteOrder> Sealed<O> for &[byteorder::I32<O>] {}
-    impl<O: ByteOrder, const N: usize> Sealed<O> for [byteorder::I32<O>; N] {}
-    impl<O: ByteOrder> Sealed<O> for Vec<byteorder::I32<O>> {}
-    impl<O: ByteOrder> Sealed<O> for &[byteorder::I64<O>] {}
-    impl<O: ByteOrder, const N: usize> Sealed<O> for [byteorder::I64<O>; N] {}
-    impl<O: ByteOrder> Sealed<O> for Vec<byteorder::I64<O>> {}
-    impl<O: ByteOrder> Sealed<O> for OwnedValue<O> {}
+    impl<T: Into<OwnedValue<O>>, O: ByteOrder> Sealed<O> for T {}
 }
 
 pub trait IntoOwnedValue<O: ByteOrder>: private::Sealed<O> {
@@ -134,29 +101,6 @@ impl<O: ByteOrder> IntoOwnedValue<O> for i8 {
     }
 }
 
-impl<O: ByteOrder> IntoOwnedValue<O> for u8 {
-    #[inline]
-    fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        (self as i8).compound_insert(data, key)
-    }
-    #[inline]
-    fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        IntoOwnedValue::<O>::list_push(self as i8, data)
-    }
-    #[inline]
-    unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { IntoOwnedValue::<O>::list_push_unchecked(self as i8, data) }
-    }
-    #[inline]
-    fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        IntoOwnedValue::<O>::list_insert(self as i8, data, index)
-    }
-    #[inline]
-    unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { IntoOwnedValue::<O>::list_insert_unchecked(self as i8, data, index) }
-    }
-}
-
 impl<O: ByteOrder> IntoOwnedValue<O> for byteorder::I16<O> {
     #[inline]
     fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
@@ -200,29 +144,6 @@ impl<O: ByteOrder> IntoOwnedValue<O> for i16 {
     #[inline]
     unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
         unsafe { byteorder::I16::<O>::from(self).list_insert_unchecked(data, index) }
-    }
-}
-
-impl<O: ByteOrder> IntoOwnedValue<O> for u16 {
-    #[inline]
-    fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        (self as i16).compound_insert(data, key)
-    }
-    #[inline]
-    fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        IntoOwnedValue::<O>::list_push(self as i16, data)
-    }
-    #[inline]
-    unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { IntoOwnedValue::<O>::list_push_unchecked(self as i16, data) }
-    }
-    #[inline]
-    fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        IntoOwnedValue::<O>::list_insert(self as i16, data, index)
-    }
-    #[inline]
-    unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { IntoOwnedValue::<O>::list_insert_unchecked(self as i16, data, index) }
     }
 }
 
@@ -272,29 +193,6 @@ impl<O: ByteOrder> IntoOwnedValue<O> for i32 {
     }
 }
 
-impl<O: ByteOrder> IntoOwnedValue<O> for u32 {
-    #[inline]
-    fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        (self as i32).compound_insert(data, key)
-    }
-    #[inline]
-    fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        IntoOwnedValue::<O>::list_push(self as i32, data)
-    }
-    #[inline]
-    unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { IntoOwnedValue::<O>::list_push_unchecked(self as i32, data) }
-    }
-    #[inline]
-    fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        IntoOwnedValue::<O>::list_insert(self as i32, data, index)
-    }
-    #[inline]
-    unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { IntoOwnedValue::<O>::list_insert_unchecked(self as i32, data, index) }
-    }
-}
-
 impl<O: ByteOrder> IntoOwnedValue<O> for byteorder::I64<O> {
     #[inline]
     fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
@@ -338,29 +236,6 @@ impl<O: ByteOrder> IntoOwnedValue<O> for i64 {
     #[inline]
     unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
         unsafe { byteorder::I64::<O>::from(self).list_insert_unchecked(data, index) }
-    }
-}
-
-impl<O: ByteOrder> IntoOwnedValue<O> for u64 {
-    #[inline]
-    fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        (self as i64).compound_insert(data, key)
-    }
-    #[inline]
-    fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        IntoOwnedValue::<O>::list_push(self as i64, data)
-    }
-    #[inline]
-    unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { IntoOwnedValue::<O>::list_push_unchecked(self as i64, data) }
-    }
-    #[inline]
-    fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        IntoOwnedValue::<O>::list_insert(self as i64, data, index)
-    }
-    #[inline]
-    unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { IntoOwnedValue::<O>::list_insert_unchecked(self as i64, data, index) }
     }
 }
 

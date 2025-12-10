@@ -17,14 +17,14 @@ pub use value_own::{OwnedCompound, OwnedList, OwnedValue};
 use zerocopy::{IntoBytes as _, byteorder};
 
 use crate::{
-    NbtError,
+    Error,
     implementation::mutable::write::{
         write_byte_array, write_compound, write_head, write_list, write_string,
     },
     util::ByteOrder,
 };
 
-pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>, NbtError> {
+pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>, Error> {
     let mut result = Vec::new();
     unsafe {
         match value {
@@ -84,7 +84,7 @@ pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>, 
     Ok(result)
 }
 
-pub fn write_owned<O: ByteOrder>(value: &OwnedValue<O>) -> Result<Vec<u8>, NbtError> {
+pub fn write_owned<O: ByteOrder>(value: &OwnedValue<O>) -> Result<Vec<u8>, Error> {
     let mut result = Vec::new();
     unsafe {
         match value {

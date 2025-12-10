@@ -3,13 +3,13 @@ use std::{hint::unreachable_unchecked, ptr, slice};
 use zerocopy::{IntoBytes, byteorder};
 
 use crate::{
-    NbtError,
+    Error,
     implementation::mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
     util::{ByteOrder, cold_path},
 };
 
 #[inline]
-pub unsafe fn write_string<O: ByteOrder>(data: &[u8], out: &mut Vec<u8>) -> Result<(), NbtError> {
+pub unsafe fn write_string<O: ByteOrder>(data: &[u8], out: &mut Vec<u8>) -> Result<(), Error> {
     out.extend_from_slice(&byteorder::U16::<O>::from(data.len() as u16).to_bytes());
     out.extend_from_slice(data);
     Ok(())
@@ -19,7 +19,7 @@ pub unsafe fn write_string<O: ByteOrder>(data: &[u8], out: &mut Vec<u8>) -> Resu
 pub unsafe fn write_byte_array<O: ByteOrder>(
     data: &[i8],
     out: &mut Vec<u8>,
-) -> Result<(), NbtError> {
+) -> Result<(), Error> {
     out.extend_from_slice(&byteorder::U32::<O>::from(data.len() as u32).to_bytes());
     out.extend_from_slice(data.as_bytes());
     Ok(())
@@ -29,7 +29,7 @@ pub unsafe fn write_byte_array<O: ByteOrder>(
 pub unsafe fn write_int_array<O: ByteOrder>(
     data: &[byteorder::I32<O>],
     out: &mut Vec<u8>,
-) -> Result<(), NbtError> {
+) -> Result<(), Error> {
     out.extend_from_slice(&byteorder::U32::<O>::from(data.len() as u32).to_bytes());
     out.extend_from_slice(data.as_bytes());
     Ok(())
@@ -39,14 +39,14 @@ pub unsafe fn write_int_array<O: ByteOrder>(
 pub unsafe fn write_long_array<O: ByteOrder>(
     data: &[byteorder::I64<O>],
     out: &mut Vec<u8>,
-) -> Result<(), NbtError> {
+) -> Result<(), Error> {
     out.extend_from_slice(&byteorder::U32::<O>::from(data.len() as u32).to_bytes());
     out.extend_from_slice(data.as_bytes());
     Ok(())
 }
 
 #[inline]
-pub unsafe fn write_list<O: ByteOrder>(data: *const u8, out: &mut Vec<u8>) -> Result<(), NbtError> {
+pub unsafe fn write_list<O: ByteOrder>(data: *const u8, out: &mut Vec<u8>) -> Result<(), Error> {
     unsafe {
         let tag_id = list_tag_id(data);
         let len = list_len::<O>(data);
@@ -70,7 +70,7 @@ pub unsafe fn write_list<O: ByteOrder>(data: *const u8, out: &mut Vec<u8>) -> Re
 pub unsafe fn write_compound<O: ByteOrder>(
     data: *const u8,
     out: &mut Vec<u8>,
-) -> Result<(), NbtError> {
+) -> Result<(), Error> {
     unsafe {
         let mut start = data;
         let mut end = data;
@@ -114,7 +114,7 @@ pub unsafe fn write_payload<O: ByteOrder>(
     tag_id: u8,
     payload: *const u8,
     out: &mut Vec<u8>,
-) -> Result<(), NbtError> {
+) -> Result<(), Error> {
     unsafe {
         match tag_id {
             0..=6 => {
@@ -179,7 +179,7 @@ pub unsafe fn write_head<O: ByteOrder>(
     tag_id: u8,
     name: &str,
     out: &mut Vec<u8>,
-) -> Result<(), NbtError> {
+) -> Result<(), Error> {
     debug_assert!(out.is_empty());
     // TAG ID
     out.push(tag_id);

@@ -1,7 +1,7 @@
 use zerocopy::{ByteOrder, byteorder};
 
 use crate::{
-    NbtError,
+    Error,
     implementation::immutable::mark::{Cache, Mark},
     util::cold_path,
 };
@@ -10,7 +10,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
     mut current_pos: *const u8,
     len: usize,
     f: impl FnOnce(Vec<Mark>) -> R,
-) -> Result<R, NbtError> {
+) -> Result<R, Error> {
     // Size in bytes of each primitive tag type's payload
     const TAG_SIZE: [usize; 13] = [
         0, // End
@@ -39,7 +39,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
         ($bytes_read:expr, $len:expr) => {
             if $bytes_read > $len {
                 cold_path();
-                return Err(NbtError::EndOfFile);
+                return Err(Error::EndOfFile);
             }
         };
     }
@@ -105,7 +105,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
             10 => label = Label::CompBegin,
             _ => {
                 cold_path();
-                return Err(NbtError::InvalidTagType(root_tag));
+                return Err(Error::InvalidTagType(root_tag));
             }
         }
 
@@ -178,7 +178,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             break;
                         }
                         _ => {
-                            return Err(NbtError::InvalidTagType(tag_id));
+                            return Err(Error::InvalidTagType(tag_id));
                         }
                     }
                 },
@@ -285,7 +285,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             break;
                         }
                         _ => {
-                            return Err(NbtError::InvalidTagType(element_type));
+                            return Err(Error::InvalidTagType(element_type));
                         }
                     }
                 },
