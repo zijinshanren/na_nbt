@@ -201,7 +201,6 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
         self.get(index)
     }
 
-    #[inline]
     fn visit_scoped<'a, R>(&'a self, match_fn: impl FnOnce(ValueScoped<'a, Self::Config>) -> R) -> R
     where
         'doc: 'a,
@@ -254,7 +253,6 @@ impl<'doc, O: ByteOrder> ReadableValue<'doc> for ImmutableValue<'doc, O> {
         self.get(index)
     }
 
-    #[inline]
     fn visit<'a, R>(
         &'a self,
         match_fn: impl FnOnce(crate::value_trait::Value<'a, 'doc, Self::Config>) -> R,
@@ -283,6 +281,22 @@ impl<'doc, O: ByteOrder> ReadableValue<'doc> for ImmutableValue<'doc, O> {
 impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for ImmutableList<'doc, O> {
     type Config = Config<O>;
 
+    #[inline]
+    fn tag_id(&self) -> u8 {
+        self.tag_id()
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    #[inline]
     fn get_scoped<'a>(&'a self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where
         'doc: 'a,
@@ -290,6 +304,7 @@ impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for ImmutableList<'doc, O> {
         self.get(index)
     }
 
+    #[inline]
     fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::ListIter<'a>
     where
         'doc: 'a,

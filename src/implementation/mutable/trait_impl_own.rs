@@ -466,6 +466,21 @@ impl<O: ByteOrder> ScopedReadableList<'static> for OwnedList<O> {
     type Config = Config<O>;
 
     #[inline]
+    fn tag_id(&self) -> u8 {
+        self.tag_id()
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    #[inline]
     fn get_scoped<'a>(&'a self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where
         'static: 'a,

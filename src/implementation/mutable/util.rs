@@ -1,4 +1,4 @@
-use std::{iter::repeat_n, marker::PhantomData, ptr, slice};
+use std::{hint::assert_unchecked, iter::repeat_n, marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
@@ -14,13 +14,12 @@ use crate::{
 pub const SIZE_USIZE: usize = std::mem::size_of::<usize>();
 pub const SIZE_DYN: usize = SIZE_USIZE * 3;
 
-pub unsafe fn tag_size(tag_id: u8) -> usize {
-    *unsafe {
-        [
-            0, 1, 2, 4, 8, 4, 8, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN,
-        ]
-        .get_unchecked(tag_id as usize)
-    }
+pub const unsafe fn tag_size(tag_id: u8) -> usize {
+    const TAG_SIZES: [usize; 13] = [
+        0, 1, 2, 4, 8, 4, 8, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN,
+    ];
+    unsafe { assert_unchecked(tag_id < 13) };
+    TAG_SIZES[tag_id as usize]
 }
 
 #[inline]
@@ -135,13 +134,8 @@ macro_rules! impl_list_push {
             data: &mut VecViewMut<'_, u8>,
             value: i8,
         ) {
-            unsafe {
-                let tag_size = tag_size(1);
-                let len_bytes = data.len();
-                data.extend(repeat_n(0, tag_size));
-                ptr::write(data.as_mut_ptr().add(len_bytes).cast(), value);
-                list_increase::<O>(data);
-            }
+            data.push(value as u8);
+            list_increase::<O>(data);
         }
     };
     (flat, $name:ident, $name_unchecked:ident, $type:ty, $tag_id:expr) => {
@@ -159,10 +153,11 @@ macro_rules! impl_list_push {
 
         pub unsafe fn $name_unchecked<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: $type) {
             unsafe {
-                let tag_size = tag_size($tag_id);
+                const TAG_SIZE: usize = unsafe { tag_size($tag_id) };
                 let len_bytes = data.len();
-                data.extend(repeat_n(0, tag_size));
+                data.reserve(TAG_SIZE);
                 ptr::write(data.as_mut_ptr().add(len_bytes).cast(), value.to_bytes());
+                data.set_len(len_bytes + TAG_SIZE);
                 list_increase::<O>(data);
             }
         }
@@ -182,10 +177,11 @@ macro_rules! impl_list_push {
 
         pub unsafe fn $name_unchecked<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: $type) {
             unsafe {
-                let tag_size = tag_size($tag_id);
+                const TAG_SIZE: usize = unsafe { tag_size($tag_id) };
                 let len_bytes = data.len();
-                data.extend(repeat_n(0, tag_size));
+                data.reserve(TAG_SIZE);
                 value.write(data.as_mut_ptr().add(len_bytes));
+                data.set_len(len_bytes + TAG_SIZE);
                 list_increase::<O>(data);
             }
         }
@@ -290,12 +286,12 @@ pub unsafe fn list_push_value_unchecked<O: ByteOrder>(
     unsafe {
         let tag_size = tag_size(value.tag());
         let len_bytes = data.len();
-        data.extend(repeat_n(0, tag_size));
+        data.reserve(tag_size);
         value.write(data.as_mut_ptr().add(len_bytes));
+        data.set_len(len_bytes + tag_size);
         list_increase::<O>(data);
     }
 }
-
 pub fn list_insert_end<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, index: usize, value: ()) {
     if list_len::<O>(data.as_ptr()) == 0 {
         cold_path();
@@ -348,9 +344,9 @@ macro_rules! impl_list_insert {
             value: i8,
         ) {
             unsafe {
-                let tag_size = tag_size(1);
-                let pos_bytes = index * tag_size + 1 + 4;
-                data.splice_drop(pos_bytes..pos_bytes, repeat_n(0, tag_size));
+                const TAG_SIZE: usize = unsafe { tag_size(1) };
+                let pos_bytes = index * TAG_SIZE + 1 + 4;
+                data.splice_drop(pos_bytes..pos_bytes, [0; TAG_SIZE]);
                 ptr::write(data.as_mut_ptr().add(pos_bytes).cast(), value);
                 list_increase::<O>(data);
             }
@@ -656,27 +652,21 @@ macro_rules! impl_compound_insert {
             value: i8,
         ) -> Option<OwnedValue<O>> {
             let old_value = compound_remove::<O>(data, key);
-            unsafe {
-                let tag_id = 1;
-                let tag_size = tag_size(tag_id);
-                let name_bytes = simd_cesu8::mutf8::encode(key);
-                let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
-                // remove TAG_END
-                data.pop();
+            let name_bytes = simd_cesu8::mutf8::encode(key);
+            let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
+            // remove TAG_END
+            data.pop();
 
-                data.push(tag_id);
-                data.extend_from_slice(&name_len);
-                data.extend_from_slice(&name_bytes);
+            data.push(1);
+            data.extend_from_slice(&name_len);
+            data.extend_from_slice(&name_bytes);
 
-                let len_bytes = data.len();
-                data.extend(repeat_n(0, tag_size));
-                ptr::write(data.as_mut_ptr().add(len_bytes).cast(), value);
+            data.push(value as u8);
 
-                // add TAG_END
-                data.push(0);
+            // add TAG_END
+            data.push(0);
 
-                old_value
-            }
+            old_value
         }
     };
     (flat, $name:ident, $type:ty, $tag_id:expr) => {
@@ -686,27 +676,21 @@ macro_rules! impl_compound_insert {
             value: $type,
         ) -> Option<OwnedValue<O>> {
             let old_value = compound_remove::<O>(data, key);
-            unsafe {
-                let tag_id = $tag_id;
-                let tag_size = tag_size(tag_id);
-                let name_bytes = simd_cesu8::mutf8::encode(key);
-                let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
-                // remove TAG_END
-                data.pop();
+            let name_bytes = simd_cesu8::mutf8::encode(key);
+            let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
+            // remove TAG_END
+            data.pop();
 
-                data.push(tag_id);
-                data.extend_from_slice(&name_len);
-                data.extend_from_slice(&name_bytes);
+            data.push($tag_id);
+            data.extend_from_slice(&name_len);
+            data.extend_from_slice(&name_bytes);
 
-                let len_bytes = data.len();
-                data.extend(repeat_n(0, tag_size));
-                ptr::write(data.as_mut_ptr().add(len_bytes).cast(), value.to_bytes());
+            data.extend_from_slice(&value.to_bytes());
 
-                // add TAG_END
-                data.push(0);
+            // add TAG_END
+            data.push(0);
 
-                old_value
-            }
+            old_value
         }
     };
     (nested, $name:ident, $type:ty, $tag_id:expr) => {
@@ -717,20 +701,20 @@ macro_rules! impl_compound_insert {
         ) -> Option<OwnedValue<O>> {
             let old_value = compound_remove::<O>(data, key);
             unsafe {
-                let tag_id = $tag_id;
-                let tag_size = tag_size(tag_id);
                 let name_bytes = simd_cesu8::mutf8::encode(key);
                 let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
                 // remove TAG_END
                 data.pop();
 
-                data.push(tag_id);
+                data.push($tag_id);
                 data.extend_from_slice(&name_len);
                 data.extend_from_slice(&name_bytes);
 
+                const TAG_SIZE: usize = unsafe { tag_size($tag_id) };
                 let len_bytes = data.len();
-                data.extend(repeat_n(0, tag_size));
+                data.reserve(TAG_SIZE);
                 value.write(data.as_mut_ptr().add(len_bytes));
+                data.set_len(len_bytes + TAG_SIZE);
 
                 // add TAG_END
                 data.push(0);
@@ -776,7 +760,6 @@ pub fn compound_insert_value<O: ByteOrder>(
     let old_value = compound_remove::<O>(data, key);
     unsafe {
         let tag_id = value.tag();
-        let tag_size = tag_size(tag_id);
         let name_bytes = simd_cesu8::mutf8::encode(key);
         let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
         // remove TAG_END
@@ -786,9 +769,11 @@ pub fn compound_insert_value<O: ByteOrder>(
         data.extend_from_slice(&name_len);
         data.extend_from_slice(&name_bytes);
 
+        let tag_size = tag_size(tag_id);
         let len_bytes = data.len();
-        data.extend(repeat_n(0, tag_size));
+        data.reserve(tag_size);
         value.write(data.as_mut_ptr().add(len_bytes));
+        data.set_len(len_bytes + tag_size);
 
         // add TAG_END
         data.push(0);

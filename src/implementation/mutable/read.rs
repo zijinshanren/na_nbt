@@ -1,10 +1,10 @@
-use std::{iter::repeat_n, marker::PhantomData, slice};
+use std::{marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
     Error, OwnedCompound, OwnedList, OwnedValue, Result,
-    implementation::mutable::util::SIZE_DYN,
+    implementation::mutable::util::{SIZE_DYN, tag_size},
     util::{ByteOrder, cold_path},
 };
 
@@ -13,22 +13,6 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
 ) -> Result<OwnedValue<O>> {
-    const TAG_SIZE: [usize; 13] = [
-        0, // End
-        1, // Byte
-        2, // Short
-        4, // Int
-        8, // Long
-        4, // Float
-        8, // Double
-        1, // ByteArray (element size)
-        0, // String (variable)
-        0, // List (variable)
-        0, // Compound (variable)
-        4, // IntArray (element size)
-        8, // LongArray (element size)
-    ];
-
     macro_rules! check_bounds {
         ($extra:expr) => {
             if (*current_pos).add($extra) > end_pos {
@@ -105,7 +89,7 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
                 match tag_id {
                     0 => Ok(OwnedValue::List(OwnedList::default())),
                     1..=6 => {
-                        let size = *TAG_SIZE.get_unchecked(tag_id as usize);
+                        let size = tag_size(tag_id);
                         check_bounds!(len * size);
                         let value = slice::from_raw_parts(
                             (*current_pos).sub(1 + 4).cast(),
@@ -118,12 +102,22 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
                         }))
                     }
                     7..=12 => {
-                        let mut list = OwnedList::default();
-                        list.data.as_mut_ptr().write(tag_id);
+                        let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                        ptr::copy_nonoverlapping(
+                            (*current_pos).sub(1 + 4),
+                            list_data.as_mut_ptr(),
+                            1 + 4,
+                        );
+                        let mut write_ptr = list_data.as_mut_ptr().add(1 + 4);
                         for _ in 0..len {
-                            list.push_unchecked(read_unsafe::<O>(tag_id, current_pos, end_pos)?);
+                            read_unsafe::<O>(tag_id, current_pos, end_pos)?.write(write_ptr);
+                            write_ptr = write_ptr.add(SIZE_DYN);
                         }
-                        Ok(OwnedValue::List(list))
+                        list_data.set_len(1 + 4 + len * SIZE_DYN);
+                        Ok(OwnedValue::List(OwnedList {
+                            data: list_data.into(),
+                            _marker: PhantomData,
+                        }))
                     }
                     _ => Err(Error::InvalidTagType(tag_id)),
                 }
@@ -159,7 +153,7 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
 
                     match tag_id {
                         1..=6 => {
-                            let size = *TAG_SIZE.get_unchecked(tag_id as usize);
+                            let size = tag_size(tag_id);
                             check_bounds!(size);
                             *current_pos = current_pos.add(size);
                         }
@@ -169,13 +163,10 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
                                 current_pos.byte_offset_from_unsigned(start),
                             ));
                             let value = read_unsafe::<O>(tag_id, current_pos, end_pos)?;
-                            compound_data.extend(repeat_n(0, SIZE_DYN));
-                            value.write(
-                                compound_data
-                                    .as_mut_ptr()
-                                    .add(compound_data.len())
-                                    .sub(SIZE_DYN),
-                            );
+                            let len = compound_data.len();
+                            compound_data.reserve(SIZE_DYN);
+                            value.write(compound_data.as_mut_ptr().add(len));
+                            compound_data.set_len(len + SIZE_DYN);
                             start = *current_pos;
                         }
                         _ => return Err(Error::InvalidTagType(tag_id)),

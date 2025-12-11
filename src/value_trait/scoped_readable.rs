@@ -81,6 +81,12 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
 pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
     type Config: ReadableConfig;
 
+    fn tag_id(&self) -> u8;
+
+    fn len(&self) -> usize;
+
+    fn is_empty(&self) -> bool;
+
     fn get_scoped<'a>(
         &'a self,
         index: usize,
