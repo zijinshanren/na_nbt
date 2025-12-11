@@ -11,9 +11,9 @@ use crate::{
             OwnedCompoundIter, OwnedListIter,
         },
         util::{
-            SIZE_USIZE, compound_get, compound_get_mut, compound_iter, compound_iter_mut,
-            compound_remove, list_get, list_get_mut, list_is_empty, list_iter, list_iter_mut,
-            list_len, list_pop, list_remove, list_tag_id, tag_size,
+            compound_get, compound_get_mut, compound_iter, compound_iter_mut, compound_remove,
+            list_get, list_get_mut, list_is_empty, list_iter, list_iter_mut, list_len, list_pop,
+            list_remove, list_tag_id, tag_size,
         },
     },
     index::Index,
@@ -23,41 +23,21 @@ use crate::{
 
 impl<T> VecViewOwn<T> {
     pub(crate) unsafe fn write(self, dst: *mut u8) {
-        let (ptr, len, cap) = self.into_raw_parts();
-        unsafe {
-            ptr::write(dst.cast(), ptr.get().to_ne_bytes());
-            ptr::write(dst.add(SIZE_USIZE).cast(), len.get().to_ne_bytes());
-            ptr::write(dst.add(SIZE_USIZE * 2).cast(), cap.get().to_ne_bytes());
-        }
+        unsafe { ptr::write(dst.cast(), self) };
     }
 
     pub(crate) unsafe fn read(src: *mut u8) -> Self {
-        unsafe {
-            let ptr = Unalign::new(usize::from_ne_bytes(*src.cast()));
-            let len = Unalign::new(usize::from_ne_bytes(*src.add(SIZE_USIZE).cast()));
-            let cap = Unalign::new(usize::from_ne_bytes(*src.add(SIZE_USIZE * 2).cast()));
-            VecViewOwn::new(ptr, len, cap)
-        }
+        unsafe { ptr::read(src.cast()) }
     }
 }
 
 impl StringViewOwn {
     pub(crate) unsafe fn write(self, dst: *mut u8) {
-        let (ptr, len, cap) = self.into_raw_parts();
-        unsafe {
-            ptr::write(dst.cast(), ptr.get().to_ne_bytes());
-            ptr::write(dst.add(SIZE_USIZE).cast(), len.get().to_ne_bytes());
-            ptr::write(dst.add(SIZE_USIZE * 2).cast(), cap.get().to_ne_bytes());
-        }
+        unsafe { ptr::write(dst.cast(), self) };
     }
 
     pub(crate) unsafe fn read(src: *mut u8) -> Self {
-        unsafe {
-            let ptr = Unalign::new(usize::from_ne_bytes(*src.cast()));
-            let len = Unalign::new(usize::from_ne_bytes(*src.add(SIZE_USIZE).cast()));
-            let cap = Unalign::new(usize::from_ne_bytes(*src.add(SIZE_USIZE * 2).cast()));
-            StringViewOwn::new(ptr, len, cap)
-        }
+        unsafe { ptr::read(src.cast()) }
     }
 }
 

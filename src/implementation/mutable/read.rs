@@ -86,40 +86,35 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
                 check_bounds!(4);
                 let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
                 *current_pos = current_pos.add(4);
-                match tag_id {
-                    0 => Ok(OwnedValue::List(OwnedList::default())),
-                    1..=6 => {
-                        let size = tag_size(tag_id);
-                        check_bounds!(len * size);
-                        let value = slice::from_raw_parts(
-                            (*current_pos).sub(1 + 4).cast(),
-                            len * size + 1 + 4,
-                        );
-                        *current_pos = current_pos.add(len * size);
-                        Ok(OwnedValue::List(OwnedList {
-                            data: value.into(),
-                            _marker: PhantomData,
-                        }))
+                if tag_id <= 6 {
+                    let size = tag_size(tag_id);
+                    check_bounds!(len * size);
+                    let value =
+                        slice::from_raw_parts((*current_pos).sub(1 + 4).cast(), len * size + 1 + 4);
+                    *current_pos = current_pos.add(len * size);
+                    Ok(OwnedValue::List(OwnedList {
+                        data: value.into(),
+                        _marker: PhantomData,
+                    }))
+                } else if tag_id <= 12 {
+                    let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                    ptr::copy_nonoverlapping(
+                        (*current_pos).sub(1 + 4),
+                        list_data.as_mut_ptr(),
+                        1 + 4,
+                    );
+                    let mut write_ptr = list_data.as_mut_ptr().add(1 + 4);
+                    for _ in 0..len {
+                        read_unsafe::<O>(tag_id, current_pos, end_pos)?.write(write_ptr);
+                        write_ptr = write_ptr.add(SIZE_DYN);
                     }
-                    7..=12 => {
-                        let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
-                        ptr::copy_nonoverlapping(
-                            (*current_pos).sub(1 + 4),
-                            list_data.as_mut_ptr(),
-                            1 + 4,
-                        );
-                        let mut write_ptr = list_data.as_mut_ptr().add(1 + 4);
-                        for _ in 0..len {
-                            read_unsafe::<O>(tag_id, current_pos, end_pos)?.write(write_ptr);
-                            write_ptr = write_ptr.add(SIZE_DYN);
-                        }
-                        list_data.set_len(1 + 4 + len * SIZE_DYN);
-                        Ok(OwnedValue::List(OwnedList {
-                            data: list_data.into(),
-                            _marker: PhantomData,
-                        }))
-                    }
-                    _ => Err(Error::InvalidTagType(tag_id)),
+                    list_data.set_len(1 + 4 + len * SIZE_DYN);
+                    Ok(OwnedValue::List(OwnedList {
+                        data: list_data.into(),
+                        _marker: PhantomData,
+                    }))
+                } else {
+                    Err(Error::InvalidTagType(tag_id))
                 }
             }
             10 => {
@@ -151,25 +146,23 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
                     check_bounds!(name_len);
                     *current_pos = current_pos.add(name_len);
 
-                    match tag_id {
-                        1..=6 => {
-                            let size = tag_size(tag_id);
-                            check_bounds!(size);
-                            *current_pos = current_pos.add(size);
-                        }
-                        7..=12 => {
-                            compound_data.extend_from_slice(slice::from_raw_parts(
-                                start,
-                                current_pos.byte_offset_from_unsigned(start),
-                            ));
-                            let value = read_unsafe::<O>(tag_id, current_pos, end_pos)?;
-                            let len = compound_data.len();
-                            compound_data.reserve(SIZE_DYN);
-                            value.write(compound_data.as_mut_ptr().add(len));
-                            compound_data.set_len(len + SIZE_DYN);
-                            start = *current_pos;
-                        }
-                        _ => return Err(Error::InvalidTagType(tag_id)),
+                    if tag_id <= 6 {
+                        let size = tag_size(tag_id);
+                        check_bounds!(size);
+                        *current_pos = current_pos.add(size);
+                    } else if tag_id <= 12 {
+                        compound_data.extend_from_slice(slice::from_raw_parts(
+                            start,
+                            current_pos.byte_offset_from_unsigned(start),
+                        ));
+                        let value = read_unsafe::<O>(tag_id, current_pos, end_pos)?;
+                        let len = compound_data.len();
+                        compound_data.reserve(SIZE_DYN);
+                        value.write(compound_data.as_mut_ptr().add(len));
+                        compound_data.set_len(len + SIZE_DYN);
+                        start = *current_pos;
+                    } else {
+                        return Err(Error::InvalidTagType(tag_id));
                     }
                 }
             }

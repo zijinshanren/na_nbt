@@ -927,6 +927,7 @@ impl Write for StringViewMut<'_> {
     }
 }
 
+#[repr(C)]
 pub struct VecViewOwn<T> {
     pub(crate) ptr: Unalign<usize>,
     pub(crate) len: Unalign<usize>,
@@ -1496,6 +1497,7 @@ impl<T> Drop for VecViewOwn<T> {
 /// A view into a String's raw parts, allowing mutable access without owning the String.
 ///
 /// This is similar to `VecView<u8>` but maintains String's UTF-8 invariants.
+#[repr(C)]
 pub struct StringViewOwn {
     pub(crate) ptr: Unalign<usize>,
     pub(crate) len: Unalign<usize>,
