@@ -153,13 +153,32 @@ pub fn read_owned<SOURCE: ByteOrder, TARGET: ByteOrder>(
     source: &[u8],
 ) -> Result<OwnedValue<TARGET>> {
     unsafe {
+        macro_rules! check_bounds {
+            ($required:expr) => {
+                if source.len() < $required {
+                    cold_path();
+                    return Err(Error::EndOfFile);
+                }
+            };
+        }
+
         let mut current_pos = source.as_ptr();
         let end_pos = source.as_ptr().add(source.len());
+
+        check_bounds!(1);
 
         let tag_id = *current_pos;
         current_pos = current_pos.add(1);
 
+        if tag_id == 0 {
+            cold_path();
+            return Ok(OwnedValue::End);
+        }
+
+        check_bounds!(1 + 2);
         let name_len = byteorder::U16::<SOURCE>::from_bytes(*current_pos.cast()).get();
+
+        check_bounds!(1 + 2 + name_len as usize);
         current_pos = current_pos.add(2 + name_len as usize);
 
         let value = if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {

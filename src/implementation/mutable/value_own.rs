@@ -1,6 +1,11 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData, mem::ManuallyDrop, ptr};
+use std::{
+    hint::{assert_unchecked, unreachable_unchecked},
+    marker::PhantomData,
+    mem::{ManuallyDrop, MaybeUninit},
+    ptr,
+};
 
-use zerocopy::{Unalign, byteorder};
+use zerocopy::byteorder;
 
 use crate::{
     ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
@@ -41,20 +46,21 @@ impl StringViewOwn {
     }
 }
 
+#[repr(u8)]
 pub enum OwnedValue<O: ByteOrder> {
-    End,
-    Byte(i8),
-    Short(byteorder::I16<O>),
-    Int(byteorder::I32<O>),
-    Long(byteorder::I64<O>),
-    Float(byteorder::F32<O>),
-    Double(byteorder::F64<O>),
-    ByteArray(VecViewOwn<i8>),
-    String(StringViewOwn),
-    List(OwnedList<O>),
-    Compound(OwnedCompound<O>),
-    IntArray(VecViewOwn<byteorder::I32<O>>),
-    LongArray(VecViewOwn<byteorder::I64<O>>),
+    End = 0,
+    Byte(i8) = 1,
+    Short(byteorder::I16<O>) = 2,
+    Int(byteorder::I32<O>) = 3,
+    Long(byteorder::I64<O>) = 4,
+    Float(byteorder::F32<O>) = 5,
+    Double(byteorder::F64<O>) = 6,
+    ByteArray(VecViewOwn<i8>) = 7,
+    String(StringViewOwn) = 8,
+    List(OwnedList<O>) = 9,
+    Compound(OwnedCompound<O>) = 10,
+    IntArray(VecViewOwn<byteorder::I32<O>>) = 11,
+    LongArray(VecViewOwn<byteorder::I64<O>>) = 12,
 }
 
 impl<O: ByteOrder> From<()> for OwnedValue<O> {
@@ -209,61 +215,37 @@ impl<O: ByteOrder> From<Vec<byteorder::I64<O>>> for OwnedValue<O> {
 
 impl<O: ByteOrder> OwnedValue<O> {
     pub fn tag(&self) -> u8 {
-        match self {
-            OwnedValue::End => 0,
-            OwnedValue::Byte(_) => 1,
-            OwnedValue::Short(_) => 2,
-            OwnedValue::Int(_) => 3,
-            OwnedValue::Long(_) => 4,
-            OwnedValue::Float(_) => 5,
-            OwnedValue::Double(_) => 6,
-            OwnedValue::ByteArray(_) => 7,
-            OwnedValue::String(_) => 8,
-            OwnedValue::List(_) => 9,
-            OwnedValue::Compound(_) => 10,
-            OwnedValue::IntArray(_) => 11,
-            OwnedValue::LongArray(_) => 12,
+        unsafe { *(self as *const Self as *const u8) }
+    }
+
+    pub(crate) unsafe fn set_tag(&mut self, tag_id: u8) {
+        unsafe {
+            assert_unchecked(tag_id < 13);
+            *(self as *mut Self as *mut u8) = tag_id;
         }
     }
 
     pub(crate) unsafe fn write(self, dst: *mut u8) {
         unsafe {
-            match self {
-                OwnedValue::End => (),
-                OwnedValue::Byte(value) => ptr::write(dst.cast(), value),
-                OwnedValue::Short(value) => ptr::write(dst.cast(), value.to_bytes()),
-                OwnedValue::Int(value) => ptr::write(dst.cast(), value.to_bytes()),
-                OwnedValue::Long(value) => ptr::write(dst.cast(), value.to_bytes()),
-                OwnedValue::Float(value) => ptr::write(dst.cast(), value.to_bytes()),
-                OwnedValue::Double(value) => ptr::write(dst.cast(), value.to_bytes()),
-                OwnedValue::ByteArray(value) => value.write(dst),
-                OwnedValue::String(value) => value.write(dst),
-                OwnedValue::List(value) => value.write(dst),
-                OwnedValue::Compound(value) => value.write(dst),
-                OwnedValue::IntArray(value) => value.write(dst),
-                OwnedValue::LongArray(value) => value.write(dst),
-            }
+            let me = ManuallyDrop::new(self);
+            ptr::copy(
+                (&me as *const ManuallyDrop<Self> as *const u8).add(1),
+                dst,
+                tag_size(me.tag()),
+            );
         }
     }
 
     pub(crate) unsafe fn read(tag_id: u8, src: *mut u8) -> Self {
         unsafe {
-            match tag_id {
-                0 => OwnedValue::End,
-                1 => OwnedValue::Byte(*src.cast()),
-                2 => OwnedValue::Short(byteorder::I16::<O>::from_bytes(*src.cast())),
-                3 => OwnedValue::Int(byteorder::I32::<O>::from_bytes(*src.cast())),
-                4 => OwnedValue::Long(byteorder::I64::<O>::from_bytes(*src.cast())),
-                5 => OwnedValue::Float(byteorder::F32::<O>::from_bytes(*src.cast())),
-                6 => OwnedValue::Double(byteorder::F64::<O>::from_bytes(*src.cast())),
-                7 => OwnedValue::ByteArray(VecViewOwn::read(src)),
-                8 => OwnedValue::String(StringViewOwn::read(src)),
-                9 => OwnedValue::List(OwnedList::read(src)),
-                10 => OwnedValue::Compound(OwnedCompound::read(src)),
-                11 => OwnedValue::IntArray(VecViewOwn::read(src)),
-                12 => OwnedValue::LongArray(VecViewOwn::read(src)),
-                _ => unreachable_unchecked(),
-            }
+            let mut uninit = MaybeUninit::<Self>::uninit();
+            uninit.assume_init_mut().set_tag(tag_id);
+            ptr::copy(
+                src,
+                (&mut uninit as *mut MaybeUninit<_> as *mut u8).add(1),
+                tag_size(tag_id),
+            );
+            uninit.assume_init()
         }
     }
 }
@@ -733,6 +715,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     }
 }
 
+#[repr(transparent)]
 pub struct OwnedList<O: ByteOrder> {
     pub(crate) data: VecViewOwn<u8>,
     pub(crate) _marker: PhantomData<O>,
@@ -749,15 +732,13 @@ impl<O: ByteOrder> Default for OwnedList<O> {
 
 impl<O: ByteOrder> OwnedList<O> {
     pub(crate) unsafe fn write(self, dst: *mut u8) {
-        let me = ManuallyDrop::new(self);
-        unsafe { ptr::read(&me.data).write(dst) };
+        unsafe {
+            ptr::write(dst.cast(), self);
+        }
     }
 
     pub(crate) unsafe fn read(src: *mut u8) -> Self {
-        OwnedList {
-            data: unsafe { VecViewOwn::read(src) },
-            _marker: PhantomData,
-        }
+        unsafe { ptr::read(src.cast()) }
     }
 }
 
@@ -927,6 +908,7 @@ impl<O: ByteOrder> OwnedList<O> {
     }
 }
 
+#[repr(transparent)]
 pub struct OwnedCompound<O: ByteOrder> {
     pub(crate) data: VecViewOwn<u8>,
     pub(crate) _marker: PhantomData<O>,
@@ -943,15 +925,13 @@ impl<O: ByteOrder> Default for OwnedCompound<O> {
 
 impl<O: ByteOrder> OwnedCompound<O> {
     pub(crate) unsafe fn write(self, dst: *mut u8) {
-        let me = ManuallyDrop::new(self);
-        unsafe { ptr::read(&me.data).write(dst) };
+        unsafe {
+            ptr::write(dst.cast(), self);
+        }
     }
 
     pub(crate) unsafe fn read(src: *mut u8) -> Self {
-        OwnedCompound {
-            data: unsafe { VecViewOwn::read(src) },
-            _marker: PhantomData,
-        }
+        unsafe { ptr::read(src.cast()) }
     }
 }
 

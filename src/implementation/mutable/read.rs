@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, ptr, slice};
+use std::{hint::assert_unchecked, marker::PhantomData, mem::MaybeUninit, ptr, slice};
 
 use zerocopy::byteorder;
 
@@ -6,13 +6,35 @@ use crate::{
     Error, OwnedCompound, OwnedList, OwnedValue, Result,
     implementation::mutable::util::{SIZE_DYN, tag_size},
     util::{ByteOrder, cold_path},
+    view::VecViewOwn,
 };
 
-pub unsafe fn read_unsafe<O: ByteOrder>(
+pub unsafe fn read_unsafe_impl<O: ByteOrder>(
     tag_id: u8,
     current_pos: &mut *const u8,
     end_pos: *const u8,
 ) -> Result<OwnedValue<O>> {
+    const TAG_SIZE: [usize; 13] = [
+        0, // End
+        1, // Byte
+        2, // Short
+        4, // Int
+        8, // Long
+        4, // Float
+        8, // Double
+        1, // ByteArray (element size)
+        0, // String (variable)
+        0, // List (variable)
+        0, // Compound (variable)
+        4, // IntArray (element size)
+        8, // LongArray (element size)
+    ];
+
+    unsafe fn tag_size(tag_id: u8) -> usize {
+        unsafe { assert_unchecked(tag_id < 13) };
+        TAG_SIZE[tag_id as usize]
+    }
+
     macro_rules! check_bounds {
         ($extra:expr) => {
             if (*current_pos).add($extra) > end_pos {
@@ -23,52 +45,21 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
     }
 
     unsafe {
+        assert_unchecked(tag_id > 6);
         match tag_id {
-            0 => Ok(OwnedValue::End),
-            1 => {
-                check_bounds!(1);
-                let value = *current_pos.cast();
-                *current_pos = current_pos.add(1);
-                Ok(OwnedValue::Byte(value))
-            }
-            2 => {
-                check_bounds!(2);
-                let value = *current_pos.cast();
-                *current_pos = current_pos.add(2);
-                Ok(OwnedValue::Short(value))
-            }
-            3 => {
-                check_bounds!(4);
-                let value = *current_pos.cast();
-                *current_pos = current_pos.add(4);
-                Ok(OwnedValue::Int(value))
-            }
-            4 => {
-                check_bounds!(8);
-                let value = *current_pos.cast();
-                *current_pos = current_pos.add(8);
-                Ok(OwnedValue::Long(value))
-            }
-            5 => {
-                check_bounds!(4);
-                let value = *current_pos.cast();
-                *current_pos = current_pos.add(4);
-                Ok(OwnedValue::Float(value))
-            }
-            6 => {
-                check_bounds!(8);
-                let value = *current_pos.cast();
-                *current_pos = current_pos.add(8);
-                Ok(OwnedValue::Double(value))
-            }
-            7 => {
+            7 | 11 | 12 => {
                 check_bounds!(4);
                 let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
                 *current_pos = current_pos.add(4);
-                check_bounds!(len);
-                let value = slice::from_raw_parts((*current_pos).cast(), len);
-                *current_pos = current_pos.add(len);
-                Ok(OwnedValue::ByteArray(value.into()))
+                check_bounds!(len * tag_size(tag_id));
+                let value = slice::from_raw_parts(*current_pos, len * tag_size(tag_id));
+                *current_pos = current_pos.add(len * tag_size(tag_id));
+
+                let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
+                uninit.assume_init_mut().set_tag(tag_id);
+                VecViewOwn::from(value)
+                    .write((&mut uninit as *mut MaybeUninit<_> as *mut u8).add(1));
+                Ok(uninit.assume_init())
             }
             8 => {
                 check_bounds!(2);
@@ -166,25 +157,40 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
                     }
                 }
             }
-            11 => {
-                check_bounds!(4);
-                let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
-                *current_pos = current_pos.add(4);
-                check_bounds!(len * 4);
-                let value = slice::from_raw_parts((*current_pos).cast(), len);
-                *current_pos = current_pos.add(len * 4);
-                Ok(OwnedValue::IntArray(value.into()))
-            }
-            12 => {
-                check_bounds!(4);
-                let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
-                *current_pos = current_pos.add(4);
-                check_bounds!(len * 8);
-                let value = slice::from_raw_parts((*current_pos).cast(), len);
-                *current_pos = current_pos.add(len * 8);
-                Ok(OwnedValue::LongArray(value.into()))
-            }
             _ => Err(Error::InvalidTagType(tag_id)),
+        }
+    }
+}
+
+pub unsafe fn read_unsafe<O: ByteOrder>(
+    tag_id: u8,
+    current_pos: &mut *const u8,
+    end_pos: *const u8,
+) -> Result<OwnedValue<O>> {
+    macro_rules! check_bounds {
+        ($extra:expr) => {
+            if (*current_pos).add($extra) > end_pos {
+                cold_path();
+                return Err(Error::EndOfFile);
+            }
+        };
+    }
+
+    unsafe {
+        assert_unchecked(tag_id != 0);
+        if tag_id <= 6 {
+            check_bounds!(tag_size(tag_id));
+            let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
+            uninit.assume_init_mut().set_tag(tag_id);
+            ptr::copy(
+                *current_pos,
+                (&mut uninit as *mut MaybeUninit<_> as *mut u8).add(1),
+                tag_size(tag_id),
+            );
+            *current_pos = current_pos.add(tag_size(tag_id));
+            Ok(uninit.assume_init())
+        } else {
+            read_unsafe_impl::<O>(tag_id, current_pos, end_pos)
         }
     }
 }

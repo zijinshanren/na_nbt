@@ -72,6 +72,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
             cold_path();
             return Ok(f(mark));
         }
+
         bytes_read += 2;
         check_bounds!(bytes_read, len);
         let name_len = byteorder::U16::<O>::from_bytes(*current_pos.cast()).get();
