@@ -20,12 +20,11 @@ pub use value_own::{OwnedCompound, OwnedList, OwnedValue};
 use zerocopy::{IntoBytes as _, byteorder};
 
 use crate::{
-    Error, Result,
+    ByteOrder, Error, Result, cold_path,
     implementation::mutable::{
         read::{read_unsafe, read_unsafe_fallback},
         write::{write_byte_array, write_compound, write_head, write_list, write_string},
     },
-    util::{ByteOrder, cold_path},
 };
 
 pub fn write<'s, O: ByteOrder>(value: ImmutableValue<'s, O>) -> Result<Vec<u8>> {

@@ -7,4 +7,5 @@ mod view;
 
 pub use error::*;
 pub use implementation::*;
+pub use util::*;
 pub use value_trait::*;

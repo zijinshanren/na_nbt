@@ -3,6 +3,7 @@ use std::{borrow::Cow, hint::unreachable_unchecked, marker::PhantomData, ptr, sl
 use zerocopy::byteorder;
 
 use crate::{
+    ByteOrder,
     implementation::mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter},
         util::{
@@ -11,7 +12,6 @@ use crate::{
         },
     },
     index::Index,
-    util::ByteOrder,
 };
 
 #[derive(Clone)]

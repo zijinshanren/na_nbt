@@ -1,7 +1,7 @@
 use zerocopy::byteorder;
 
 use crate::{
-    OwnedCompound, OwnedList, OwnedValue,
+    ByteOrder, OwnedCompound, OwnedList, OwnedValue,
     implementation::mutable::util::{
         compound_insert_byte, compound_insert_byte_array, compound_insert_compound,
         compound_insert_double, compound_insert_end, compound_insert_float, compound_insert_int,
@@ -26,13 +26,12 @@ use crate::{
         list_push_short_unchecked, list_push_string, list_push_string_unchecked, list_push_value,
         list_push_value_unchecked,
     },
-    util::ByteOrder,
     view::VecViewMut,
 };
 
 mod private {
 
-    use crate::{implementation::mutable::OwnedValue, util::ByteOrder};
+    use crate::{ByteOrder, implementation::mutable::OwnedValue};
 
     pub trait Sealed<O: ByteOrder> {}
     impl<T: Into<OwnedValue<O>>, O: ByteOrder> Sealed<O> for T {}

@@ -3,9 +3,9 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ImmutableString, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue,
+    ByteOrder, ImmutableString, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue,
+    cold_path,
     implementation::mutable::util::tag_size,
-    util::{ByteOrder, cold_path},
     view::{StringViewOwn, VecViewOwn},
 };
 

@@ -3,9 +3,8 @@ use std::{hint::unreachable_unchecked, ptr, slice};
 use zerocopy::{IntoBytes, byteorder};
 
 use crate::{
-    Error,
+    ByteOrder, Error, cold_path,
     implementation::mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
-    util::{ByteOrder, cold_path},
 };
 
 #[inline]
@@ -16,10 +15,7 @@ pub unsafe fn write_string<O: ByteOrder>(data: &[u8], out: &mut Vec<u8>) -> Resu
 }
 
 #[inline]
-pub unsafe fn write_byte_array<O: ByteOrder>(
-    data: &[i8],
-    out: &mut Vec<u8>,
-) -> Result<(), Error> {
+pub unsafe fn write_byte_array<O: ByteOrder>(data: &[i8], out: &mut Vec<u8>) -> Result<(), Error> {
     out.extend_from_slice(&byteorder::U32::<O>::from(data.len() as u32).to_bytes());
     out.extend_from_slice(data.as_bytes());
     Ok(())

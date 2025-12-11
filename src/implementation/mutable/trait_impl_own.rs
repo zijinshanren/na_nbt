@@ -3,13 +3,12 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ImmutableCompound, ImmutableList, ImmutableString, IntoOwnedValue, MutableCompound,
+    ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, IntoOwnedValue, MutableCompound,
     MutableList, OwnedCompound, OwnedList, OwnedValue, ReadableConfig, ScopedReadableCompound,
     ScopedReadableList, ScopedReadableValue, ScopedWritableCompound, ScopedWritableList,
     ScopedWritableValue, ValueMutScoped, ValueScoped, WritableConfig,
     implementation::mutable::trait_impl::Config,
     index::Index,
-    util::ByteOrder,
     view::{StringViewMut, VecViewMut},
 };
 

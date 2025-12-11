@@ -3,9 +3,9 @@ use std::{borrow::Cow, hint::unreachable_unchecked, marker::PhantomData, slice};
 use zerocopy::byteorder;
 
 use crate::{
+    ByteOrder, cold_path,
     implementation::immutable::{mark::Mark, util::tag_size},
     index::Index,
-    util::{ByteOrder, cold_path},
 };
 
 pub trait Document: Send + Sync + Clone + 'static {}

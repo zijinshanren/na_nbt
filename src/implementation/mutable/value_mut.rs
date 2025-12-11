@@ -3,7 +3,8 @@ use std::{hint::unreachable_unchecked, marker::PhantomData};
 use zerocopy::byteorder;
 
 use crate::{
-    ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue, OwnedValue,
+    ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
+    OwnedValue,
     implementation::mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
         util::{
@@ -13,7 +14,6 @@ use crate::{
         },
     },
     index::Index,
-    util::ByteOrder,
     view::{StringViewMut, VecViewMut},
 };
 

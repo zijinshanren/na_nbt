@@ -1,6 +1,6 @@
 use crate::{
-    ReadableCompound, ReadableList, ReadableString, ReadableValue, WritableCompound, WritableList,
-    WritableValue, util::ByteOrder,
+    ByteOrder, ReadableCompound, ReadableList, ReadableString, ReadableValue, WritableCompound,
+    WritableList, WritableValue,
 };
 
 pub trait ReadableConfig: Send + Sync + Sized + 'static {

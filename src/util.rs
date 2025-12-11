@@ -1,6 +1,6 @@
 #[inline(always)]
 #[cold]
-pub fn cold_path() {}
+pub(crate) fn cold_path() {}
 
 pub trait ByteOrder: zerocopy::ByteOrder + Send + Sync + 'static {}
 

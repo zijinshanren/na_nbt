@@ -3,11 +3,10 @@ use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue,
+    ByteOrder, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue, cold_path,
     implementation::mutable::iter::{
         ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
     },
-    util::{ByteOrder, cold_path},
     view::{StringViewOwn, VecViewMut, VecViewOwn},
 };
 

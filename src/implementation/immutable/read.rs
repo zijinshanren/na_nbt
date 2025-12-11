@@ -1,9 +1,10 @@
+use std::hint::assert_unchecked;
+
 use zerocopy::{ByteOrder, byteorder};
 
 use crate::{
-    Error, Result,
+    Error, Result, cold_path,
     implementation::immutable::mark::{Cache, Mark},
-    util::cold_path,
 };
 
 pub unsafe fn read_unsafe<O: ByteOrder, R>(
@@ -27,6 +28,12 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
         4, // IntArray (element size)
         8, // LongArray (element size)
     ];
+
+    #[inline(always)]
+    unsafe fn tag_size(tag_id: u8) -> usize {
+        unsafe { assert_unchecked(tag_id < 13) };
+        TAG_SIZE[tag_id as usize]
+    }
 
     // Special marker value for compound tags in the mark table
     const COMPOUND_TAG_MARKER: u64 = 13;
@@ -75,31 +82,48 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
 
         bytes_read += 2;
         check_bounds!(bytes_read, len);
-        let name_len = byteorder::U16::<O>::from_bytes(*current_pos.cast()).get();
-        bytes_read += name_len as usize;
+        let name_len = byteorder::U16::<O>::from_bytes(*current_pos.cast()).get() as usize;
+        bytes_read += name_len;
         check_bounds!(bytes_read, len);
-        current_pos = current_pos.add(2 + name_len as usize);
+        current_pos = current_pos.add(2 + name_len);
 
         match root_tag {
             0 => std::hint::unreachable_unchecked(),
             1..=6 => {
                 cold_path();
-                check_bounds!(bytes_read + TAG_SIZE.get_unchecked(root_tag as usize), len);
+                bytes_read += tag_size(root_tag);
+                check_bounds!(bytes_read, len);
+                if bytes_read < len {
+                    cold_path();
+                    return Err(Error::TrailingData(len - bytes_read));
+                }
                 return Ok(f(mark));
             }
             7 | 11 | 12 => {
                 cold_path();
-                check_bounds!(bytes_read + 4, len);
-                let array_len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get();
-                let element_size = *TAG_SIZE.get_unchecked(root_tag as usize);
-                check_bounds!(bytes_read + 4 + array_len as usize * element_size, len);
+                bytes_read += 4;
+                check_bounds!(bytes_read, len);
+                let array_len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                let element_size = tag_size(root_tag);
+                bytes_read += array_len * element_size;
+                check_bounds!(bytes_read, len);
+                if bytes_read < len {
+                    cold_path();
+                    return Err(Error::TrailingData(len - bytes_read));
+                }
                 return Ok(f(mark));
             }
             8 => {
                 cold_path();
-                check_bounds!(bytes_read + 2, len);
-                let str_len = byteorder::U16::<O>::from_bytes(*current_pos.cast()).get();
-                check_bounds!(bytes_read + 2 + str_len as usize, len);
+                bytes_read += 2;
+                check_bounds!(bytes_read, len);
+                let str_len = byteorder::U16::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                bytes_read += str_len;
+                check_bounds!(bytes_read, len);
+                if bytes_read < len {
+                    cold_path();
+                    return Err(Error::TrailingData(len - bytes_read));
+                }
                 return Ok(f(mark));
             }
             9 => label = Label::ListBegin,
@@ -137,15 +161,16 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                     bytes_read += 2;
                     check_bounds!(bytes_read, len);
 
-                    let name_len = byteorder::U16::<O>::from_bytes(*current_pos.cast()).get();
-                    bytes_read += name_len as usize;
+                    let name_len =
+                        byteorder::U16::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                    bytes_read += name_len;
                     check_bounds!(bytes_read, len);
 
-                    current_pos = current_pos.add(2 + name_len as usize);
+                    current_pos = current_pos.add(2 + name_len);
 
                     match tag_id {
                         1..=6 => {
-                            let size = *TAG_SIZE.get_unchecked(tag_id as usize);
+                            let size = tag_size(tag_id);
                             bytes_read += size;
                             check_bounds!(bytes_read, len);
                             current_pos = current_pos.add(size);
@@ -154,9 +179,9 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             bytes_read += 4;
                             check_bounds!(bytes_read, len);
                             let array_len =
-                                byteorder::U32::<O>::from_bytes(*current_pos.cast()).get();
-                            let element_size = *TAG_SIZE.get_unchecked(tag_id as usize);
-                            let size = array_len as usize * element_size;
+                                byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                            let element_size = tag_size(tag_id);
+                            let size = array_len * element_size;
                             bytes_read += size;
                             check_bounds!(bytes_read, len);
                             current_pos = current_pos.add(4 + size);
@@ -165,10 +190,10 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             bytes_read += 2;
                             check_bounds!(bytes_read, len);
                             let str_len =
-                                byteorder::U16::<O>::from_bytes(*current_pos.cast()).get();
-                            bytes_read += str_len as usize;
+                                byteorder::U16::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                            bytes_read += str_len;
                             check_bounds!(bytes_read, len);
-                            current_pos = current_pos.add(2 + str_len as usize);
+                            current_pos = current_pos.add(2 + str_len);
                         }
                         9 => {
                             label = Label::ListBegin;
@@ -192,7 +217,10 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
 
                     if current == 0 {
                         cold_path();
-                        debug_assert_eq!(bytes_read, len);
+                        if bytes_read < len {
+                            cold_path();
+                            return Err(Error::TrailingData(len - bytes_read));
+                        }
                         return Ok(f(mark));
                     }
 
@@ -225,13 +253,11 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
 
                     let cur = mark.get_unchecked_mut(current);
 
-                    {
-                        cur.cache.general_parent_offset = ((current - parent) as u64)
-                            | (u64::from(element_type) << TAG_TYPE_SHIFT);
-                    }
+                    cur.cache.general_parent_offset =
+                        ((current - parent) as u64) | (u64::from(element_type) << TAG_TYPE_SHIFT);
 
                     if element_type <= 6 {
-                        let element_size = *TAG_SIZE.get_unchecked(element_type as usize);
+                        let element_size = tag_size(element_type);
                         let total_size = element_count as usize * element_size;
                         bytes_read += total_size;
                         check_bounds!(bytes_read, len);
@@ -261,9 +287,9 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             bytes_read += 4;
                             check_bounds!(bytes_read, len);
                             let array_len =
-                                byteorder::U32::<O>::from_bytes(*current_pos.cast()).get();
-                            let element_size = *TAG_SIZE.get_unchecked(element_type as usize);
-                            let size = array_len as usize * element_size;
+                                byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                            let element_size = tag_size(element_type);
+                            let size = array_len * element_size;
                             bytes_read += size;
                             check_bounds!(bytes_read, len);
                             current_pos = current_pos.add(4 + size);
@@ -272,10 +298,10 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             bytes_read += 2;
                             check_bounds!(bytes_read, len);
                             let str_len =
-                                byteorder::U16::<O>::from_bytes(*current_pos.cast()).get();
-                            bytes_read += str_len as usize;
+                                byteorder::U16::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                            bytes_read += str_len;
                             check_bounds!(bytes_read, len);
-                            current_pos = current_pos.add(2 + str_len as usize);
+                            current_pos = current_pos.add(2 + str_len);
                         }
                         9 => {
                             label = Label::ListBegin;
@@ -299,7 +325,10 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
 
                     if current == 0 {
                         cold_path();
-                        debug_assert_eq!(bytes_read, len);
+                        if bytes_read < len {
+                            cold_path();
+                            return Err(Error::TrailingData(len - bytes_read));
+                        }
                         return Ok(f(mark));
                     }
 

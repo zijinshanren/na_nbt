@@ -3,10 +3,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use zerocopy::byteorder;
 
-use crate::{
-    Result,
-    util::{ByteOrder, cold_path},
-};
+use crate::{ByteOrder, Result, cold_path};
 
 mod mark;
 mod read;

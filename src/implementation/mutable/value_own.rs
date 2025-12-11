@@ -8,8 +8,8 @@ use std::{
 use zerocopy::byteorder;
 
 use crate::{
-    ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
-    MutableCompound, MutableList, MutableValue,
+    ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
+    MutableCompound, MutableList, MutableValue, cold_path,
     implementation::mutable::{
         iter::{
             ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
@@ -22,7 +22,6 @@ use crate::{
         },
     },
     index::Index,
-    util::{ByteOrder, cold_path},
     view::{StringViewMut, StringViewOwn, VecViewMut, VecViewOwn},
 };
 
@@ -228,7 +227,7 @@ impl<O: ByteOrder> OwnedValue<O> {
     pub(crate) unsafe fn write(self, dst: *mut u8) {
         unsafe {
             let me = ManuallyDrop::new(self);
-            ptr::copy(
+            ptr::copy_nonoverlapping(
                 (&me as *const ManuallyDrop<Self> as *const u8).add(1),
                 dst,
                 tag_size(me.tag()),
@@ -240,7 +239,7 @@ impl<O: ByteOrder> OwnedValue<O> {
         unsafe {
             let mut uninit = MaybeUninit::<Self>::uninit();
             uninit.assume_init_mut().set_tag(tag_id);
-            ptr::copy(
+            ptr::copy_nonoverlapping(
                 src,
                 (&mut uninit as *mut MaybeUninit<_> as *mut u8).add(1),
                 tag_size(tag_id),
