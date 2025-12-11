@@ -55,21 +55,67 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
 
     let mut mark = Vec::with_capacity(len / 32);
     let mut current: usize = 0;
-    let mut parent: usize = 0;
+    let mut parent: usize;
 
     // State machine labels for the parser
     enum Label {
-        CompBegin,     // Start parsing a compound tag
         CompItemBegin, // Start parsing a compound item
-        CompEnd,       // Finish parsing a compound tag
-        ListBegin,     // Start parsing a list tag
         ListItemBegin, // Start parsing a list item
-        ListEnd,       // Finish parsing a list tag
     }
 
     let mut label: Label;
 
     unsafe {
+        macro_rules! comp_begin {
+            () => {{
+                parent = current;
+                mark.push(Mark {
+                    cache: Cache::default(),
+                });
+                current = mark.len() - 1;
+                mark.get_unchecked_mut(current).cache.general_parent_offset =
+                    (current - parent) as u64 | (COMPOUND_TAG_MARKER << TAG_TYPE_SHIFT);
+                label = Label::CompItemBegin;
+            }};
+        }
+
+        macro_rules! list_begin {
+            () => {{
+                parent = current;
+                mark.push(Mark {
+                    cache: Cache::default(),
+                });
+                current = mark.len() - 1;
+
+                bytes_read += 1 + 4;
+                check_bounds!(bytes_read, len);
+
+                let element_type = *current_pos;
+                let element_count =
+                    byteorder::U32::<O>::from_bytes(*current_pos.add(1).cast()).get();
+
+                let cur = mark.get_unchecked_mut(current);
+
+                cur.cache.general_parent_offset =
+                    ((current - parent) as u64) | (u64::from(element_type) << TAG_TYPE_SHIFT);
+
+                if element_type <= 6 {
+                    let element_size = tag_size(element_type);
+                    let total_size = element_count as usize * element_size;
+                    bytes_read += total_size;
+                    check_bounds!(bytes_read, len);
+                    current_pos = current_pos.add(5 + total_size);
+                    cur.cache.list_total_length = 0;
+                    cur.cache.list_current_length = 0;
+                } else {
+                    current_pos = current_pos.add(5);
+                    cur.cache.list_total_length = element_count;
+                    cur.cache.list_current_length = 0;
+                }
+                label = Label::ListItemBegin;
+            }};
+        }
+
         check_bounds!(bytes_read, len);
 
         let root_tag = *current_pos;
@@ -126,8 +172,8 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                 }
                 return Ok(f(mark));
             }
-            9 => label = Label::ListBegin,
-            10 => label = Label::CompBegin,
+            9 => list_begin!(),
+            10 => comp_begin!(),
             _ => {
                 cold_path();
                 return Err(Error::InvalidTagType(root_tag));
@@ -136,16 +182,6 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
 
         loop {
             match label {
-                Label::CompBegin => {
-                    parent = current;
-                    mark.push(Mark {
-                        cache: Cache::default(),
-                    });
-                    current = mark.len() - 1;
-                    mark.get_unchecked_mut(current).cache.general_parent_offset =
-                        (current - parent) as u64 | (COMPOUND_TAG_MARKER << TAG_TYPE_SHIFT);
-                    label = Label::CompItemBegin;
-                }
                 Label::CompItemBegin => loop {
                     bytes_read += 1;
                     check_bounds!(bytes_read, len);
@@ -154,7 +190,34 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                     current_pos = current_pos.add(1);
 
                     if tag_id == 0 {
-                        label = Label::CompEnd;
+                        let mark_len = mark.len();
+                        let cur = mark.get_unchecked_mut(current);
+
+                        cur.store.end_pointer = current_pos;
+                        cur.store.flat_next_mark = (mark_len - current) as u64;
+
+                        if current == 0 {
+                            cold_path();
+                            if bytes_read < len {
+                                cold_path();
+                                return Err(Error::TrailingData(len - bytes_read));
+                            }
+                            return Ok(f(mark));
+                        }
+
+                        current = parent;
+                        parent = parent
+                            - ((mark.get_unchecked(parent).cache.general_parent_offset)
+                                & PARENT_OFFSET_MASK) as usize;
+
+                        if ((mark.get_unchecked(current).cache.general_parent_offset)
+                            >> TAG_TYPE_SHIFT)
+                            == COMPOUND_TAG_MARKER
+                        {
+                            label = Label::CompItemBegin;
+                        } else {
+                            label = Label::ListItemBegin;
+                        };
                         break;
                     }
 
@@ -196,11 +259,11 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             current_pos = current_pos.add(2 + str_len);
                         }
                         9 => {
-                            label = Label::ListBegin;
+                            list_begin!();
                             break;
                         }
                         10 => {
-                            label = Label::CompBegin;
+                            comp_begin!();
                             break;
                         }
                         _ => {
@@ -208,73 +271,38 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                         }
                     }
                 },
-                Label::CompEnd => {
-                    let mark_len = mark.len();
-                    let cur = mark.get_unchecked_mut(current);
-
-                    cur.store.end_pointer = current_pos;
-                    cur.store.flat_next_mark = (mark_len - current) as u64;
-
-                    if current == 0 {
-                        cold_path();
-                        if bytes_read < len {
-                            cold_path();
-                            return Err(Error::TrailingData(len - bytes_read));
-                        }
-                        return Ok(f(mark));
-                    }
-
-                    current = parent;
-                    parent = parent
-                        - ((mark.get_unchecked(parent).cache.general_parent_offset)
-                            & PARENT_OFFSET_MASK) as usize;
-
-                    if ((mark.get_unchecked(current).cache.general_parent_offset) >> TAG_TYPE_SHIFT)
-                        == COMPOUND_TAG_MARKER
-                    {
-                        label = Label::CompItemBegin;
-                    } else {
-                        label = Label::ListItemBegin;
-                    }
-                }
-                Label::ListBegin => {
-                    parent = current;
-                    mark.push(Mark {
-                        cache: Cache::default(),
-                    });
-                    current = mark.len() - 1;
-
-                    bytes_read += 1 + 4;
-                    check_bounds!(bytes_read, len);
-
-                    let element_type = *current_pos;
-                    let element_count =
-                        byteorder::U32::<O>::from_bytes(*current_pos.add(1).cast()).get();
-
-                    let cur = mark.get_unchecked_mut(current);
-
-                    cur.cache.general_parent_offset =
-                        ((current - parent) as u64) | (u64::from(element_type) << TAG_TYPE_SHIFT);
-
-                    if element_type <= 6 {
-                        let element_size = tag_size(element_type);
-                        let total_size = element_count as usize * element_size;
-                        bytes_read += total_size;
-                        check_bounds!(bytes_read, len);
-                        current_pos = current_pos.add(5 + total_size);
-                        label = Label::ListEnd;
-                    } else {
-                        current_pos = current_pos.add(5);
-                        cur.cache.list_total_length = element_count;
-                        cur.cache.list_current_length = 0;
-                        label = Label::ListItemBegin;
-                    }
-                }
                 Label::ListItemBegin => loop {
                     let cur = mark.get_unchecked_mut(current);
 
                     if cur.cache.list_current_length >= cur.cache.list_total_length {
-                        label = Label::ListEnd;
+                        let mark_len = mark.len();
+                        let cur = mark.get_unchecked_mut(current);
+
+                        cur.store.end_pointer = current_pos;
+                        cur.store.flat_next_mark = (mark_len - current) as u64;
+
+                        if current == 0 {
+                            cold_path();
+                            if bytes_read < len {
+                                cold_path();
+                                return Err(Error::TrailingData(len - bytes_read));
+                            }
+                            return Ok(f(mark));
+                        }
+
+                        current = parent;
+                        parent = parent
+                            - ((mark.get_unchecked(parent).cache.general_parent_offset)
+                                & PARENT_OFFSET_MASK) as usize;
+
+                        if ((mark.get_unchecked(current).cache.general_parent_offset)
+                            >> TAG_TYPE_SHIFT)
+                            == COMPOUND_TAG_MARKER
+                        {
+                            label = Label::CompItemBegin;
+                        } else {
+                            label = Label::ListItemBegin;
+                        }
                         break;
                     }
 
@@ -304,11 +332,11 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             current_pos = current_pos.add(2 + str_len);
                         }
                         9 => {
-                            label = Label::ListBegin;
+                            list_begin!();
                             break;
                         }
                         10 => {
-                            label = Label::CompBegin;
+                            comp_begin!();
                             break;
                         }
                         _ => {
@@ -316,35 +344,6 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                         }
                     }
                 },
-                Label::ListEnd => {
-                    let mark_len = mark.len();
-                    let cur = mark.get_unchecked_mut(current);
-
-                    cur.store.end_pointer = current_pos;
-                    cur.store.flat_next_mark = (mark_len - current) as u64;
-
-                    if current == 0 {
-                        cold_path();
-                        if bytes_read < len {
-                            cold_path();
-                            return Err(Error::TrailingData(len - bytes_read));
-                        }
-                        return Ok(f(mark));
-                    }
-
-                    current = parent;
-                    parent = parent
-                        - ((mark.get_unchecked(parent).cache.general_parent_offset)
-                            & PARENT_OFFSET_MASK) as usize;
-
-                    if ((mark.get_unchecked(current).cache.general_parent_offset) >> TAG_TYPE_SHIFT)
-                        == COMPOUND_TAG_MARKER
-                    {
-                        label = Label::CompItemBegin;
-                    } else {
-                        label = Label::ListItemBegin;
-                    }
-                }
             }
         }
     }
