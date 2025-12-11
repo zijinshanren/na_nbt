@@ -13,6 +13,7 @@ use crate::{
 pub const SIZE_USIZE: usize = std::mem::size_of::<usize>();
 pub const SIZE_DYN: usize = SIZE_USIZE * 3;
 
+#[inline]
 pub const unsafe fn tag_size(tag_id: u8) -> usize {
     const TAG_SIZES: [usize; 13] = [
         0, 1, 2, 4, 8, 4, 8, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN,
