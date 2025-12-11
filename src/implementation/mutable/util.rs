@@ -1,4 +1,4 @@
-use std::{hint::assert_unchecked, iter::repeat_n, marker::PhantomData, ptr, slice};
+use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
@@ -343,13 +343,10 @@ macro_rules! impl_list_insert {
             index: usize,
             value: i8,
         ) {
-            unsafe {
-                const TAG_SIZE: usize = unsafe { tag_size(1) };
-                let pos_bytes = index * TAG_SIZE + 1 + 4;
-                data.splice_drop(pos_bytes..pos_bytes, [0; TAG_SIZE]);
-                ptr::write(data.as_mut_ptr().add(pos_bytes).cast(), value);
-                list_increase::<O>(data);
-            }
+            const TAG_SIZE: usize = unsafe { tag_size(1) };
+            let pos_bytes = index * TAG_SIZE + 1 + 4;
+            data.insert(pos_bytes, value as u8);
+            list_increase::<O>(data);
         }
     };
     (flat, $name:ident, $name_unchecked:ident, $type:ty, $tag_id:expr) => {
@@ -375,10 +372,14 @@ macro_rules! impl_list_insert {
             value: $type,
         ) {
             unsafe {
-                let tag_size = tag_size($tag_id);
-                let pos_bytes = index * tag_size + 1 + 4;
-                data.splice_drop(pos_bytes..pos_bytes, repeat_n(0, tag_size));
-                ptr::write(data.as_mut_ptr().add(pos_bytes).cast(), value.to_bytes());
+                const TAG_SIZE: usize = unsafe { tag_size($tag_id) };
+                let pos_bytes = index * TAG_SIZE + 1 + 4;
+                let len_bytes = data.len();
+                data.reserve(TAG_SIZE);
+                let start = data.as_mut_ptr().add(pos_bytes);
+                ptr::copy(start, start.add(TAG_SIZE), len_bytes - pos_bytes);
+                ptr::write(start.cast(), value.to_bytes());
+                data.set_len(len_bytes + TAG_SIZE);
                 list_increase::<O>(data);
             }
         }
@@ -406,12 +407,16 @@ macro_rules! impl_list_insert {
             value: $type,
         ) {
             unsafe {
-                let tag_size = tag_size($tag_id);
-                let pos_bytes = index * tag_size + 1 + 4;
-                data.splice_drop(pos_bytes..pos_bytes, repeat_n(0, tag_size));
-                value.write(data.as_mut_ptr().add(pos_bytes));
+                const TAG_SIZE: usize = unsafe { tag_size($tag_id) };
+                let pos_bytes = index * TAG_SIZE + 1 + 4;
+                let len_bytes = data.len();
+                let start = data.as_mut_ptr().add(pos_bytes);
+                data.reserve(TAG_SIZE);
+                ptr::copy(start, start.add(TAG_SIZE), len_bytes - pos_bytes);
+                value.write(start);
+                data.set_len(len_bytes + TAG_SIZE);
                 list_increase::<O>(data);
-            }
+            };
         }
     };
 }
@@ -523,8 +528,12 @@ pub unsafe fn list_insert_value_unchecked<O: ByteOrder>(
     unsafe {
         let tag_size = tag_size(value.tag());
         let pos_bytes = index * tag_size + 1 + 4;
-        data.splice_drop(pos_bytes..pos_bytes, repeat_n(0, tag_size));
-        value.write(data.as_mut_ptr().add(pos_bytes));
+        let len_bytes = data.len();
+        data.reserve(tag_size);
+        let start = data.as_mut_ptr().add(pos_bytes);
+        ptr::copy(start, start.add(tag_size), len_bytes - pos_bytes);
+        value.write(start);
+        data.set_len(len_bytes + tag_size);
         list_increase::<O>(data);
     }
 }
@@ -539,7 +548,7 @@ pub fn list_pop<O: ByteOrder>(data: &mut VecViewMut<'_, u8>) -> Option<OwnedValu
         let tag_id = list_tag_id(data.as_ptr());
         let tag_size = tag_size(tag_id);
         let value = OwnedValue::<O>::read(tag_id, data.as_mut_ptr().add(len_bytes - tag_size));
-        data.truncate(len_bytes - tag_size);
+        data.set_len(len_bytes - tag_size);
         list_decrease::<O>(data);
         Some(value)
     }
@@ -555,8 +564,11 @@ pub fn list_remove<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, index: usize) ->
         let tag_id = list_tag_id(data.as_ptr());
         let tag_size = tag_size(tag_id);
         let pos_bytes = index * tag_size + 1 + 4;
+        let len_bytes = data.len();
         let value = OwnedValue::<O>::read(tag_id, data.as_mut_ptr().add(pos_bytes));
-        data.splice_drop(pos_bytes..pos_bytes + tag_size, []);
+        let start = data.as_mut_ptr().add(pos_bytes);
+        ptr::copy(start.add(tag_size), start, len_bytes - pos_bytes - tag_size);
+        data.set_len(len_bytes - tag_size);
         list_decrease::<O>(data);
         value
     }
@@ -806,12 +818,16 @@ pub fn compound_remove<O: ByteOrder>(
             ptr = ptr.add(name_len as usize);
 
             if name == name_bytes {
+                let tag_size = tag_size(tag_id);
                 let pos_bytes = ptr.byte_offset_from_unsigned(data.as_mut_ptr());
                 let value = OwnedValue::<O>::read(tag_id, ptr);
-                data.splice_drop(
-                    pos_bytes - name_len as usize - 2 - 1..pos_bytes + tag_size(tag_id),
-                    [],
+                let len_bytes = data.len();
+                ptr::copy(
+                    ptr.add(tag_size),
+                    ptr.sub(name_len as usize + 2 + 1),
+                    len_bytes - pos_bytes - tag_size,
                 );
+                data.set_len(len_bytes - (tag_size + name_len as usize + 2 + 1));
                 return Some(value);
             }
 
