@@ -165,9 +165,9 @@ unsafe fn read_unsafe_impl<O: ByteOrder>(
                 *current_pos = current_pos.add(len * tag_size(tag_id));
 
                 let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
-                uninit.assume_init_mut().set_tag(tag_id);
-                VecViewOwn::from(value)
-                    .write((&mut uninit as *mut MaybeUninit<_> as *mut u8).add(1));
+                let ptr = uninit.as_mut_ptr() as *mut u8;
+                *ptr = tag_id;
+                VecViewOwn::from(value).write(ptr.add(1));
                 Ok(uninit.assume_init())
             }
             8 => {
@@ -203,15 +203,13 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
     unsafe {
         assert_unchecked(tag_id != 0);
         if tag_id <= 6 {
-            check_bounds!(tag_size(tag_id));
+            let size = tag_size(tag_id);
+            check_bounds!(size);
             let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
-            uninit.assume_init_mut().set_tag(tag_id);
-            ptr::copy_nonoverlapping(
-                *current_pos,
-                (&mut uninit as *mut MaybeUninit<_> as *mut u8).add(1),
-                tag_size(tag_id),
-            );
-            *current_pos = current_pos.add(tag_size(tag_id));
+            let ptr = uninit.as_mut_ptr() as *mut u8;
+            *ptr = tag_id;
+            ptr::copy_nonoverlapping(*current_pos, ptr.add(1), size);
+            *current_pos = current_pos.add(size);
             Ok(uninit.assume_init())
         } else {
             read_unsafe_impl::<O>(tag_id, current_pos, end_pos)

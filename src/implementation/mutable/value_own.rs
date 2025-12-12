@@ -1,5 +1,5 @@
 use std::{
-    hint::{assert_unchecked, unreachable_unchecked},
+    hint::unreachable_unchecked,
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
     ptr,
@@ -217,18 +217,11 @@ impl<O: ByteOrder> OwnedValue<O> {
         unsafe { *(self as *const Self as *const u8) }
     }
 
-    pub(crate) unsafe fn set_tag(&mut self, tag_id: u8) {
-        unsafe {
-            assert_unchecked(tag_id < 13);
-            *(self as *mut Self as *mut u8) = tag_id;
-        }
-    }
-
     pub(crate) unsafe fn write(self, dst: *mut u8) {
         unsafe {
             let me = ManuallyDrop::new(self);
             ptr::copy_nonoverlapping(
-                (&me as *const ManuallyDrop<Self> as *const u8).add(1),
+                (&*me as *const Self as *const u8).add(1),
                 dst,
                 tag_size(me.tag()),
             );
@@ -237,13 +230,10 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     pub(crate) unsafe fn read(tag_id: u8, src: *mut u8) -> Self {
         unsafe {
-            let mut uninit = MaybeUninit::<Self>::uninit();
-            uninit.assume_init_mut().set_tag(tag_id);
-            ptr::copy_nonoverlapping(
-                src,
-                (&mut uninit as *mut MaybeUninit<_> as *mut u8).add(1),
-                tag_size(tag_id),
-            );
+            let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
+            let ptr = uninit.as_mut_ptr() as *mut u8;
+            *ptr = tag_id;
+            ptr::copy_nonoverlapping(src, ptr.add(1), tag_size(tag_id));
             uninit.assume_init()
         }
     }
