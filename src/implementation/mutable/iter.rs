@@ -194,7 +194,7 @@ impl<O: ByteOrder> ExactSizeIterator for OwnedListIter<O> {}
 impl<O: ByteOrder> Drop for OwnedListIter<O> {
     fn drop(&mut self) {
         let tag_id = self.tag_id;
-        if tag_id <= Tag::Double {
+        if tag_id.is_primitive() {
             return;
         }
 

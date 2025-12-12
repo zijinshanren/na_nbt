@@ -737,10 +737,10 @@ impl<O: ByteOrder> Drop for OwnedList<O> {
         unsafe {
             let mut ptr = self.data.as_mut_ptr();
 
-            let tag_id = *ptr.cast();
+            let tag_id = *ptr.cast::<Tag>();
             ptr = ptr.add(1);
 
-            if tag_id <= Tag::Double {
+            if tag_id.is_primitive() {
                 return;
             }
 
@@ -947,28 +947,26 @@ impl<O: ByteOrder> Drop for OwnedCompound<O> {
 
                 ptr = ptr.add(name_len as usize);
 
-                if tag_id > Tag::Double {
-                    match tag_id {
-                        Tag::ByteArray => {
-                            VecViewOwn::<i8>::read(ptr);
-                        }
-                        Tag::String => {
-                            StringViewOwn::read(ptr);
-                        }
-                        Tag::List => {
-                            OwnedList::<O>::read(ptr);
-                        }
-                        Tag::Compound => {
-                            OwnedCompound::<O>::read(ptr);
-                        }
-                        Tag::IntArray => {
-                            VecViewOwn::<byteorder::I32<O>>::read(ptr);
-                        }
-                        Tag::LongArray => {
-                            VecViewOwn::<byteorder::I64<O>>::read(ptr);
-                        }
-                        _ => unreachable_unchecked(),
+                match tag_id {
+                    Tag::ByteArray => {
+                        VecViewOwn::<i8>::read(ptr);
                     }
+                    Tag::String => {
+                        StringViewOwn::read(ptr);
+                    }
+                    Tag::List => {
+                        OwnedList::<O>::read(ptr);
+                    }
+                    Tag::Compound => {
+                        OwnedCompound::<O>::read(ptr);
+                    }
+                    Tag::IntArray => {
+                        VecViewOwn::<byteorder::I32<O>>::read(ptr);
+                    }
+                    Tag::LongArray => {
+                        VecViewOwn::<byteorder::I64<O>>::read(ptr);
+                    }
+                    _ => (),
                 }
 
                 ptr = ptr.add(tag_size(tag_id));
@@ -1274,7 +1272,7 @@ mod tests {
             list.push(42i32);
             assert_eq!(list.len(), 1);
             assert!(!list.is_empty());
-            assert_eq!(list.tag_id(), Tag::List);
+            assert_eq!(list.tag_id(), Tag::Int);
 
             list.push(100i32);
             assert_eq!(list.len(), 2);
@@ -1394,7 +1392,7 @@ mod tests {
             list.push("world");
 
             assert_eq!(list.len(), 2);
-            assert_eq!(list.tag_id(), Tag::List);
+            assert_eq!(list.tag_id(), Tag::String);
         }
 
         #[test]

@@ -1029,7 +1029,7 @@ mod tests {
 
             assert_eq!(list.len(), 3);
             assert!(!list.is_empty());
-            assert_eq!(list.tag_id(), Tag::List);
+            assert_eq!(list.tag_id(), Tag::Int);
         }
 
         #[test]

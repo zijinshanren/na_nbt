@@ -24,7 +24,13 @@ impl Tag {
     pub const fn is_primitive(self) -> bool {
         matches!(
             self,
-            Self::Byte | Self::Short | Self::Int | Self::Long | Self::Float | Self::Double
+            Self::End
+                | Self::Byte
+                | Self::Short
+                | Self::Int
+                | Self::Long
+                | Self::Float
+                | Self::Double
         )
     }
 

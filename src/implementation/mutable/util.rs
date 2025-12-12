@@ -884,7 +884,7 @@ mod tests {
             let mut list: OwnedList<BE> = OwnedList::default();
             list.push(42i32);
 
-            assert_eq!(list.tag_id(), Tag::List);
+            assert_eq!(list.tag_id(), Tag::Int);
         }
 
         #[test]

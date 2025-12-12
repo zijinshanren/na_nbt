@@ -47,7 +47,10 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
             macro_rules! get_composite {
                 ($t:tt, $s:tt) => {
                     ImmutableValue::$t($s {
-                        data,
+                        data: slice::from_raw_parts(
+                            data,
+                            (*mark).store.end_pointer.byte_offset_from_unsigned(data),
+                        ),
                         mark: mark.add(1),
                         doc,
                         _marker: PhantomData,
@@ -309,7 +312,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
 
 #[derive(Clone)]
 pub struct ImmutableArray<'doc, T, D: Document> {
-    data: &'doc [T],
+    pub(crate) data: &'doc [T],
     _doc: D,
 }
 
@@ -339,10 +342,10 @@ impl<'doc, D: Document> ImmutableString<'doc, D> {
 
 #[derive(Clone)]
 pub struct ImmutableList<'doc, O: ByteOrder, D: Document> {
-    data: *const u8,
-    mark: *const Mark,
+    pub(crate) data: &'doc [u8],
+    pub(crate) mark: *const Mark,
     doc: D,
-    _marker: PhantomData<(&'doc (), O)>,
+    _marker: PhantomData<O>,
 }
 
 unsafe impl<'doc, O: ByteOrder, D: Document> Send for ImmutableList<'doc, O, D> {}
@@ -357,7 +360,7 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ImmutableList<'doc, O, D>
         ImmutableListIter {
             tag_id: self.tag_id(),
             remaining: self.len() as u32,
-            data: unsafe { self.data.add(1 + 4) },
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
             mark: self.mark,
             doc: self.doc,
             _marker: PhantomData,
@@ -368,12 +371,12 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ImmutableList<'doc, O, D>
 impl<'doc, O: ByteOrder, D: Document> ImmutableList<'doc, O, D> {
     #[inline]
     pub fn tag_id(&self) -> Tag {
-        unsafe { *self.data.cast() }
+        unsafe { *self.data.as_ptr().cast() }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        unsafe { byteorder::U32::<O>::from_bytes(*self.data.add(1).cast()).get() as usize }
+        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
     }
 
     #[inline]
@@ -390,7 +393,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableList<'doc, O, D> {
         macro_rules! get {
             ($t: tt, $l: tt) => {
                 unsafe {
-                    let mut ptr = self.data.add(1 + 4);
+                    let mut ptr = self.data.as_ptr().add(1 + 4);
                     for _ in 0..index {
                         let len = byteorder::$l::<O>::from_bytes(*ptr.cast()).get();
                         ptr = ptr.add(std::mem::size_of::<byteorder::$l<O>>() + len as usize);
@@ -410,7 +413,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableList<'doc, O, D> {
         macro_rules! get_composite {
             ($t:tt, $s:tt) => {
                 unsafe {
-                    let mut ptr = self.data.add(1 + 4);
+                    let mut ptr = self.data.as_ptr().add(1 + 4);
                     let mut mark = self.mark;
                     for _ in 0..index {
                         ptr = (*mark).store.end_pointer;
@@ -418,7 +421,10 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableList<'doc, O, D> {
                     }
                     Some(ImmutableValue::$t($s {
                         doc: self.doc.clone(),
-                        data: ptr,
+                        data: slice::from_raw_parts(
+                            ptr,
+                            (*mark).store.end_pointer.byte_offset_from_unsigned(ptr),
+                        ),
                         mark: mark.add(1),
                         _marker: PhantomData,
                     }))
@@ -429,22 +435,27 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableList<'doc, O, D> {
         match self.tag_id() {
             Tag::End => Some(ImmutableValue::End),
             Tag::Byte => Some(ImmutableValue::Byte(unsafe {
-                *self.data.add(1 + 4 + index).cast()
+                *self.data.as_ptr().add(1 + 4 + index).cast()
             })),
             Tag::Short => Some(ImmutableValue::Short(unsafe {
-                byteorder::I16::<O>::from_bytes(*self.data.add(1 + 4 + index * 2).cast()).get()
+                byteorder::I16::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 2).cast())
+                    .get()
             })),
             Tag::Int => Some(ImmutableValue::Int(unsafe {
-                byteorder::I32::<O>::from_bytes(*self.data.add(1 + 4 + index * 4).cast()).get()
+                byteorder::I32::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 4).cast())
+                    .get()
             })),
             Tag::Long => Some(ImmutableValue::Long(unsafe {
-                byteorder::I64::<O>::from_bytes(*self.data.add(1 + 4 + index * 8).cast()).get()
+                byteorder::I64::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 8).cast())
+                    .get()
             })),
             Tag::Float => Some(ImmutableValue::Float(unsafe {
-                byteorder::F32::<O>::from_bytes(*self.data.add(1 + 4 + index * 4).cast()).get()
+                byteorder::F32::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 4).cast())
+                    .get()
             })),
             Tag::Double => Some(ImmutableValue::Double(unsafe {
-                byteorder::F64::<O>::from_bytes(*self.data.add(1 + 4 + index * 8).cast()).get()
+                byteorder::F64::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 8).cast())
+                    .get()
             })),
             Tag::ByteArray => get!(ByteArray, U32),
             Tag::String => get!(String, U16),
@@ -460,7 +471,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableList<'doc, O, D> {
         ImmutableListIter {
             tag_id: self.tag_id(),
             remaining: self.len() as u32,
-            data: unsafe { self.data.add(1 + 4) },
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
             mark: self.mark,
             doc: self.doc.clone(),
             _marker: PhantomData,
@@ -514,10 +525,10 @@ impl<'doc, O: ByteOrder, D: Document> ExactSizeIterator for ImmutableListIter<'d
 
 #[derive(Clone)]
 pub struct ImmutableCompound<'doc, O: ByteOrder, D: Document> {
-    data: *const u8,
-    mark: *const Mark,
+    pub(crate) data: &'doc [u8],
+    pub(crate) mark: *const Mark,
     doc: D,
-    _marker: PhantomData<(&'doc (), O)>,
+    _marker: PhantomData<O>,
 }
 
 unsafe impl<'doc, O: ByteOrder, D: Document> Send for ImmutableCompound<'doc, O, D> {}
@@ -530,7 +541,7 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ImmutableCompound<'doc, O
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         ImmutableCompoundIter {
-            data: self.data,
+            data: self.data.as_ptr(),
             mark: self.mark,
             doc: self.doc,
             _marker: PhantomData,
@@ -542,7 +553,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableCompound<'doc, O, D> {
     pub fn get(&self, key: &str) -> Option<ImmutableValue<'doc, O, D>> {
         let name = simd_cesu8::mutf8::encode(key);
         unsafe {
-            let mut ptr = self.data;
+            let mut ptr = self.data.as_ptr();
             let mut mark = self.mark;
             loop {
                 let tag_id = *ptr.cast();
@@ -573,7 +584,7 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableCompound<'doc, O, D> {
     #[inline]
     pub fn iter(&self) -> ImmutableCompoundIter<'doc, O, D> {
         ImmutableCompoundIter {
-            data: self.data,
+            data: self.data.as_ptr(),
             mark: self.mark,
             doc: self.doc.clone(),
             _marker: PhantomData,
