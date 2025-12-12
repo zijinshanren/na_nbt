@@ -1,10 +1,10 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData};
+use std::marker::PhantomData;
 
 use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
-    OwnedValue,
+    OwnedValue, Tag,
     implementation::mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
         util::{
@@ -39,7 +39,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
     /// # Safety
     ///
     /// .
-    pub unsafe fn read(tag_id: u8, data: *mut u8) -> Self {
+    pub unsafe fn read(tag_id: Tag, data: *mut u8) -> Self {
         unsafe {
             macro_rules! get {
                 ($t:tt, $l:tt) => {{
@@ -63,26 +63,44 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
             }
 
             match tag_id {
-                0 => MutableValue::End,
-                1 => MutableValue::Byte(&mut *data.cast()),
-                2 => MutableValue::Short(&mut *data.cast()),
-                3 => MutableValue::Int(&mut *data.cast()),
-                4 => MutableValue::Long(&mut *data.cast()),
-                5 => MutableValue::Float(&mut *data.cast()),
-                6 => MutableValue::Double(&mut *data.cast()),
-                7 => get!(ByteArray, VecViewMut),
-                8 => get!(String, StringViewMut),
-                9 => get_composite!(List, MutableList),
-                10 => get_composite!(Compound, MutableCompound),
-                11 => get!(IntArray, VecViewMut),
-                12 => get!(LongArray, VecViewMut),
-                _ => unreachable_unchecked(),
+                Tag::End => MutableValue::End,
+                Tag::Byte => MutableValue::Byte(&mut *data.cast()),
+                Tag::Short => MutableValue::Short(&mut *data.cast()),
+                Tag::Int => MutableValue::Int(&mut *data.cast()),
+                Tag::Long => MutableValue::Long(&mut *data.cast()),
+                Tag::Float => MutableValue::Float(&mut *data.cast()),
+                Tag::Double => MutableValue::Double(&mut *data.cast()),
+                Tag::ByteArray => get!(ByteArray, VecViewMut),
+                Tag::String => get!(String, StringViewMut),
+                Tag::List => get_composite!(List, MutableList),
+                Tag::Compound => get_composite!(Compound, MutableCompound),
+                Tag::IntArray => get!(IntArray, VecViewMut),
+                Tag::LongArray => get!(LongArray, VecViewMut),
             }
         }
     }
 }
 
 impl<'s, O: ByteOrder> MutableValue<'s, O> {
+    #[inline]
+    pub fn tag_id(&self) -> Tag {
+        match self {
+            MutableValue::End => Tag::End,
+            MutableValue::Byte(_) => Tag::Byte,
+            MutableValue::Short(_) => Tag::Short,
+            MutableValue::Int(_) => Tag::Int,
+            MutableValue::Long(_) => Tag::Long,
+            MutableValue::Float(_) => Tag::Float,
+            MutableValue::Double(_) => Tag::Double,
+            MutableValue::ByteArray(_) => Tag::ByteArray,
+            MutableValue::String(_) => Tag::String,
+            MutableValue::List(_) => Tag::List,
+            MutableValue::Compound(_) => Tag::Compound,
+            MutableValue::IntArray(_) => Tag::IntArray,
+            MutableValue::LongArray(_) => Tag::LongArray,
+        }
+    }
+
     #[inline]
     pub fn as_end(&self) -> Option<()> {
         match self {
@@ -603,7 +621,7 @@ impl<'s, O: ByteOrder> IntoIterator for MutableList<'s, O> {
 
 impl<'s, O: ByteOrder> MutableList<'s, O> {
     #[inline]
-    pub fn tag_id(&self) -> u8 {
+    pub fn tag_id(&self) -> Tag {
         list_tag_id(self.data.as_ptr())
     }
 
@@ -992,6 +1010,8 @@ mod tests {
     }
 
     mod mutable_list_tests {
+        use crate::Tag;
+
         use super::*;
 
         #[test]
@@ -1009,7 +1029,7 @@ mod tests {
 
             assert_eq!(list.len(), 3);
             assert!(!list.is_empty());
-            assert_eq!(list.tag_id(), 3);
+            assert_eq!(list.tag_id(), Tag::List);
         }
 
         #[test]

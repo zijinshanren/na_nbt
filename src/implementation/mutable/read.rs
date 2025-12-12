@@ -3,7 +3,7 @@ use std::{hint::assert_unchecked, marker::PhantomData, mem::MaybeUninit, ptr, sl
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Error, OwnedCompound, OwnedList, OwnedValue, Result, cold_path,
+    ByteOrder, Error, OwnedCompound, OwnedList, OwnedValue, Result, Tag, cold_path,
     implementation::mutable::util::{SIZE_DYN, tag_size},
     view::VecViewOwn,
 };
@@ -51,7 +51,7 @@ unsafe fn read_compound<O: ByteOrder>(
             *current_pos = current_pos.add(name_len);
 
             if tag_id <= 6 {
-                let size = tag_size(tag_id);
+                let size = tag_size(Tag::from_u8_unchecked(tag_id));
                 check_bounds!(size);
                 *current_pos = current_pos.add(size);
             } else if tag_id <= 12 {
@@ -91,7 +91,7 @@ unsafe fn read_list<O: ByteOrder>(
         let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
         *current_pos = current_pos.add(4);
         if tag_id <= 6 {
-            let size = tag_size(tag_id);
+            let size = tag_size(Tag::from_u8_unchecked(tag_id));
             check_bounds!(len * size);
             let value = slice::from_raw_parts((*current_pos).sub(1 + 4).cast(), len * size + 1 + 4);
             *current_pos = current_pos.add(len * size);
@@ -117,6 +117,7 @@ unsafe fn read_list<O: ByteOrder>(
         }
     }
 }
+
 unsafe fn read_unsafe_impl<O: ByteOrder>(
     tag_id: u8,
     current_pos: &mut *const u8,
@@ -203,7 +204,7 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
     unsafe {
         assert_unchecked(tag_id != 0);
         if tag_id <= 6 {
-            let size = tag_size(tag_id);
+            let size = tag_size(Tag::from_u8_unchecked(tag_id));
             check_bounds!(size);
             let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
             let ptr = uninit.as_mut_ptr() as *mut u8;
@@ -258,7 +259,7 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
 
             if tag_id <= 12 {
                 assert_unchecked(tag_id != 0);
-                let value_size = tag_size(tag_id);
+                let value_size = tag_size(Tag::from_u8_unchecked(tag_id));
                 let raw_len = 1 + 2 + name_len;
                 let len = compound_data.len();
                 compound_data.reserve(raw_len + value_size);
@@ -312,7 +313,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 _marker: PhantomData,
             }))
         } else if tag_id <= 12 {
-            let tag_size = tag_size(tag_id);
+            let tag_size = tag_size(Tag::from_u8_unchecked(tag_id));
             let mut list_data = Vec::with_capacity(1 + 4 + len * tag_size);
             let write_ptr = list_data.as_mut_ptr();
             ptr::write(write_ptr, tag_id);

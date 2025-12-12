@@ -9,7 +9,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
-    MutableCompound, MutableList, MutableValue, cold_path,
+    MutableCompound, MutableList, MutableValue, Tag, cold_path,
     implementation::mutable::{
         iter::{
             ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
@@ -213,26 +213,22 @@ impl<O: ByteOrder> From<Vec<byteorder::I64<O>>> for OwnedValue<O> {
 }
 
 impl<O: ByteOrder> OwnedValue<O> {
-    pub fn tag(&self) -> u8 {
-        unsafe { *(self as *const Self as *const u8) }
-    }
-
     pub(crate) unsafe fn write(self, dst: *mut u8) {
         unsafe {
             let me = ManuallyDrop::new(self);
             ptr::copy_nonoverlapping(
                 (&*me as *const Self as *const u8).add(1),
                 dst,
-                tag_size(me.tag()),
+                tag_size(me.tag_id()),
             );
         }
     }
 
-    pub(crate) unsafe fn read(tag_id: u8, src: *mut u8) -> Self {
+    pub(crate) unsafe fn read(tag_id: Tag, src: *mut u8) -> Self {
         unsafe {
             let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
             let ptr = uninit.as_mut_ptr() as *mut u8;
-            *ptr = tag_id;
+            *ptr = tag_id as u8;
             ptr::copy_nonoverlapping(src, ptr.add(1), tag_size(tag_id));
             uninit.assume_init()
         }
@@ -240,6 +236,11 @@ impl<O: ByteOrder> OwnedValue<O> {
 }
 
 impl<O: ByteOrder> OwnedValue<O> {
+    #[inline]
+    pub fn tag_id(&self) -> Tag {
+        unsafe { *(self as *const Self as *const Tag) }
+    }
+
     #[inline]
     pub fn as_end(&self) -> Option<()> {
         match self {
@@ -736,10 +737,10 @@ impl<O: ByteOrder> Drop for OwnedList<O> {
         unsafe {
             let mut ptr = self.data.as_mut_ptr();
 
-            let tag_id = *ptr;
+            let tag_id = *ptr.cast();
             ptr = ptr.add(1);
 
-            if tag_id <= 6 {
+            if tag_id <= Tag::Double {
                 return;
             }
 
@@ -747,37 +748,37 @@ impl<O: ByteOrder> Drop for OwnedList<O> {
             ptr = ptr.add(4);
 
             match tag_id {
-                7 => {
+                Tag::ByteArray => {
                     for _ in 0..len {
                         VecViewOwn::<i8>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                8 => {
+                Tag::String => {
                     for _ in 0..len {
                         StringViewOwn::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                9 => {
+                Tag::List => {
                     for _ in 0..len {
                         OwnedList::<O>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                10 => {
+                Tag::Compound => {
                     for _ in 0..len {
                         OwnedCompound::<O>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                11 => {
+                Tag::IntArray => {
                     for _ in 0..len {
                         VecViewOwn::<byteorder::I32<O>>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                12 => {
+                Tag::LongArray => {
                     for _ in 0..len {
                         VecViewOwn::<byteorder::I64<O>>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
@@ -813,7 +814,7 @@ impl<O: ByteOrder> IntoIterator for OwnedList<O> {
 
 impl<O: ByteOrder> OwnedList<O> {
     #[inline]
-    pub fn tag_id(&self) -> u8 {
+    pub fn tag_id(&self) -> Tag {
         list_tag_id(self.data.as_ptr())
     }
 
@@ -930,10 +931,10 @@ impl<O: ByteOrder> Drop for OwnedCompound<O> {
             let mut ptr = self.data.as_mut_ptr();
 
             loop {
-                let tag_id = *ptr;
+                let tag_id = *ptr.cast();
                 ptr = ptr.add(1);
 
-                if tag_id == 0 {
+                if tag_id == Tag::End {
                     cold_path();
                     debug_assert!(
                         ptr.byte_offset_from_unsigned(self.data.as_mut_ptr()) == self.data.len()
@@ -946,27 +947,28 @@ impl<O: ByteOrder> Drop for OwnedCompound<O> {
 
                 ptr = ptr.add(name_len as usize);
 
-                match tag_id {
-                    0..=6 => (),
-                    7 => {
-                        VecViewOwn::<i8>::read(ptr);
+                if tag_id > Tag::Double {
+                    match tag_id {
+                        Tag::ByteArray => {
+                            VecViewOwn::<i8>::read(ptr);
+                        }
+                        Tag::String => {
+                            StringViewOwn::read(ptr);
+                        }
+                        Tag::List => {
+                            OwnedList::<O>::read(ptr);
+                        }
+                        Tag::Compound => {
+                            OwnedCompound::<O>::read(ptr);
+                        }
+                        Tag::IntArray => {
+                            VecViewOwn::<byteorder::I32<O>>::read(ptr);
+                        }
+                        Tag::LongArray => {
+                            VecViewOwn::<byteorder::I64<O>>::read(ptr);
+                        }
+                        _ => unreachable_unchecked(),
                     }
-                    8 => {
-                        StringViewOwn::read(ptr);
-                    }
-                    9 => {
-                        OwnedList::<O>::read(ptr);
-                    }
-                    10 => {
-                        OwnedCompound::<O>::read(ptr);
-                    }
-                    11 => {
-                        VecViewOwn::<byteorder::I32<O>>::read(ptr);
-                    }
-                    12 => {
-                        VecViewOwn::<byteorder::I64<O>>::read(ptr);
-                    }
-                    _ => unreachable_unchecked(),
                 }
 
                 ptr = ptr.add(tag_size(tag_id));
@@ -1045,7 +1047,7 @@ mod tests {
             let v: OwnedValue<BE> = ().into();
             assert!(v.is_end());
             assert_eq!(v.as_end(), Some(()));
-            assert_eq!(v.tag(), 0);
+            assert_eq!(v.tag_id(), Tag::End);
         }
 
         #[test]
@@ -1053,7 +1055,7 @@ mod tests {
             let v: OwnedValue<BE> = 42i8.into();
             assert!(v.is_byte());
             assert_eq!(v.as_byte(), Some(42));
-            assert_eq!(v.tag(), 1);
+            assert_eq!(v.tag_id(), Tag::Byte);
         }
 
         #[test]
@@ -1061,7 +1063,7 @@ mod tests {
             let v: OwnedValue<BE> = 1000i16.into();
             assert!(v.is_short());
             assert_eq!(v.as_short(), Some(1000));
-            assert_eq!(v.tag(), 2);
+            assert_eq!(v.tag_id(), Tag::Short);
         }
 
         #[test]
@@ -1069,7 +1071,7 @@ mod tests {
             let v: OwnedValue<BE> = 100000i32.into();
             assert!(v.is_int());
             assert_eq!(v.as_int(), Some(100000));
-            assert_eq!(v.tag(), 3);
+            assert_eq!(v.tag_id(), Tag::Int);
         }
 
         #[test]
@@ -1077,7 +1079,7 @@ mod tests {
             let v: OwnedValue<BE> = 9999999999i64.into();
             assert!(v.is_long());
             assert_eq!(v.as_long(), Some(9999999999));
-            assert_eq!(v.tag(), 4);
+            assert_eq!(v.tag_id(), Tag::Long);
         }
 
         #[test]
@@ -1085,7 +1087,7 @@ mod tests {
             let v: OwnedValue<BE> = f32::consts::PI.into();
             assert!(v.is_float());
             assert!((v.as_float().unwrap() - f32::consts::PI).abs() < 0.001);
-            assert_eq!(v.tag(), 5);
+            assert_eq!(v.tag_id(), Tag::Float);
         }
 
         #[test]
@@ -1093,7 +1095,7 @@ mod tests {
             let v: OwnedValue<BE> = f64::consts::PI.into();
             assert!(v.is_double());
             assert!((v.as_double().unwrap() - f64::consts::PI).abs() < 0.0000001);
-            assert_eq!(v.tag(), 6);
+            assert_eq!(v.tag_id(), Tag::Double);
         }
 
         #[test]
@@ -1101,7 +1103,7 @@ mod tests {
             let v: OwnedValue<BE> = vec![1i8, 2, 3, 4].into();
             assert!(v.is_byte_array());
             assert_eq!(v.as_byte_array(), Some(&[1i8, 2, 3, 4][..]));
-            assert_eq!(v.tag(), 7);
+            assert_eq!(v.tag_id(), Tag::ByteArray);
         }
 
         #[test]
@@ -1110,7 +1112,7 @@ mod tests {
             assert!(v.is_string());
             let s = v.as_string().unwrap();
             assert_eq!(s.decode().as_ref(), "hello");
-            assert_eq!(v.tag(), 8);
+            assert_eq!(v.tag_id(), Tag::String);
         }
 
         #[test]
@@ -1119,6 +1121,7 @@ mod tests {
             assert!(v.is_string());
             let s = v.as_string().unwrap();
             assert_eq!(s.decode().as_ref(), "world");
+            assert_eq!(v.tag_id(), Tag::String);
         }
 
         #[test]
@@ -1262,7 +1265,7 @@ mod tests {
             let list: OwnedList<BE> = OwnedList::default();
             assert_eq!(list.len(), 0);
             assert!(list.is_empty());
-            assert_eq!(list.tag_id(), 0);
+            assert_eq!(list.tag_id(), Tag::End);
         }
 
         #[test]
@@ -1271,7 +1274,7 @@ mod tests {
             list.push(42i32);
             assert_eq!(list.len(), 1);
             assert!(!list.is_empty());
-            assert_eq!(list.tag_id(), 3);
+            assert_eq!(list.tag_id(), Tag::List);
 
             list.push(100i32);
             assert_eq!(list.len(), 2);
@@ -1391,7 +1394,7 @@ mod tests {
             list.push("world");
 
             assert_eq!(list.len(), 2);
-            assert_eq!(list.tag_id(), 8);
+            assert_eq!(list.tag_id(), Tag::List);
         }
 
         #[test]
@@ -1404,7 +1407,7 @@ mod tests {
             outer.push(inner);
 
             assert_eq!(outer.len(), 1);
-            assert_eq!(outer.tag_id(), 9);
+            assert_eq!(outer.tag_id(), Tag::List);
         }
     }
 

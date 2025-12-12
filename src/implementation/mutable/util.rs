@@ -1,9 +1,9 @@
-use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
+use std::{marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue, cold_path,
+    ByteOrder, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue, Tag, cold_path,
     implementation::mutable::iter::{
         ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
     },
@@ -14,16 +14,15 @@ pub const SIZE_USIZE: usize = std::mem::size_of::<usize>();
 pub const SIZE_DYN: usize = SIZE_USIZE * 3;
 
 #[inline]
-pub const unsafe fn tag_size(tag_id: u8) -> usize {
+pub const unsafe fn tag_size(tag_id: Tag) -> usize {
     const TAG_SIZES: [usize; 13] = [
         0, 1, 2, 4, 8, 4, 8, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN,
     ];
-    unsafe { assert_unchecked(tag_id < 13) };
     TAG_SIZES[tag_id as usize]
 }
 
 #[inline]
-pub fn list_tag_id(data: *const u8) -> u8 {
+pub fn list_tag_id(data: *const u8) -> Tag {
     unsafe { *data.cast() }
 }
 
@@ -103,9 +102,9 @@ fn list_decrease<O: ByteOrder>(data: &mut VecViewMut<'_, u8>) {
 pub fn list_push_end<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: ()) {
     if list_len::<O>(data.as_ptr()) == 0 {
         cold_path();
-        unsafe { data.as_mut_ptr().write(0) };
+        unsafe { data.as_mut_ptr().write(Tag::End as u8) };
     }
-    if 0 != list_tag_id(data.as_ptr()) {
+    if Tag::End != list_tag_id(data.as_ptr()) {
         cold_path();
         panic!("tag mismatch");
     }
@@ -121,9 +120,9 @@ macro_rules! impl_list_push {
         pub fn list_push_byte<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: i8) {
             if list_len::<O>(data.as_ptr()) == 0 {
                 cold_path();
-                unsafe { data.as_mut_ptr().write(1) };
+                unsafe { data.as_mut_ptr().write(Tag::Byte as u8) };
             }
-            if 1 != list_tag_id(data.as_ptr()) {
+            if Tag::Byte != list_tag_id(data.as_ptr()) {
                 cold_path();
                 panic!("tag mismatch");
             }
@@ -142,7 +141,7 @@ macro_rules! impl_list_push {
         pub fn $name<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: $type) {
             if list_len::<O>(data.as_ptr()) == 0 {
                 cold_path();
-                unsafe { data.as_mut_ptr().write($tag_id) };
+                unsafe { data.as_mut_ptr().write($tag_id as u8) };
             }
             if $tag_id != list_tag_id(data.as_ptr()) {
                 cold_path();
@@ -166,7 +165,7 @@ macro_rules! impl_list_push {
         pub fn $name<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: $type) {
             if list_len::<O>(data.as_ptr()) == 0 {
                 cold_path();
-                unsafe { data.as_mut_ptr().write($tag_id) };
+                unsafe { data.as_mut_ptr().write($tag_id as u8) };
             }
             if $tag_id != list_tag_id(data.as_ptr()) {
                 cold_path();
@@ -194,85 +193,85 @@ impl_list_push!(
     list_push_short,
     list_push_short_unchecked,
     byteorder::I16<O>,
-    2
+    Tag::Short
 );
 impl_list_push!(
     flat,
     list_push_int,
     list_push_int_unchecked,
     byteorder::I32<O>,
-    3
+    Tag::Int
 );
 impl_list_push!(
     flat,
     list_push_long,
     list_push_long_unchecked,
     byteorder::I64<O>,
-    4
+    Tag::Long
 );
 impl_list_push!(
     flat,
     list_push_float,
     list_push_float_unchecked,
     byteorder::F32<O>,
-    5
+    Tag::Float
 );
 impl_list_push!(
     flat,
     list_push_double,
     list_push_double_unchecked,
     byteorder::F64<O>,
-    6
+    Tag::Double
 );
 impl_list_push!(
     nested,
     list_push_byte_array,
     list_push_byte_array_unchecked,
     VecViewOwn<i8>,
-    7
+    Tag::ByteArray
 );
 impl_list_push!(
     nested,
     list_push_string,
     list_push_string_unchecked,
     StringViewOwn,
-    8
+    Tag::String
 );
 impl_list_push!(
     nested,
     list_push_list,
     list_push_list_unchecked,
     OwnedList<O>,
-    9
+    Tag::List
 );
 impl_list_push!(
     nested,
     list_push_compound,
     list_push_compound_unchecked,
     OwnedCompound<O>,
-    10
+    Tag::Compound
 );
 impl_list_push!(
     nested,
     list_push_int_array,
     list_push_int_array_unchecked,
     VecViewOwn<byteorder::I32<O>>,
-    11
+    Tag::IntArray
 );
 impl_list_push!(
     nested,
     list_push_long_array,
     list_push_long_array_unchecked,
     VecViewOwn<byteorder::I64<O>>,
-    12
+    Tag::LongArray
 );
 
 pub fn list_push_value<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: OwnedValue<O>) {
     if list_len::<O>(data.as_ptr()) == 0 {
         cold_path();
-        unsafe { data.as_mut_ptr().write(value.tag()) };
+        unsafe { data.as_mut_ptr().write(value.tag_id() as u8) };
     }
-    if value.tag() != list_tag_id(data.as_ptr()) {
+    if value.tag_id() != list_tag_id(data.as_ptr()) {
         cold_path();
         panic!("tag mismatch");
     }
@@ -284,7 +283,7 @@ pub unsafe fn list_push_value_unchecked<O: ByteOrder>(
     value: OwnedValue<O>,
 ) {
     unsafe {
-        let tag_size = tag_size(value.tag());
+        let tag_size = tag_size(value.tag_id());
         let len_bytes = data.len();
         data.reserve(tag_size);
         value.write(data.as_mut_ptr().add(len_bytes));
@@ -295,9 +294,9 @@ pub unsafe fn list_push_value_unchecked<O: ByteOrder>(
 pub fn list_insert_end<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, index: usize, value: ()) {
     if list_len::<O>(data.as_ptr()) == 0 {
         cold_path();
-        unsafe { data.as_mut_ptr().write(0) };
+        unsafe { data.as_mut_ptr().write(Tag::End as u8) };
     }
-    if 0 != list_tag_id(data.as_ptr()) {
+    if Tag::End != list_tag_id(data.as_ptr()) {
         cold_path();
         panic!("tag mismatch");
     }
@@ -325,9 +324,9 @@ macro_rules! impl_list_insert {
         ) {
             if list_len::<O>(data.as_ptr()) == 0 {
                 cold_path();
-                unsafe { data.as_mut_ptr().write(1) };
+                unsafe { data.as_mut_ptr().write(Tag::Byte as u8) };
             }
-            if 1 != list_tag_id(data.as_ptr()) {
+            if Tag::Byte != list_tag_id(data.as_ptr()) {
                 cold_path();
                 panic!("tag mismatch");
             }
@@ -343,7 +342,7 @@ macro_rules! impl_list_insert {
             index: usize,
             value: i8,
         ) {
-            const TAG_SIZE: usize = unsafe { tag_size(1) };
+            const TAG_SIZE: usize = unsafe { tag_size(Tag::Byte) };
             let pos_bytes = index * TAG_SIZE + 1 + 4;
             data.insert(pos_bytes, value as u8);
             list_increase::<O>(data);
@@ -353,7 +352,7 @@ macro_rules! impl_list_insert {
         pub fn $name<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, index: usize, value: $type) {
             if list_len::<O>(data.as_ptr()) == 0 {
                 cold_path();
-                unsafe { data.as_mut_ptr().write($tag_id) };
+                unsafe { data.as_mut_ptr().write($tag_id as u8) };
             }
             if $tag_id != list_tag_id(data.as_ptr()) {
                 cold_path();
@@ -388,7 +387,7 @@ macro_rules! impl_list_insert {
         pub fn $name<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, index: usize, value: $type) {
             if list_len::<O>(data.as_ptr()) == 0 {
                 cold_path();
-                unsafe { data.as_mut_ptr().write($tag_id) };
+                unsafe { data.as_mut_ptr().write($tag_id as u8) };
             }
             if $tag_id != list_tag_id(data.as_ptr()) {
                 cold_path();
@@ -427,77 +426,77 @@ impl_list_insert!(
     list_insert_short,
     list_insert_short_unchecked,
     byteorder::I16<O>,
-    2
+    Tag::Short
 );
 impl_list_insert!(
     flat,
     list_insert_int,
     list_insert_int_unchecked,
     byteorder::I32<O>,
-    3
+    Tag::Int
 );
 impl_list_insert!(
     flat,
     list_insert_long,
     list_insert_long_unchecked,
     byteorder::I64<O>,
-    4
+    Tag::Long
 );
 impl_list_insert!(
     flat,
     list_insert_float,
     list_insert_float_unchecked,
     byteorder::F32<O>,
-    5
+    Tag::Float
 );
 impl_list_insert!(
     flat,
     list_insert_double,
     list_insert_double_unchecked,
     byteorder::F64<O>,
-    6
+    Tag::Double
 );
 impl_list_insert!(
     nested,
     list_insert_byte_array,
     list_insert_byte_array_unchecked,
     VecViewOwn<i8>,
-    7
+    Tag::ByteArray
 );
 impl_list_insert!(
     nested,
     list_insert_string,
     list_insert_string_unchecked,
     StringViewOwn,
-    8
+    Tag::String
 );
 impl_list_insert!(
     nested,
     list_insert_list,
     list_insert_list_unchecked,
     OwnedList<O>,
-    9
+    Tag::List
 );
 impl_list_insert!(
     nested,
     list_insert_compound,
     list_insert_compound_unchecked,
     OwnedCompound<O>,
-    10
+    Tag::Compound
 );
 impl_list_insert!(
     nested,
     list_insert_int_array,
     list_insert_int_array_unchecked,
     VecViewOwn<byteorder::I32<O>>,
-    11
+    Tag::IntArray
 );
 impl_list_insert!(
     nested,
     list_insert_long_array,
     list_insert_long_array_unchecked,
     VecViewOwn<byteorder::I64<O>>,
-    12
+    Tag::LongArray
 );
 
 pub fn list_insert_value<O: ByteOrder>(
@@ -507,9 +506,9 @@ pub fn list_insert_value<O: ByteOrder>(
 ) {
     if list_len::<O>(data.as_ptr()) == 0 {
         cold_path();
-        unsafe { data.as_mut_ptr().write(value.tag()) };
+        unsafe { data.as_mut_ptr().write(value.tag_id() as u8) };
     }
-    if value.tag() != list_tag_id(data.as_ptr()) {
+    if value.tag_id() != list_tag_id(data.as_ptr()) {
         cold_path();
         panic!("tag mismatch");
     }
@@ -526,7 +525,7 @@ pub unsafe fn list_insert_value_unchecked<O: ByteOrder>(
     value: OwnedValue<O>,
 ) {
     unsafe {
-        let tag_size = tag_size(value.tag());
+        let tag_size = tag_size(value.tag_id());
         let pos_bytes = index * tag_size + 1 + 4;
         let len_bytes = data.len();
         data.reserve(tag_size);
@@ -580,10 +579,10 @@ pub fn compound_get<'s, O: ByteOrder>(data: *const u8, key: &str) -> Option<Immu
     unsafe {
         let mut ptr = data;
         loop {
-            let tag_id = *ptr;
+            let tag_id = *ptr.cast();
             ptr = ptr.add(1);
 
-            if tag_id == 0 {
+            if tag_id == Tag::End {
                 cold_path();
                 return None;
             }
@@ -617,10 +616,10 @@ pub fn compound_get_mut<'s, O: ByteOrder>(data: *mut u8, key: &str) -> Option<Mu
     unsafe {
         let mut ptr = data;
         loop {
-            let tag_id = *ptr;
+            let tag_id = *ptr.cast();
             ptr = ptr.add(1);
 
-            if tag_id == 0 {
+            if tag_id == Tag::End {
                 cold_path();
                 return None;
             }
@@ -669,14 +668,14 @@ macro_rules! impl_compound_insert {
             // remove TAG_END
             data.pop();
 
-            data.push(1);
+            data.push(Tag::Byte as u8);
             data.extend_from_slice(&name_len);
             data.extend_from_slice(&name_bytes);
 
             data.push(value as u8);
 
             // add TAG_END
-            data.push(0);
+            data.push(Tag::End as u8);
 
             old_value
         }
@@ -693,14 +692,14 @@ macro_rules! impl_compound_insert {
             // remove TAG_END
             data.pop();
 
-            data.push($tag_id);
+            data.push($tag_id as u8);
             data.extend_from_slice(&name_len);
             data.extend_from_slice(&name_bytes);
 
             data.extend_from_slice(&value.to_bytes());
 
             // add TAG_END
-            data.push(0);
+            data.push(Tag::End as u8);
 
             old_value
         }
@@ -718,7 +717,7 @@ macro_rules! impl_compound_insert {
                 // remove TAG_END
                 data.pop();
 
-                data.push($tag_id);
+                data.push($tag_id as u8);
                 data.extend_from_slice(&name_len);
                 data.extend_from_slice(&name_bytes);
 
@@ -729,7 +728,7 @@ macro_rules! impl_compound_insert {
                 data.set_len(len_bytes + TAG_SIZE);
 
                 // add TAG_END
-                data.push(0);
+                data.push(Tag::End as u8);
 
                 old_value
             }
@@ -738,26 +737,36 @@ macro_rules! impl_compound_insert {
 }
 
 impl_compound_insert!();
-impl_compound_insert!(flat, compound_insert_short, byteorder::I16<O>, 2);
-impl_compound_insert!(flat, compound_insert_int, byteorder::I32<O>, 3);
-impl_compound_insert!(flat, compound_insert_long, byteorder::I64<O>, 4);
-impl_compound_insert!(flat, compound_insert_float, byteorder::F32<O>, 5);
-impl_compound_insert!(flat, compound_insert_double, byteorder::F64<O>, 6);
-impl_compound_insert!(nested, compound_insert_byte_array, VecViewOwn<i8>, 7);
-impl_compound_insert!(nested, compound_insert_string, StringViewOwn, 8);
-impl_compound_insert!(nested, compound_insert_list, OwnedList<O>, 9);
-impl_compound_insert!(nested, compound_insert_compound, OwnedCompound<O>, 10);
+impl_compound_insert!(flat, compound_insert_short, byteorder::I16<O>, Tag::Short);
+impl_compound_insert!(flat, compound_insert_int, byteorder::I32<O>, Tag::Int);
+impl_compound_insert!(flat, compound_insert_long, byteorder::I64<O>, Tag::Long);
+impl_compound_insert!(flat, compound_insert_float, byteorder::F32<O>, Tag::Float);
+impl_compound_insert!(flat, compound_insert_double, byteorder::F64<O>, Tag::Double);
+impl_compound_insert!(
+    nested,
+    compound_insert_byte_array,
+    VecViewOwn<i8>,
+    Tag::ByteArray
+);
+impl_compound_insert!(nested, compound_insert_string, StringViewOwn, Tag::String);
+impl_compound_insert!(nested, compound_insert_list, OwnedList<O>, Tag::List);
+impl_compound_insert!(
+    nested,
+    compound_insert_compound,
+    OwnedCompound<O>,
+    Tag::Compound
+);
 impl_compound_insert!(
     nested,
     compound_insert_int_array,
     VecViewOwn<byteorder::I32<O>>,
-    11
+    Tag::IntArray
 );
 impl_compound_insert!(
     nested,
     compound_insert_long_array,
     VecViewOwn<byteorder::I64<O>>,
-    12
+    Tag::LongArray
 );
 
 pub fn compound_insert_value<O: ByteOrder>(
@@ -771,13 +780,13 @@ pub fn compound_insert_value<O: ByteOrder>(
     }
     let old_value = compound_remove::<O>(data, key);
     unsafe {
-        let tag_id = value.tag();
+        let tag_id = value.tag_id();
         let name_bytes = simd_cesu8::mutf8::encode(key);
         let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
         // remove TAG_END
         data.pop();
 
-        data.push(tag_id);
+        data.push(tag_id as u8);
         data.extend_from_slice(&name_len);
         data.extend_from_slice(&name_bytes);
 
@@ -803,10 +812,10 @@ pub fn compound_remove<O: ByteOrder>(
     unsafe {
         let mut ptr = data.as_mut_ptr();
         loop {
-            let tag_id = *ptr;
+            let tag_id = *ptr.cast();
             ptr = ptr.add(1);
 
-            if tag_id == 0 {
+            if tag_id == Tag::End {
                 cold_path();
                 return None;
             }
@@ -850,19 +859,19 @@ mod tests {
         #[test]
         fn test_tag_sizes() {
             unsafe {
-                assert_eq!(tag_size(0), 0); // End
-                assert_eq!(tag_size(1), 1); // Byte
-                assert_eq!(tag_size(2), 2); // Short
-                assert_eq!(tag_size(3), 4); // Int
-                assert_eq!(tag_size(4), 8); // Long
-                assert_eq!(tag_size(5), 4); // Float
-                assert_eq!(tag_size(6), 8); // Double
-                assert_eq!(tag_size(7), SIZE_DYN); // ByteArray
-                assert_eq!(tag_size(8), SIZE_DYN); // String
-                assert_eq!(tag_size(9), SIZE_DYN); // List
-                assert_eq!(tag_size(10), SIZE_DYN); // Compound
-                assert_eq!(tag_size(11), SIZE_DYN); // IntArray
-                assert_eq!(tag_size(12), SIZE_DYN); // LongArray
+                assert_eq!(tag_size(Tag::End), 0); // End
+                assert_eq!(tag_size(Tag::Byte), 1); // Byte
+                assert_eq!(tag_size(Tag::Short), 2); // Short
+                assert_eq!(tag_size(Tag::Int), 4); // Int
+                assert_eq!(tag_size(Tag::Long), 8); // Long
+                assert_eq!(tag_size(Tag::Float), 4); // Float
+                assert_eq!(tag_size(Tag::Double), 8); // Double
+                assert_eq!(tag_size(Tag::ByteArray), SIZE_DYN); // ByteArray
+                assert_eq!(tag_size(Tag::String), SIZE_DYN); // String
+                assert_eq!(tag_size(Tag::List), SIZE_DYN); // List
+                assert_eq!(tag_size(Tag::Compound), SIZE_DYN); // Compound
+                assert_eq!(tag_size(Tag::IntArray), SIZE_DYN); // IntArray
+                assert_eq!(tag_size(Tag::LongArray), SIZE_DYN); // LongArray
             }
         }
     }
@@ -875,7 +884,7 @@ mod tests {
             let mut list: OwnedList<BE> = OwnedList::default();
             list.push(42i32);
 
-            assert_eq!(list.tag_id(), 3);
+            assert_eq!(list.tag_id(), Tag::List);
         }
 
         #[test]

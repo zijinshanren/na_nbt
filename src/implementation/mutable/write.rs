@@ -46,7 +46,7 @@ pub unsafe fn write_list<O: ByteOrder>(data: *const u8, out: &mut Vec<u8>) -> Re
     unsafe {
         let tag_id = list_tag_id(data);
         let len = list_len::<O>(data);
-        match tag_id {
+        match tag_id as u8 {
             0..=6 => {
                 out.extend_from_slice(slice::from_raw_parts(data, 1 + 4 + len * tag_size(tag_id)));
             }

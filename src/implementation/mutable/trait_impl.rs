@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, ReadableCompound,
     ReadableConfig, ReadableList, ReadableString, ReadableValue, ScopedReadableCompound,
-    ScopedReadableList, ScopedReadableValue, Value, ValueScoped,
+    ScopedReadableList, ScopedReadableValue, Tag, Value, ValueScoped,
     implementation::mutable::iter::{ImmutableCompoundIter, ImmutableListIter},
     index::Index,
 };
@@ -36,6 +36,11 @@ impl<O: ByteOrder> ReadableConfig for Config<O> {
 
 impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
     type Config = Config<O>;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        self.tag_id()
+    }
 
     #[inline]
     fn as_end(&self) -> Option<()> {
@@ -281,7 +286,7 @@ impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for ImmutableList<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> u8 {
+    fn tag_id(&self) -> Tag {
         self.tag_id()
     }
 

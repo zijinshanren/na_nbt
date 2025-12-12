@@ -1,4 +1,4 @@
-use std::hint::assert_unchecked;
+use std::hint::{assert_unchecked, unreachable_unchecked};
 
 use zerocopy::{ByteOrder, byteorder};
 
@@ -134,7 +134,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
         current_pos = current_pos.add(2 + name_len);
 
         match root_tag {
-            0 => std::hint::unreachable_unchecked(),
+            0 => unreachable_unchecked(),
             1..=6 => {
                 cold_path();
                 bytes_read += tag_size(root_tag);
@@ -190,6 +190,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                     current_pos = current_pos.add(1);
 
                     if tag_id == 0 {
+                        cold_path();
                         let mark_len = mark.len();
                         let cur = mark.get_unchecked_mut(current);
 
@@ -267,6 +268,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             break;
                         }
                         _ => {
+                            cold_path();
                             return Err(Error::InvalidTagType(tag_id));
                         }
                     }
@@ -275,6 +277,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                     let cur = mark.get_unchecked_mut(current);
 
                     if cur.cache.list_current_length >= cur.cache.list_total_length {
+                        cold_path();
                         let mark_len = mark.len();
                         let cur = mark.get_unchecked_mut(current);
 
@@ -310,7 +313,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
 
                     let element_type = ((cur.cache.general_parent_offset) >> TAG_TYPE_SHIFT) as u8;
                     match element_type {
-                        0..=6 => std::hint::unreachable_unchecked(),
+                        0..=6 => unreachable_unchecked(),
                         7 | 11 | 12 => {
                             bytes_read += 4;
                             check_bounds!(bytes_read, len);
@@ -340,6 +343,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             break;
                         }
                         _ => {
+                            cold_path();
                             return Err(Error::InvalidTagType(element_type));
                         }
                     }

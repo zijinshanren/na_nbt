@@ -1,12 +1,15 @@
 use zerocopy::byteorder;
 
 use crate::{
+    Tag,
     index::Index,
     value_trait::{ReadableConfig, ValueScoped},
 };
 
 pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     type Config: ReadableConfig;
+
+    fn tag_id(&self) -> Tag;
 
     fn as_end(&self) -> Option<()>;
     fn is_end(&self) -> bool;
@@ -81,7 +84,7 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
 pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
     type Config: ReadableConfig;
 
-    fn tag_id(&self) -> u8;
+    fn tag_id(&self) -> Tag;
 
     fn len(&self) -> usize;
 

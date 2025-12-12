@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::TypeId, sync::Arc};
 
 use bytes::Bytes;
 use zerocopy::byteorder;
@@ -10,10 +10,10 @@ mod read;
 mod trait_impl;
 mod util;
 mod value;
+mod write;
 
 pub type BorrowedValue<'s, O> = value::ImmutableValue<'s, O, ()>;
 
-#[inline]
 pub fn read_borrowed<'s, O: ByteOrder>(source: &'s [u8]) -> Result<BorrowedDocument<'s, O>> {
     unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| BorrowedDocument {
@@ -58,7 +58,6 @@ unsafe impl<'s, O: ByteOrder> Sync for BorrowedDocument<'s, O> {}
 
 pub type SharedValue<O> = value::ImmutableValue<'static, O, Arc<SharedDocument>>;
 
-#[inline]
 pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
     Ok(unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {
@@ -96,3 +95,15 @@ impl SharedDocument {
         }
     }
 }
+
+pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>(
+    value: value::ImmutableValue<'s, SOURCE, D>,
+) -> Result<Vec<u8>> {
+    if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+        unsafe { write::write_unsafe::<SOURCE>(value.tag_id(), payload, mark) }
+    } else {
+        write::write_unsafe_fallback::<SOURCE, TARGET>(value)
+    }
+}
+
+// todo: Read & Write trait

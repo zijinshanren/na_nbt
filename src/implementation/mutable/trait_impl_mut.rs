@@ -6,8 +6,8 @@ use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, IntoOwnedValue, MutableCompound,
     MutableList, MutableValue, OwnedValue, ReadableConfig, ScopedReadableCompound,
     ScopedReadableList, ScopedReadableValue, ScopedWritableCompound, ScopedWritableList,
-    ScopedWritableValue, ValueMut, ValueMutScoped, ValueScoped, WritableCompound, WritableConfig,
-    WritableList, WritableValue,
+    ScopedWritableValue, Tag, ValueMut, ValueMutScoped, ValueScoped, WritableCompound,
+    WritableConfig, WritableList, WritableValue,
     implementation::mutable::{
         iter::{MutableCompoundIter, MutableListIter},
         trait_impl::Config,
@@ -26,6 +26,11 @@ impl<O: ByteOrder> WritableConfig for Config<O> {
 
 impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
     type Config = Config<O>;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        self.tag_id()
+    }
 
     #[inline]
     fn as_end(&self) -> Option<()> {
@@ -555,7 +560,7 @@ impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for MutableList<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> u8 {
+    fn tag_id(&self) -> Tag {
         self.tag_id()
     }
 
