@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, io::Write, mem::MaybeUninit, ptr, slice};
+use std::{hint::unreachable_unchecked, io::Write, ptr, slice};
 
 use zerocopy::byteorder;
 
