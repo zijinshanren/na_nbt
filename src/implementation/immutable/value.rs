@@ -628,9 +628,10 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ImmutableCompoundIter<'doc, O
                 self.doc.clone(),
             );
 
-            let (data_advance, mark_advance) =
-                tag_size::<O>(tag_id, self.data.add(3 + name_len as usize), self.mark);
-            self.data = self.data.add(3 + name_len as usize + data_advance);
+            self.data = self.data.add(1 + 2 + name_len as usize);
+
+            let (data_advance, mark_advance) = tag_size::<O>(tag_id, self.data, self.mark);
+            self.data = self.data.add(data_advance);
             self.mark = self.mark.add(mark_advance);
 
             Some((name, value))
