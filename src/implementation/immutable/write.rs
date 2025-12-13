@@ -1,8 +1,10 @@
-use std::{hint::unreachable_unchecked, ptr};
+use std::{hint::unreachable_unchecked, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{ByteOrder, Result, Tag, cold_path};
+
+const SLICE_THRESHOLD: u32 = 128;
 
 pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) -> Result<usize> {
     unsafe {
@@ -24,40 +26,29 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) 
                     buf = buf.add(2);
                 }
             }
-            Tag::Int => {
-                for _ in 0..len {
-                    ptr::write(
-                        buf.cast(),
-                        u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                    );
-                    buf = buf.add(4);
+            Tag::Int | Tag::Float => {
+                let s = slice::from_raw_parts_mut(buf.cast::<[u8; 4]>(), len as usize);
+                for element in s {
+                    *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
                 }
+                buf = buf.add(4 * len as usize);
             }
-            Tag::Long => {
-                for _ in 0..len {
-                    ptr::write(
-                        buf.cast(),
-                        u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                    );
-                    buf = buf.add(8);
-                }
-            }
-            Tag::Float => {
-                for _ in 0..len {
-                    ptr::write(
-                        buf.cast(),
-                        u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                    );
-                    buf = buf.add(4);
-                }
-            }
-            Tag::Double => {
-                for _ in 0..len {
-                    ptr::write(
-                        buf.cast(),
-                        u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                    );
-                    buf = buf.add(8);
+            Tag::Long | Tag::Double => {
+                if len >= SLICE_THRESHOLD {
+                    cold_path();
+                    let s = slice::from_raw_parts_mut(buf.cast::<[u8; 8]>(), len as usize);
+                    for element in s {
+                        *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    }
+                    buf = buf.add(8 * len as usize);
+                } else {
+                    for _ in 0..len {
+                        ptr::write(
+                            buf.cast(),
+                            u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
+                        );
+                        buf = buf.add(8);
+                    }
                 }
             }
             Tag::ByteArray => {
@@ -91,13 +82,11 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) 
                     let array_len = byteorder::U32::<O>::from_bytes(*buf.cast()).get();
                     ptr::write(buf.cast(), byteorder::U32::<R>::new(array_len).to_bytes());
                     buf = buf.add(4);
-                    for _ in 0..array_len {
-                        ptr::write(
-                            buf.cast(),
-                            u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                        );
-                        buf = buf.add(4);
+                    let s = slice::from_raw_parts_mut(buf.cast::<[u8; 4]>(), array_len as usize);
+                    for element in s {
+                        *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
                     }
+                    buf = buf.add(4 * array_len as usize);
                 }
             }
             Tag::LongArray => {
@@ -105,12 +94,22 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) 
                     let array_len = byteorder::U32::<O>::from_bytes(*buf.cast()).get();
                     ptr::write(buf.cast(), byteorder::U32::<R>::new(array_len).to_bytes());
                     buf = buf.add(4);
-                    for _ in 0..array_len {
-                        ptr::write(
-                            buf.cast(),
-                            u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                        );
-                        buf = buf.add(8);
+                    if array_len >= SLICE_THRESHOLD {
+                        cold_path();
+                        let s =
+                            slice::from_raw_parts_mut(buf.cast::<[u8; 8]>(), array_len as usize);
+                        for element in s {
+                            *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                        }
+                        buf = buf.add(8 * array_len as usize);
+                    } else {
+                        for _ in 0..array_len {
+                            ptr::write(
+                                buf.cast(),
+                                u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
+                            );
+                            buf = buf.add(8);
+                        }
                     }
                 }
             }
@@ -147,28 +146,14 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     );
                     buf = buf.add(2);
                 }
-                Tag::Int => {
+                Tag::Int | Tag::Float => {
                     ptr::write(
                         buf.cast(),
                         u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
                     );
                     buf = buf.add(4);
                 }
-                Tag::Long => {
-                    ptr::write(
-                        buf.cast(),
-                        u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                    );
-                    buf = buf.add(8);
-                }
-                Tag::Float => {
-                    ptr::write(
-                        buf.cast(),
-                        u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                    );
-                    buf = buf.add(4);
-                }
-                Tag::Double => {
+                Tag::Long | Tag::Double => {
                     ptr::write(
                         buf.cast(),
                         u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
@@ -197,24 +182,32 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     let array_len = byteorder::U32::<O>::from_bytes(*buf.cast()).get();
                     ptr::write(buf.cast(), byteorder::U32::<R>::new(array_len).to_bytes());
                     buf = buf.add(4);
-                    for _ in 0..array_len {
-                        ptr::write(
-                            buf.cast(),
-                            u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                        );
-                        buf = buf.add(4);
+                    let s = slice::from_raw_parts_mut(buf.cast::<[u8; 4]>(), array_len as usize);
+                    for element in s {
+                        *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
                     }
+                    buf = buf.add(4 * array_len as usize);
                 }
                 Tag::LongArray => {
                     let array_len = byteorder::U32::<O>::from_bytes(*buf.cast()).get();
                     ptr::write(buf.cast(), byteorder::U32::<R>::new(array_len).to_bytes());
                     buf = buf.add(4);
-                    for _ in 0..array_len {
-                        ptr::write(
-                            buf.cast(),
-                            u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
-                        );
-                        buf = buf.add(8);
+                    if array_len >= SLICE_THRESHOLD {
+                        cold_path();
+                        let s =
+                            slice::from_raw_parts_mut(buf.cast::<[u8; 8]>(), array_len as usize);
+                        for element in s {
+                            *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                        }
+                        buf = buf.add(8 * array_len as usize);
+                    } else {
+                        for _ in 0..array_len {
+                            ptr::write(
+                                buf.cast(),
+                                u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
+                            );
+                            buf = buf.add(8);
+                        }
                     }
                 }
             }

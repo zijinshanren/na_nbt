@@ -1,9 +1,9 @@
-use std::{any::TypeId, ptr, sync::Arc};
+use std::{any::TypeId, io::Write, mem::MaybeUninit, ptr, sync::Arc};
 
 use bytes::Bytes;
-use zerocopy::byteorder;
+use zerocopy::{IntoBytes, byteorder};
 
-use crate::{ByteOrder, Result, Tag, cold_path};
+use crate::{ByteOrder, Error, Result, Tag, cold_path};
 
 mod mark;
 mod read;
@@ -96,8 +96,8 @@ impl SharedDocument {
     }
 }
 
-pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>(
-    value: value::ImmutableValue<'s, SOURCE, D>,
+pub fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>(
+    value: &value::ImmutableValue<'s, SOURCE, D>,
 ) -> Result<Vec<u8>> {
     unsafe {
         match value {
@@ -105,7 +105,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
             value::ImmutableValue::Byte(value) => {
                 let mut buf = Vec::<u8>::with_capacity(4);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Byte as u8, 0u8, 0u8, value as u8]);
+                ptr::write(buf_ptr.cast(), [Tag::Byte as u8, 0u8, 0u8, *value as u8]);
                 buf.set_len(4);
                 Ok(buf)
             }
@@ -115,7 +115,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Short as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::I16::<TARGET>::new(value).to_bytes(),
+                    byteorder::I16::<TARGET>::new(*value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 2);
                 Ok(buf)
@@ -126,7 +126,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Int as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::I32::<TARGET>::new(value).to_bytes(),
+                    byteorder::I32::<TARGET>::new(*value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 4);
                 Ok(buf)
@@ -137,7 +137,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Long as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::I64::<TARGET>::new(value).to_bytes(),
+                    byteorder::I64::<TARGET>::new(*value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 8);
                 Ok(buf)
@@ -148,7 +148,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Float as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::F32::<TARGET>::new(value).to_bytes(),
+                    byteorder::F32::<TARGET>::new(*value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 4);
                 Ok(buf)
@@ -159,36 +159,38 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Double as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::F64::<TARGET>::new(value).to_bytes(),
+                    byteorder::F64::<TARGET>::new(*value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 8);
                 Ok(buf)
             }
             value::ImmutableValue::ByteArray(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
-                let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
-                let size = 4 + len as usize;
+                let len = value.data.len();
+                let size = 4 + len;
                 let mut buf = Vec::<u8>::with_capacity(3 + size);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::ByteArray as u8, 0u8, 0u8]);
-                ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
-                if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
-                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
-                }
+                ptr::write(
+                    buf_ptr.add(1 + 2).cast(),
+                    byteorder::U32::<SOURCE>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(payload, buf_ptr.add(1 + 2 + 4), len);
                 buf.set_len(3 + size);
                 Ok(buf)
             }
             value::ImmutableValue::String(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
-                let len = byteorder::U16::<SOURCE>::from_bytes(*payload.cast()).get();
-                let size = 2 + len as usize;
+                let len = value.data.len();
+                let size = 2 + len;
                 let mut buf = Vec::<u8>::with_capacity(3 + size);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::String as u8, 0u8, 0u8]);
-                ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
-                if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
-                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
-                }
+                ptr::write(
+                    buf_ptr.add(1 + 2).cast(),
+                    byteorder::U16::<SOURCE>::new(len as u16).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(payload, buf_ptr.add(1 + 2 + 2), len);
                 buf.set_len(3 + size);
                 Ok(buf)
             }
@@ -224,17 +226,23 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
             }
             value::ImmutableValue::IntArray(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
-                let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
-                let size = 4 + len as usize * 4;
-                let mut buf = Vec::<u8>::with_capacity(3 + size);
+                let len = value.data.len();
+                let len_bytes = std::mem::size_of_val(value.data);
+                let mut buf = Vec::<u8>::with_capacity(3 + 4 + len_bytes);
                 let mut buf_ptr = buf.as_mut_ptr();
+                // head
                 ptr::write(buf_ptr.cast(), [Tag::IntArray as u8, 0u8, 0u8]);
+                // length
+                ptr::write(
+                    buf_ptr.add(1 + 2).cast(),
+                    byteorder::U32::<SOURCE>::new(len as u32).to_bytes(),
+                );
+                // data
+                buf_ptr = buf_ptr.add(1 + 2 + 4);
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
+                    ptr::copy_nonoverlapping(payload, buf_ptr, len_bytes);
                 } else {
-                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
-                    buf_ptr = buf_ptr.add(1 + 2 + 4);
-                    let mut payload_ptr = payload.add(4);
+                    let mut payload_ptr = payload;
                     for _ in 0..len {
                         ptr::write(
                             buf_ptr.cast(),
@@ -246,22 +254,28 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                         payload_ptr = payload_ptr.add(4);
                     }
                 }
-                buf.set_len(3 + size);
+                buf.set_len(3 + 4 + len_bytes);
                 Ok(buf)
             }
             value::ImmutableValue::LongArray(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
-                let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
-                let size = 4 + len as usize * 8;
-                let mut buf = Vec::<u8>::with_capacity(3 + size);
+                let len = value.data.len();
+                let len_bytes = std::mem::size_of_val(value.data);
+                let mut buf = Vec::<u8>::with_capacity(3 + 4 + len_bytes);
                 let mut buf_ptr = buf.as_mut_ptr();
+                // head
                 ptr::write(buf_ptr.cast(), [Tag::LongArray as u8, 0u8, 0u8]);
+                // length
+                ptr::write(
+                    buf_ptr.add(1 + 2).cast(),
+                    byteorder::U32::<SOURCE>::new(len as u32).to_bytes(),
+                );
+                // data
+                buf_ptr = buf_ptr.add(1 + 2 + 4);
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
+                    ptr::copy_nonoverlapping(payload, buf_ptr, len_bytes);
                 } else {
-                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
-                    buf_ptr = buf_ptr.add(1 + 2 + 4);
-                    let mut payload_ptr = payload.add(4);
+                    let mut payload_ptr = payload;
                     for _ in 0..len {
                         ptr::write(
                             buf_ptr.cast(),
@@ -273,11 +287,162 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                         payload_ptr = payload_ptr.add(8);
                     }
                 }
-                buf.set_len(3 + size);
+                buf.set_len(3 + 4 + len_bytes);
                 Ok(buf)
             }
         }
     }
 }
 
+pub fn write_value_to_writer<
+    's,
+    D: value::Document,
+    SOURCE: ByteOrder,
+    TARGET: ByteOrder,
+    W: Write,
+>(
+    mut writer: W,
+    value: &value::ImmutableValue<'s, SOURCE, D>,
+) -> Result<()> {
+    unsafe {
+        match value {
+            value::ImmutableValue::End => writer.write_all(&[0]).map_err(Error::IO),
+            value::ImmutableValue::Byte(value) => writer
+                .write_all(&[Tag::Byte as u8, 0u8, 0u8, *value as u8])
+                .map_err(Error::IO),
+            value::ImmutableValue::Short(value) => {
+                let mut buf = MaybeUninit::<[u8; 1 + 2 + 2]>::uninit();
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Short as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::I16::<TARGET>::new(*value).to_bytes(),
+                );
+                writer.write_all(buf.assume_init_ref()).map_err(Error::IO)
+            }
+            value::ImmutableValue::Int(value) => {
+                let mut buf = MaybeUninit::<[u8; 1 + 2 + 4]>::uninit();
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Int as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::I32::<TARGET>::new(*value).to_bytes(),
+                );
+                writer.write_all(buf.assume_init_ref()).map_err(Error::IO)
+            }
+            value::ImmutableValue::Long(value) => {
+                let mut buf = MaybeUninit::<[u8; 1 + 2 + 8]>::uninit();
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Long as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::I64::<TARGET>::new(*value).to_bytes(),
+                );
+                writer.write_all(buf.assume_init_ref()).map_err(Error::IO)
+            }
+            value::ImmutableValue::Float(value) => {
+                let mut buf = MaybeUninit::<[u8; 1 + 2 + 4]>::uninit();
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Float as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::F32::<TARGET>::new(*value).to_bytes(),
+                );
+                writer.write_all(buf.assume_init_ref()).map_err(Error::IO)
+            }
+            value::ImmutableValue::Double(value) => {
+                let mut buf = MaybeUninit::<[u8; 1 + 2 + 8]>::uninit();
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Double as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::F64::<TARGET>::new(*value).to_bytes(),
+                );
+                writer.write_all(buf.assume_init_ref()).map_err(Error::IO)
+            }
+            value::ImmutableValue::ByteArray(value) => {
+                let mut buf_head = MaybeUninit::<[u8; 1 + 2 + 4]>::uninit();
+                ptr::write(
+                    buf_head.as_mut_ptr().cast(),
+                    [Tag::ByteArray as u8, 0u8, 0u8],
+                );
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U32::<SOURCE>::new(value.data.len() as u32).to_bytes(),
+                );
+                writer
+                    .write_all(buf_head.assume_init_ref())
+                    .map_err(Error::IO)?;
+                writer.write_all(value.data.as_bytes()).map_err(Error::IO)
+            }
+            value::ImmutableValue::String(value) => {
+                let mut buf_head = MaybeUninit::<[u8; 1 + 2 + 2]>::uninit();
+                ptr::write(buf_head.as_mut_ptr().cast(), [Tag::String as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U16::<SOURCE>::new(value.data.len() as u16).to_bytes(),
+                );
+                writer
+                    .write_all(buf_head.assume_init_ref())
+                    .map_err(Error::IO)?;
+                writer.write_all(value.data.as_bytes()).map_err(Error::IO)
+            }
+            value::ImmutableValue::List(value) => {
+                todo!()
+            }
+            value::ImmutableValue::Compound(value) => {
+                todo!()
+            }
+            value::ImmutableValue::IntArray(value) => {
+                let mut buf_head = MaybeUninit::<[u8; 1 + 2 + 4]>::uninit();
+                ptr::write(
+                    buf_head.as_mut_ptr().cast(),
+                    [Tag::IntArray as u8, 0u8, 0u8],
+                );
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U32::<SOURCE>::new(value.data.len() as u32).to_bytes(),
+                );
+                writer
+                    .write_all(buf_head.assume_init_ref())
+                    .map_err(Error::IO)?;
+                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                    writer.write_all(value.data.as_bytes()).map_err(Error::IO)
+                } else {
+                    let mut payload_ptr = value.data.as_ptr().cast::<u8>();
+                    for _ in 0..value.data.len() {
+                        writer
+                            .write_all(
+                                &u64::from_ne_bytes(*payload_ptr.cast())
+                                    .swap_bytes()
+                                    .to_ne_bytes(),
+                            )
+                            .map_err(Error::IO)?;
+                        payload_ptr = payload_ptr.add(4);
+                    }
+                    Ok(())
+                }
+            }
+            value::ImmutableValue::LongArray(value) => {
+                let mut buf_head = MaybeUninit::<[u8; 1 + 2 + 4]>::uninit();
+                ptr::write(
+                    buf_head.as_mut_ptr().cast(),
+                    [Tag::LongArray as u8, 0u8, 0u8],
+                );
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U32::<SOURCE>::new(value.data.len() as u32).to_bytes(),
+                );
+                writer
+                    .write_all(buf_head.assume_init_ref())
+                    .map_err(Error::IO)?;
+                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                    writer.write_all(value.data.as_bytes()).map_err(Error::IO)
+                } else {
+                    for value in value.data {
+                        writer
+                            .write_all(&byteorder::I64::<TARGET>::new(value.get()).to_bytes())
+                            .map_err(Error::IO)?;
+                    }
+                    Ok(())
+                }
+            }
+        }
+    }
+}
 // todo: Read & Write trait
