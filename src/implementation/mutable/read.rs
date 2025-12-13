@@ -123,28 +123,6 @@ unsafe fn read_unsafe_impl<O: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
 ) -> Result<OwnedValue<O>> {
-    const TAG_SIZE: [usize; 13] = [
-        0, // End
-        1, // Byte
-        2, // Short
-        4, // Int
-        8, // Long
-        4, // Float
-        8, // Double
-        1, // ByteArray (element size)
-        0, // String (variable)
-        0, // List (variable)
-        0, // Compound (variable)
-        4, // IntArray (element size)
-        8, // LongArray (element size)
-    ];
-
-    #[inline(always)]
-    unsafe fn tag_size(tag_id: u8) -> usize {
-        unsafe { assert_unchecked(tag_id < 13) };
-        TAG_SIZE[tag_id as usize]
-    }
-
     macro_rules! check_bounds {
         ($extra:expr) => {
             if (*current_pos).add($extra) > end_pos {
@@ -157,13 +135,44 @@ unsafe fn read_unsafe_impl<O: ByteOrder>(
     unsafe {
         assert_unchecked(tag_id > 6);
         match tag_id {
-            7 | 11 | 12 => {
+            7 => {
+                // ByteArray: element size is 1 byte
                 check_bounds!(4);
                 let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
                 *current_pos = current_pos.add(4);
-                check_bounds!(len * tag_size(tag_id));
-                let value = slice::from_raw_parts(*current_pos, len * tag_size(tag_id));
-                *current_pos = current_pos.add(len * tag_size(tag_id));
+                check_bounds!(len);
+                let value = slice::from_raw_parts(*current_pos, len);
+                *current_pos = current_pos.add(len);
+
+                let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
+                let ptr = uninit.as_mut_ptr() as *mut u8;
+                *ptr = tag_id;
+                VecViewOwn::from(value).write(ptr.add(1));
+                Ok(uninit.assume_init())
+            }
+            11 => {
+                // IntArray: element size is 4 bytes
+                check_bounds!(4);
+                let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                *current_pos = current_pos.add(4);
+                check_bounds!(len * 4);
+                let value: &[byteorder::I32<O>] = slice::from_raw_parts((*current_pos).cast(), len);
+                *current_pos = current_pos.add(len * 4);
+
+                let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
+                let ptr = uninit.as_mut_ptr() as *mut u8;
+                *ptr = tag_id;
+                VecViewOwn::from(value).write(ptr.add(1));
+                Ok(uninit.assume_init())
+            }
+            12 => {
+                // LongArray: element size is 8 bytes
+                check_bounds!(4);
+                let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
+                *current_pos = current_pos.add(4);
+                check_bounds!(len * 8);
+                let value: &[byteorder::I64<O>] = slice::from_raw_parts((*current_pos).cast(), len);
+                *current_pos = current_pos.add(len * 8);
 
                 let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
                 let ptr = uninit.as_mut_ptr() as *mut u8;

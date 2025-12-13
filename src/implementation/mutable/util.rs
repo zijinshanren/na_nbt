@@ -409,8 +409,8 @@ macro_rules! impl_list_insert {
                 const TAG_SIZE: usize = unsafe { tag_size($tag_id) };
                 let pos_bytes = index * TAG_SIZE + 1 + 4;
                 let len_bytes = data.len();
-                let start = data.as_mut_ptr().add(pos_bytes);
                 data.reserve(TAG_SIZE);
+                let start = data.as_mut_ptr().add(pos_bytes);
                 ptr::copy(start, start.add(TAG_SIZE), len_bytes - pos_bytes);
                 value.write(start);
                 data.set_len(len_bytes + TAG_SIZE);
