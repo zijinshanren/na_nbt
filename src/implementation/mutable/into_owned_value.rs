@@ -126,23 +126,23 @@ impl<O: ByteOrder> IntoOwnedValue<O> for byteorder::I16<O> {
 impl<O: ByteOrder> IntoOwnedValue<O> for i16 {
     #[inline]
     fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        byteorder::I16::<O>::from(self).compound_insert(data, key)
+        byteorder::I16::<O>::new(self).compound_insert(data, key)
     }
     #[inline]
     fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        byteorder::I16::<O>::from(self).list_push(data)
+        byteorder::I16::<O>::new(self).list_push(data)
     }
     #[inline]
     unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { byteorder::I16::<O>::from(self).list_push_unchecked(data) }
+        unsafe { byteorder::I16::<O>::new(self).list_push_unchecked(data) }
     }
     #[inline]
     fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        byteorder::I16::<O>::from(self).list_insert(data, index)
+        byteorder::I16::<O>::new(self).list_insert(data, index)
     }
     #[inline]
     unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { byteorder::I16::<O>::from(self).list_insert_unchecked(data, index) }
+        unsafe { byteorder::I16::<O>::new(self).list_insert_unchecked(data, index) }
     }
 }
 
@@ -172,23 +172,23 @@ impl<O: ByteOrder> IntoOwnedValue<O> for byteorder::I32<O> {
 impl<O: ByteOrder> IntoOwnedValue<O> for i32 {
     #[inline]
     fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        byteorder::I32::<O>::from(self).compound_insert(data, key)
+        byteorder::I32::<O>::new(self).compound_insert(data, key)
     }
     #[inline]
     fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        byteorder::I32::<O>::from(self).list_push(data)
+        byteorder::I32::<O>::new(self).list_push(data)
     }
     #[inline]
     unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { byteorder::I32::<O>::from(self).list_push_unchecked(data) }
+        unsafe { byteorder::I32::<O>::new(self).list_push_unchecked(data) }
     }
     #[inline]
     fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        byteorder::I32::<O>::from(self).list_insert(data, index)
+        byteorder::I32::<O>::new(self).list_insert(data, index)
     }
     #[inline]
     unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { byteorder::I32::<O>::from(self).list_insert_unchecked(data, index) }
+        unsafe { byteorder::I32::<O>::new(self).list_insert_unchecked(data, index) }
     }
 }
 
@@ -218,23 +218,23 @@ impl<O: ByteOrder> IntoOwnedValue<O> for byteorder::I64<O> {
 impl<O: ByteOrder> IntoOwnedValue<O> for i64 {
     #[inline]
     fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        byteorder::I64::<O>::from(self).compound_insert(data, key)
+        byteorder::I64::<O>::new(self).compound_insert(data, key)
     }
     #[inline]
     fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        byteorder::I64::<O>::from(self).list_push(data)
+        byteorder::I64::<O>::new(self).list_push(data)
     }
     #[inline]
     unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { byteorder::I64::<O>::from(self).list_push_unchecked(data) }
+        unsafe { byteorder::I64::<O>::new(self).list_push_unchecked(data) }
     }
     #[inline]
     fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        byteorder::I64::<O>::from(self).list_insert(data, index)
+        byteorder::I64::<O>::new(self).list_insert(data, index)
     }
     #[inline]
     unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { byteorder::I64::<O>::from(self).list_insert_unchecked(data, index) }
+        unsafe { byteorder::I64::<O>::new(self).list_insert_unchecked(data, index) }
     }
 }
 
@@ -264,23 +264,23 @@ impl<O: ByteOrder> IntoOwnedValue<O> for byteorder::F32<O> {
 impl<O: ByteOrder> IntoOwnedValue<O> for f32 {
     #[inline]
     fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        byteorder::F32::<O>::from(self).compound_insert(data, key)
+        byteorder::F32::<O>::new(self).compound_insert(data, key)
     }
     #[inline]
     fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        byteorder::F32::<O>::from(self).list_push(data)
+        byteorder::F32::<O>::new(self).list_push(data)
     }
     #[inline]
     unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { byteorder::F32::<O>::from(self).list_push_unchecked(data) }
+        unsafe { byteorder::F32::<O>::new(self).list_push_unchecked(data) }
     }
     #[inline]
     fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        byteorder::F32::<O>::from(self).list_insert(data, index)
+        byteorder::F32::<O>::new(self).list_insert(data, index)
     }
     #[inline]
     unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { byteorder::F32::<O>::from(self).list_insert_unchecked(data, index) }
+        unsafe { byteorder::F32::<O>::new(self).list_insert_unchecked(data, index) }
     }
 }
 
@@ -310,23 +310,23 @@ impl<O: ByteOrder> IntoOwnedValue<O> for byteorder::F64<O> {
 impl<O: ByteOrder> IntoOwnedValue<O> for f64 {
     #[inline]
     fn compound_insert(self, data: &mut VecViewMut<'_, u8>, key: &str) -> Option<OwnedValue<O>> {
-        byteorder::F64::<O>::from(self).compound_insert(data, key)
+        byteorder::F64::<O>::new(self).compound_insert(data, key)
     }
     #[inline]
     fn list_push(self, data: &mut VecViewMut<'_, u8>) {
-        byteorder::F64::<O>::from(self).list_push(data)
+        byteorder::F64::<O>::new(self).list_push(data)
     }
     #[inline]
     unsafe fn list_push_unchecked(self, data: &mut VecViewMut<'_, u8>) {
-        unsafe { byteorder::F64::<O>::from(self).list_push_unchecked(data) }
+        unsafe { byteorder::F64::<O>::new(self).list_push_unchecked(data) }
     }
     #[inline]
     fn list_insert(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        byteorder::F64::<O>::from(self).list_insert(data, index)
+        byteorder::F64::<O>::new(self).list_insert(data, index)
     }
     #[inline]
     unsafe fn list_insert_unchecked(self, data: &mut VecViewMut<'_, u8>, index: usize) {
-        unsafe { byteorder::F64::<O>::from(self).list_insert_unchecked(data, index) }
+        unsafe { byteorder::F64::<O>::new(self).list_insert_unchecked(data, index) }
     }
 }
 

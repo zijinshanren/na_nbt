@@ -267,7 +267,7 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
                 ptr::copy_nonoverlapping(start, write_ptr, raw_len);
                 ptr::write(
                     write_ptr.add(1).cast(),
-                    byteorder::U16::<R>::from(name_len as u16).to_bytes(),
+                    byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                 );
                 read_unsafe_fallback::<O, R>(tag_id, current_pos, end_pos)?
                     .write(write_ptr.add(raw_len));
@@ -305,7 +305,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             ptr::write(write_ptr, tag_id);
             ptr::write(
                 write_ptr.add(1).cast(),
-                byteorder::U32::<R>::from(len as u32).to_bytes(),
+                byteorder::U32::<R>::new(len as u32).to_bytes(),
             );
             list_data.set_len(1 + 4);
             Ok(OwnedValue::List(OwnedList {
@@ -319,7 +319,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             ptr::write(write_ptr, tag_id);
             ptr::write(
                 write_ptr.add(1).cast(),
-                byteorder::U32::<R>::from(len as u32).to_bytes(),
+                byteorder::U32::<R>::new(len as u32).to_bytes(),
             );
             let mut write_ptr = list_data.as_mut_ptr().add(1 + 4);
             for _ in 0..len {
@@ -434,7 +434,7 @@ pub unsafe fn read_unsafe_fallback<O: ByteOrder, R: ByteOrder>(
                 for _ in 0..len {
                     ptr::write(
                         dst.cast(),
-                        byteorder::I32::<R>::from((*dst).get()).to_bytes(),
+                        byteorder::I32::<R>::new((*dst).get()).to_bytes(),
                     );
                     dst = dst.add(1);
                 }
@@ -457,7 +457,7 @@ pub unsafe fn read_unsafe_fallback<O: ByteOrder, R: ByteOrder>(
                 for _ in 0..len {
                     ptr::write(
                         dst.cast(),
-                        byteorder::I64::<R>::from((*dst).get()).to_bytes(),
+                        byteorder::I64::<R>::new((*dst).get()).to_bytes(),
                     );
                     dst = dst.add(1);
                 }

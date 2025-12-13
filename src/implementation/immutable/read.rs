@@ -97,7 +97,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                 let cur = mark.get_unchecked_mut(current);
 
                 cur.cache.general_parent_offset =
-                    ((current - parent) as u64) | (u64::from(element_type) << TAG_TYPE_SHIFT);
+                    ((current - parent) as u64) | ((element_type as u64) << TAG_TYPE_SHIFT);
 
                 if element_type <= 6 {
                     let element_size = tag_size(element_type);

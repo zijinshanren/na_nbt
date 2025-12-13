@@ -115,7 +115,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Short as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::I16::<TARGET>::from(value).to_bytes(),
+                    byteorder::I16::<TARGET>::new(value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 2);
                 Ok(buf)
@@ -126,7 +126,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Int as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::I32::<TARGET>::from(value).to_bytes(),
+                    byteorder::I32::<TARGET>::new(value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 4);
                 Ok(buf)
@@ -137,7 +137,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Long as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::I64::<TARGET>::from(value).to_bytes(),
+                    byteorder::I64::<TARGET>::new(value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 8);
                 Ok(buf)
@@ -148,7 +148,7 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Float as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::F32::<TARGET>::from(value).to_bytes(),
+                    byteorder::F32::<TARGET>::new(value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 4);
                 Ok(buf)
@@ -159,98 +159,122 @@ pub fn write_value<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>
                 ptr::write(buf_ptr.cast(), [Tag::Double as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
-                    byteorder::F64::<TARGET>::from(value).to_bytes(),
+                    byteorder::F64::<TARGET>::new(value).to_bytes(),
                 );
                 buf.set_len(1 + 2 + 8);
                 Ok(buf)
             }
             value::ImmutableValue::ByteArray(value) => {
-                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    let payload = value.data.as_ptr().cast::<u8>();
-                    let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
-                    let size = 4 + len as usize;
-                    let mut buf = Vec::<u8>::with_capacity(3 + size);
-                    let buf_ptr = buf.as_mut_ptr();
-                    ptr::write(buf_ptr.cast(), [Tag::ByteArray as u8, 0u8, 0u8]);
-                    ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
-                    buf.set_len(3 + size);
-                    Ok(buf)
-                } else {
-                    todo!()
+                let payload = value.data.as_ptr().cast::<u8>();
+                let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
+                let size = 4 + len as usize;
+                let mut buf = Vec::<u8>::with_capacity(3 + size);
+                let buf_ptr = buf.as_mut_ptr();
+                ptr::write(buf_ptr.cast(), [Tag::ByteArray as u8, 0u8, 0u8]);
+                ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
+                if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
+                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
                 }
+                buf.set_len(3 + size);
+                Ok(buf)
             }
             value::ImmutableValue::String(value) => {
-                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    let payload = value.data.as_ptr().cast::<u8>();
-                    let len = byteorder::U16::<SOURCE>::from_bytes(*payload.cast()).get();
-                    let size = 2 + len as usize;
-                    let mut buf = Vec::<u8>::with_capacity(3 + size);
-                    let buf_ptr = buf.as_mut_ptr();
-                    ptr::write(buf_ptr.cast(), [Tag::String as u8, 0u8, 0u8]);
-                    ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
-                    buf.set_len(3 + size);
-                    Ok(buf)
-                } else {
-                    todo!()
+                let payload = value.data.as_ptr().cast::<u8>();
+                let len = byteorder::U16::<SOURCE>::from_bytes(*payload.cast()).get();
+                let size = 2 + len as usize;
+                let mut buf = Vec::<u8>::with_capacity(3 + size);
+                let buf_ptr = buf.as_mut_ptr();
+                ptr::write(buf_ptr.cast(), [Tag::String as u8, 0u8, 0u8]);
+                ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
+                if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
+                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
                 }
+                buf.set_len(3 + size);
+                Ok(buf)
             }
             value::ImmutableValue::List(value) => {
-                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    let payload = value.data;
-                    let payload_len = payload.len();
-                    let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
-                    let buf_ptr = buf.as_mut_ptr();
-                    ptr::write(buf_ptr.cast(), [Tag::List as u8, 0u8, 0u8]);
-                    ptr::copy_nonoverlapping(payload.as_ptr(), buf_ptr.add(3), payload_len);
-                    buf.set_len(3 + payload_len);
-                    Ok(buf)
-                } else {
-                    todo!()
+                let payload = value.data;
+                let payload_len = payload.len();
+                let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
+                let buf_ptr = buf.as_mut_ptr();
+                ptr::write(buf_ptr.cast(), [Tag::List as u8, 0u8, 0u8]);
+                ptr::copy_nonoverlapping(payload.as_ptr(), buf_ptr.add(3), payload_len);
+                if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
+                    let size_written =
+                        write::write_list_fallback::<SOURCE, TARGET>(buf_ptr.add(1 + 2))?;
+                    debug_assert!(size_written == payload_len);
                 }
+                buf.set_len(3 + payload_len);
+                Ok(buf)
             }
             value::ImmutableValue::Compound(value) => {
-                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    let payload = value.data;
-                    let payload_len = payload.len();
-                    let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
-                    let buf_ptr = buf.as_mut_ptr();
-                    ptr::write(buf_ptr.cast(), [Tag::Compound as u8, 0u8, 0u8]);
-                    ptr::copy_nonoverlapping(payload.as_ptr(), buf_ptr.add(3), payload_len);
-                    buf.set_len(3 + payload_len);
-                    Ok(buf)
-                } else {
-                    todo!()
+                let payload = value.data;
+                let payload_len = payload.len();
+                let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
+                let buf_ptr = buf.as_mut_ptr();
+                ptr::write(buf_ptr.cast(), [Tag::Compound as u8, 0u8, 0u8]);
+                ptr::copy_nonoverlapping(payload.as_ptr(), buf_ptr.add(3), payload_len);
+                if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
+                    let size_written =
+                        write::write_compound_fallback::<SOURCE, TARGET>(buf_ptr.add(1 + 2))?;
+                    debug_assert!(size_written == payload_len);
                 }
+                buf.set_len(3 + payload_len);
+                Ok(buf)
             }
             value::ImmutableValue::IntArray(value) => {
+                let payload = value.data.as_ptr().cast::<u8>();
+                let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
+                let size = 4 + len as usize * 4;
+                let mut buf = Vec::<u8>::with_capacity(3 + size);
+                let mut buf_ptr = buf.as_mut_ptr();
+                ptr::write(buf_ptr.cast(), [Tag::IntArray as u8, 0u8, 0u8]);
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    let payload = value.data.as_ptr().cast::<u8>();
-                    let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
-                    let size = 4 + len as usize * 4;
-                    let mut buf = Vec::<u8>::with_capacity(3 + size);
-                    let buf_ptr = buf.as_mut_ptr();
-                    ptr::write(buf_ptr.cast(), [Tag::IntArray as u8, 0u8, 0u8]);
                     ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
-                    buf.set_len(3 + size);
-                    Ok(buf)
                 } else {
-                    todo!()
+                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
+                    buf_ptr = buf_ptr.add(1 + 2 + 4);
+                    let mut payload_ptr = payload.add(4);
+                    for _ in 0..len {
+                        ptr::write(
+                            buf_ptr.cast(),
+                            u32::from_ne_bytes(*payload_ptr.cast())
+                                .swap_bytes()
+                                .to_ne_bytes(),
+                        );
+                        buf_ptr = buf_ptr.add(4);
+                        payload_ptr = payload_ptr.add(4);
+                    }
                 }
+                buf.set_len(3 + size);
+                Ok(buf)
             }
             value::ImmutableValue::LongArray(value) => {
+                let payload = value.data.as_ptr().cast::<u8>();
+                let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
+                let size = 4 + len as usize * 8;
+                let mut buf = Vec::<u8>::with_capacity(3 + size);
+                let mut buf_ptr = buf.as_mut_ptr();
+                ptr::write(buf_ptr.cast(), [Tag::LongArray as u8, 0u8, 0u8]);
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                    let payload = value.data.as_ptr().cast::<u8>();
-                    let len = byteorder::U32::<SOURCE>::from_bytes(*payload.cast()).get();
-                    let size = 4 + len as usize * 8;
-                    let mut buf = Vec::<u8>::with_capacity(3 + size);
-                    let buf_ptr = buf.as_mut_ptr();
-                    ptr::write(buf_ptr.cast(), [Tag::LongArray as u8, 0u8, 0u8]);
                     ptr::copy_nonoverlapping(payload, buf_ptr.add(3), size);
-                    buf.set_len(3 + size);
-                    Ok(buf)
                 } else {
-                    todo!()
+                    ptr::write(buf_ptr.add(1 + 2).cast(), len.swap_bytes());
+                    buf_ptr = buf_ptr.add(1 + 2 + 4);
+                    let mut payload_ptr = payload.add(4);
+                    for _ in 0..len {
+                        ptr::write(
+                            buf_ptr.cast(),
+                            u64::from_ne_bytes(*payload_ptr.cast())
+                                .swap_bytes()
+                                .to_ne_bytes(),
+                        );
+                        buf_ptr = buf_ptr.add(8);
+                        payload_ptr = payload_ptr.add(8);
+                    }
                 }
+                buf.set_len(3 + size);
+                Ok(buf)
             }
         }
     }
