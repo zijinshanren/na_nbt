@@ -73,9 +73,8 @@ fn test_vec_view_own_extended() {
     assert_eq!(v.as_slice(), &[1, 2, 4, 1, 2, 8, 8, 10, 11]);
     assert!(other_view.is_empty());
     
-    // drain
-    let drained: Vec<i8> = v.drain(7..9).collect();
-    assert_eq!(drained, &[10, 11]);
+    // drain_drop
+    v.drain_drop(7..9);
     assert_eq!(v.as_slice(), &[1, 2, 4, 1, 2, 8, 8]);
     
     // retain_mut
@@ -197,9 +196,8 @@ fn test_vec_view_mut_extended() {
     }
     assert_eq!(v.as_slice(), &[1, 2, 5, 1, 3, 3, 10, 11]);
     
-    // drain
-    let drained: Vec<i8> = v.drain(6..8).collect();
-    assert_eq!(drained, &[10, 11]);
+    // drain_drop
+    v.drain_drop(6..8);
     assert_eq!(v.as_slice(), &[1, 2, 5, 1, 3, 3]);
     
     // retain_mut

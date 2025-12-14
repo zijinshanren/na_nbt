@@ -7,7 +7,8 @@ use zerocopy::byteorder::{BigEndian, LittleEndian};
 fn create_byte_nbt(value: i8) -> Vec<u8> {
     vec![
         0x01, // Tag::Byte
-        0x00, 0x00, // empty name (length = 0)
+        0x00,
+        0x00, // empty name (length = 0)
         value as u8,
     ]
 }
@@ -68,7 +69,8 @@ fn create_byte_array_nbt_be(data: &[i8]) -> Vec<u8> {
     let len_bytes = len.to_be_bytes();
     let mut result = vec![
         0x07, // Tag::ByteArray
-        0x00, 0x00, // empty name
+        0x00,
+        0x00, // empty name
         len_bytes[0],
         len_bytes[1],
         len_bytes[2],
@@ -86,7 +88,8 @@ fn create_string_nbt_be(s: &str) -> Vec<u8> {
     let len_bytes = len.to_be_bytes();
     let mut result = vec![
         0x08, // Tag::String
-        0x00, 0x00, // empty name
+        0x00,
+        0x00, // empty name
         len_bytes[0],
         len_bytes[1],
     ];
@@ -100,7 +103,8 @@ fn create_int_array_nbt_be(data: &[i32]) -> Vec<u8> {
     let len_bytes = len.to_be_bytes();
     let mut result = vec![
         0x0B, // Tag::IntArray
-        0x00, 0x00, // empty name
+        0x00,
+        0x00, // empty name
         len_bytes[0],
         len_bytes[1],
         len_bytes[2],
@@ -118,7 +122,8 @@ fn create_long_array_nbt_be(data: &[i64]) -> Vec<u8> {
     let len_bytes = len.to_be_bytes();
     let mut result = vec![
         0x0C, // Tag::LongArray
-        0x00, 0x00, // empty name
+        0x00,
+        0x00, // empty name
         len_bytes[0],
         len_bytes[1],
         len_bytes[2],
@@ -172,20 +177,20 @@ fn test_read_long() {
 
 #[test]
 fn test_read_float() {
-    let data = create_float_nbt_be(3.14);
+    let data = create_float_nbt_be(std::f32::consts::PI);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
     let v = root.as_float().unwrap();
-    assert!((v - 3.14).abs() < 0.001);
+    assert!((v - std::f32::consts::PI).abs() < 0.001);
 }
 
 #[test]
 fn test_read_double() {
-    let data = create_double_nbt_be(2.718281828);
+    let data = create_double_nbt_be(std::f64::consts::E);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
     let v = root.as_double().unwrap();
-    assert!((v - 2.718281828).abs() < 0.0000001);
+    assert!((v - std::f64::consts::E).abs() < 0.0000001);
 }
 
 #[test]

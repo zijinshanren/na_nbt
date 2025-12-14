@@ -1,8 +1,6 @@
 //! Tests for ScopedReadableValue impl on mutable module's ImmutableValue
 
-use na_nbt::{
-    read_owned, ByteOrder, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag,
-};
+use na_nbt::{ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, read_owned};
 use zerocopy::byteorder::{BigEndian as BE, LittleEndian as LE};
 
 // Helper functions to create test NBT data
@@ -207,21 +205,21 @@ fn test_immutable_from_owned_as_long() {
 
 #[test]
 fn test_immutable_from_owned_as_float() {
-    let data = create_float_nbt(3.14);
+    let data = create_float_nbt(std::f32::consts::PI);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     let val = ScopedReadableValue::as_float(&root).unwrap();
-    assert!((val - 3.14).abs() < 0.001);
+    assert!((val - std::f32::consts::PI).abs() < 0.001);
     assert!(ScopedReadableValue::is_float(&root));
 }
 
 #[test]
 fn test_immutable_from_owned_as_double() {
-    let data = create_double_nbt(3.14159265359);
+    let data = create_double_nbt(std::f64::consts::PI);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     let val = ScopedReadableValue::as_double(&root).unwrap();
-    assert!((val - 3.14159265359).abs() < 0.0000001);
+    assert!((val - std::f64::consts::PI).abs() < 0.0000001);
     assert!(ScopedReadableValue::is_double(&root));
 }
 
@@ -291,7 +289,7 @@ fn test_immutable_from_owned_type_mismatch() {
     let data = create_byte_nbt(42);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
+
     // Should return None for wrong types
     assert!(ScopedReadableValue::as_short(&root).is_none());
     assert!(ScopedReadableValue::as_int(&root).is_none());
@@ -311,7 +309,7 @@ fn test_immutable_from_owned_is_type_false() {
     let data = create_byte_nbt(42);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
+
     // Should return false for wrong types
     assert!(!ScopedReadableValue::is_short(&root));
     assert!(!ScopedReadableValue::is_int(&root));
@@ -334,20 +332,20 @@ fn test_immutable_list_from_owned() {
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     let list = ScopedReadableValue::as_list_scoped(&root).unwrap();
-    
+
     assert_eq!(ScopedReadableList::tag_id(&list), Tag::Int);
     assert_eq!(ScopedReadableList::len(&list), 3);
     assert!(!ScopedReadableList::is_empty(&list));
-    
+
     let v0 = ScopedReadableList::get_scoped(&list, 0).unwrap();
     assert_eq!(ScopedReadableValue::as_int(&v0), Some(1));
-    
+
     let v1 = ScopedReadableList::get_scoped(&list, 1).unwrap();
     assert_eq!(ScopedReadableValue::as_int(&v1), Some(2));
-    
+
     let v2 = ScopedReadableList::get_scoped(&list, 2).unwrap();
     assert_eq!(ScopedReadableValue::as_int(&v2), Some(3));
-    
+
     assert!(ScopedReadableList::get_scoped(&list, 3).is_none());
 }
 
@@ -357,7 +355,7 @@ fn test_immutable_list_iter_scoped() {
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     let list = ScopedReadableValue::as_list_scoped(&root).unwrap();
-    
+
     let mut count = 0;
     for v in ScopedReadableList::iter_scoped(&list) {
         count += 1;
@@ -374,10 +372,10 @@ fn test_immutable_compound_from_owned() {
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     let comp = ScopedReadableValue::as_compound_scoped(&root).unwrap();
-    
+
     let x = ScopedReadableCompound::get_scoped(&comp, "x").unwrap();
     assert_eq!(ScopedReadableValue::as_int(&x), Some(42));
-    
+
     assert!(ScopedReadableCompound::get_scoped(&comp, "nonexistent").is_none());
 }
 
@@ -387,7 +385,7 @@ fn test_immutable_compound_iter_scoped() {
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     let comp = ScopedReadableValue::as_compound_scoped(&root).unwrap();
-    
+
     let mut count = 0;
     for (k, v) in ScopedReadableCompound::iter_scoped(&comp) {
         assert_eq!(k.decode(), "x");
@@ -404,10 +402,10 @@ fn test_immutable_value_get_scoped_str() {
     let data = create_compound_nbt();
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
+
     let x = ScopedReadableValue::get_scoped(&root, "x").unwrap();
     assert_eq!(ScopedReadableValue::as_int(&x), Some(42));
-    
+
     assert!(ScopedReadableValue::get_scoped(&root, "nonexistent").is_none());
 }
 
@@ -416,10 +414,10 @@ fn test_immutable_value_get_scoped_usize() {
     let data = create_int_list_nbt();
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
+
     let v0 = ScopedReadableValue::get_scoped(&root, 0usize).unwrap();
     assert_eq!(ScopedReadableValue::as_int(&v0), Some(1));
-    
+
     assert!(ScopedReadableValue::get_scoped(&root, 10usize).is_none());
 }
 
@@ -430,12 +428,10 @@ fn test_immutable_value_visit_scoped_byte() {
     let data = create_byte_nbt(42);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
-    let result = ScopedReadableValue::visit_scoped(&root, |v| {
-        match v {
-            na_nbt::ValueScoped::Byte(b) => b,
-            _ => panic!("Expected Byte"),
-        }
+
+    let result = ScopedReadableValue::visit_scoped(&root, |v| match v {
+        na_nbt::ValueScoped::Byte(b) => b,
+        _ => panic!("Expected Byte"),
     });
     assert_eq!(result, 42);
 }
@@ -445,12 +441,10 @@ fn test_immutable_value_visit_scoped_string() {
     let data = create_string_nbt("hello");
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
-    let result = ScopedReadableValue::visit_scoped(&root, |v| {
-        match v {
-            na_nbt::ValueScoped::String(s) => s.decode().to_string(),
-            _ => panic!("Expected String"),
-        }
+
+    let result = ScopedReadableValue::visit_scoped(&root, |v| match v {
+        na_nbt::ValueScoped::String(s) => s.decode().to_string(),
+        _ => panic!("Expected String"),
     });
     assert_eq!(result, "hello");
 }
@@ -460,12 +454,10 @@ fn test_immutable_value_visit_scoped_list() {
     let data = create_int_list_nbt();
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
-    let result = ScopedReadableValue::visit_scoped(&root, |v| {
-        match v {
-            na_nbt::ValueScoped::List(list) => ScopedReadableList::len(&list),
-            _ => panic!("Expected List"),
-        }
+
+    let result = ScopedReadableValue::visit_scoped(&root, |v| match v {
+        na_nbt::ValueScoped::List(list) => ScopedReadableList::len(&list),
+        _ => panic!("Expected List"),
     });
     assert_eq!(result, 3);
 }
@@ -475,15 +467,13 @@ fn test_immutable_value_visit_scoped_compound() {
     let data = create_compound_nbt();
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    
-    let result = ScopedReadableValue::visit_scoped(&root, |v| {
-        match v {
-            na_nbt::ValueScoped::Compound(comp) => {
-                let x = ScopedReadableCompound::get_scoped(&comp, "x").unwrap();
-                ScopedReadableValue::as_int(&x).unwrap()
-            }
-            _ => panic!("Expected Compound"),
+
+    let result = ScopedReadableValue::visit_scoped(&root, |v| match v {
+        na_nbt::ValueScoped::Compound(comp) => {
+            let x = ScopedReadableCompound::get_scoped(&comp, "x").unwrap();
+            ScopedReadableValue::as_int(&x).unwrap()
         }
+        _ => panic!("Expected Compound"),
     });
     assert_eq!(result, 42);
 }
@@ -500,7 +490,7 @@ fn test_immutable_from_owned_le_byte() {
     data.extend_from_slice(b"root");
     data.push(99);
     data.push(0x00);
-    
+
     let owned = read_owned::<LE, LE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     assert_eq!(ScopedReadableValue::as_byte(&root), Some(99));
@@ -515,7 +505,7 @@ fn test_immutable_from_owned_le_int() {
     data.extend_from_slice(b"root");
     data.extend_from_slice(&12345i32.to_le_bytes());
     data.push(0x00);
-    
+
     let owned = read_owned::<LE, LE>(&data).unwrap();
     let root = owned.get("root").unwrap();
     assert_eq!(ScopedReadableValue::as_int(&root), Some(12345));

@@ -1,8 +1,8 @@
 //! Tests for panic scenarios and error paths
 
-use na_nbt::{read_owned, OwnedValue};
-use zerocopy::byteorder::BigEndian as BE;
+use na_nbt::{OwnedValue, read_owned};
 use std::panic;
+use zerocopy::byteorder::BigEndian as BE;
 
 fn create_int_list_be(ints: &[i32]) -> Vec<u8> {
     let mut data = vec![0x09, 0x00, 0x00];
@@ -229,16 +229,20 @@ fn test_compound_insert_all_primitive_types() {
         comp.insert("short", 1000i16);
         comp.insert("int", 100000i32);
         comp.insert("long", 1000000000i64);
-        comp.insert("float", 3.14f32);
-        comp.insert("double", 2.718281828f64);
+        comp.insert("float", std::f32::consts::PI);
+        comp.insert("double", std::f64::consts::E);
 
         // Verify
         assert_eq!(comp.get("byte").unwrap().as_byte(), Some(42));
         assert_eq!(comp.get("short").unwrap().as_short(), Some(1000));
         assert_eq!(comp.get("int").unwrap().as_int(), Some(100000));
         assert_eq!(comp.get("long").unwrap().as_long(), Some(1000000000));
-        assert!((comp.get("float").unwrap().as_float().unwrap() - 3.14).abs() < 0.001);
-        assert!((comp.get("double").unwrap().as_double().unwrap() - 2.718281828).abs() < 0.0001);
+        assert!(
+            (comp.get("float").unwrap().as_float().unwrap() - std::f32::consts::PI).abs() < 0.001
+        );
+        assert!(
+            (comp.get("double").unwrap().as_double().unwrap() - std::f64::consts::E).abs() < 0.0001
+        );
     } else {
         panic!("expected compound");
     }

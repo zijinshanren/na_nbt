@@ -185,8 +185,8 @@ fn into_owned_value_insert_various_types() {
     let data = vec![0x0A, 0x00, 0x00, 0x00];
     let mut owned = read_owned::<BE, BE>(&data).unwrap();
     if let OwnedValue::Compound(mut c) = owned {
-        c.insert("d", 3.14f64);
-        assert!((c.get("d").unwrap().as_double().unwrap() - 3.14).abs() < 0.0001);
+        c.insert("d", std::f64::consts::PI);
+        assert!((c.get("d").unwrap().as_double().unwrap() - std::f64::consts::PI).abs() < 0.0001);
 
         c.insert("ba1", vec![1i8, 2i8, 3i8]);
         assert_eq!(c.get("ba1").unwrap().as_byte_array().unwrap(), &[1i8, 2i8, 3i8]);
@@ -262,8 +262,8 @@ fn trait_impls_explicit_calls() {
             assert_eq!(ScopedReadableValue::as_float(&mv), Some(7.25));
         }
         if let Some(mut mv) = comp.get_mut("d") {
-            assert!(ScopedWritableValue::set_double(&mut mv, 6.28));
-            assert_eq!(ScopedReadableValue::as_double(&mv), Some(6.28));
+            assert!(ScopedWritableValue::set_double(&mut mv, std::f64::consts::TAU));
+            assert_eq!(ScopedReadableValue::as_double(&mv), Some(std::f64::consts::TAU));
         }
     } else {
         panic!("expected compound");

@@ -1,9 +1,9 @@
 //! Tests for write functions with endianness conversion - targeting write.rs coverage
 
 use na_nbt::{read_borrowed, read_owned, write_value_to_vec, write_value_to_writer};
+use std::io::Cursor;
 use zerocopy::byteorder::BigEndian as BE;
 use zerocopy::byteorder::LittleEndian as LE;
-use std::io::Cursor;
 
 // ==================== Helper Functions ====================
 
@@ -189,57 +189,57 @@ fn create_long_array_list_be(arrays: &[&[i64]]) -> Vec<u8> {
 
 fn create_compound_with_all_types_be() -> Vec<u8> {
     let mut data = vec![0x0A, 0x00, 0x00];
-    
+
     // Byte
     data.push(0x01);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'b');
     data.push(42);
-    
+
     // Short
     data.push(0x02);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b's');
     data.extend_from_slice(&1000i16.to_be_bytes());
-    
+
     // Int
     data.push(0x03);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'i');
     data.extend_from_slice(&100000i32.to_be_bytes());
-    
+
     // Long
     data.push(0x04);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'l');
     data.extend_from_slice(&1000000000i64.to_be_bytes());
-    
+
     // Float
     data.push(0x05);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'f');
-    data.extend_from_slice(&3.14f32.to_be_bytes());
-    
+    data.extend_from_slice(&std::f32::consts::PI.to_be_bytes());
+
     // Double
     data.push(0x06);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'd');
-    data.extend_from_slice(&2.718f64.to_be_bytes());
-    
+    data.extend_from_slice(&std::f64::consts::E.to_be_bytes());
+
     // ByteArray
     data.push(0x07);
     data.extend_from_slice(&2u16.to_be_bytes());
     data.extend_from_slice(b"ba");
     data.extend_from_slice(&3u32.to_be_bytes());
     data.extend_from_slice(&[1u8, 2, 3]);
-    
+
     // String
     data.push(0x08);
     data.extend_from_slice(&2u16.to_be_bytes());
     data.extend_from_slice(b"st");
     data.extend_from_slice(&4u16.to_be_bytes());
     data.extend_from_slice(b"test");
-    
+
     // IntArray
     data.push(0x0B);
     data.extend_from_slice(&2u16.to_be_bytes());
@@ -247,7 +247,7 @@ fn create_compound_with_all_types_be() -> Vec<u8> {
     data.extend_from_slice(&2u32.to_be_bytes());
     data.extend_from_slice(&10i32.to_be_bytes());
     data.extend_from_slice(&20i32.to_be_bytes());
-    
+
     // LongArray
     data.push(0x0C);
     data.extend_from_slice(&2u16.to_be_bytes());
@@ -255,10 +255,10 @@ fn create_compound_with_all_types_be() -> Vec<u8> {
     data.extend_from_slice(&2u32.to_be_bytes());
     data.extend_from_slice(&100i64.to_be_bytes());
     data.extend_from_slice(&200i64.to_be_bytes());
-    
+
     // End
     data.push(0x00);
-    
+
     data
 }
 
@@ -267,20 +267,20 @@ fn create_nested_list_be() -> Vec<u8> {
     let mut data = vec![0x09, 0x00, 0x00];
     data.push(0x09); // List tag
     data.extend_from_slice(&2u32.to_be_bytes()); // 2 inner lists
-    
+
     // First inner list [1, 2]
     data.push(0x03); // Int
     data.extend_from_slice(&2u32.to_be_bytes());
     data.extend_from_slice(&1i32.to_be_bytes());
     data.extend_from_slice(&2i32.to_be_bytes());
-    
+
     // Second inner list [3, 4, 5]
     data.push(0x03); // Int
     data.extend_from_slice(&3u32.to_be_bytes());
     data.extend_from_slice(&3i32.to_be_bytes());
     data.extend_from_slice(&4i32.to_be_bytes());
     data.extend_from_slice(&5i32.to_be_bytes());
-    
+
     data
 }
 
@@ -289,21 +289,21 @@ fn create_nested_compound_be() -> Vec<u8> {
     let mut data = vec![0x09, 0x00, 0x00];
     data.push(0x0A); // Compound tag
     data.extend_from_slice(&2u32.to_be_bytes()); // 2 compounds
-    
+
     // First compound { "x": 1 }
     data.push(0x03);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'x');
     data.extend_from_slice(&1i32.to_be_bytes());
     data.push(0x00);
-    
+
     // Second compound { "y": 2 }
     data.push(0x03);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'y');
     data.extend_from_slice(&2i32.to_be_bytes());
     data.push(0x00);
-    
+
     data
 }
 
@@ -314,7 +314,7 @@ fn test_write_byte_be_to_le() {
     let data = create_byte_nbt_be(42);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_byte(), Some(42));
@@ -325,7 +325,7 @@ fn test_write_short_be_to_le() {
     let data = create_short_nbt_be(1234);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_short(), Some(1234));
@@ -336,7 +336,7 @@ fn test_write_int_be_to_le() {
     let data = create_int_nbt_be(123456);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_int(), Some(123456));
@@ -347,7 +347,7 @@ fn test_write_long_be_to_le() {
     let data = create_long_nbt_be(123456789012345i64);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_long(), Some(123456789012345i64));
@@ -355,24 +355,24 @@ fn test_write_long_be_to_le() {
 
 #[test]
 fn test_write_float_be_to_le() {
-    let data = create_float_nbt_be(3.14159);
+    let data = create_float_nbt_be(std::f32::consts::PI);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
-    assert!((owned.as_float().unwrap() - 3.14159).abs() < 0.0001);
+    assert!((owned.as_float().unwrap() - std::f32::consts::PI).abs() < 0.0001);
 }
 
 #[test]
 fn test_write_double_be_to_le() {
-    let data = create_double_nbt_be(2.718281828);
+    let data = create_double_nbt_be(std::f64::consts::E);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
-    assert!((owned.as_double().unwrap() - 2.718281828).abs() < 0.0001);
+    assert!((owned.as_double().unwrap() - std::f64::consts::E).abs() < 0.0001);
 }
 
 #[test]
@@ -380,7 +380,7 @@ fn test_write_string_be_to_le() {
     let data = create_string_nbt_be("hello world");
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::String(s) = owned {
@@ -395,7 +395,7 @@ fn test_write_byte_array_be_to_le() {
     let data = create_byte_array_nbt_be(&[1, 2, 3, 4, 5]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::ByteArray(arr) = owned {
@@ -410,7 +410,7 @@ fn test_write_int_array_be_to_le() {
     let data = create_int_array_nbt_be(&[100, 200, 300]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::IntArray(arr) = owned {
@@ -426,7 +426,7 @@ fn test_write_long_array_be_to_le() {
     let data = create_long_array_nbt_be(&[1000, 2000, 3000]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::LongArray(arr) = owned {
@@ -444,7 +444,7 @@ fn test_write_byte_list_be_to_le() {
     let data = create_byte_list_be(&[1, 2, 3]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -460,7 +460,7 @@ fn test_write_short_list_be_to_le() {
     let data = create_short_list_be(&[100, 200, 300]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -478,7 +478,7 @@ fn test_write_long_list_be_to_le() {
     let data = create_long_list_be(&[1000, 2000, 3000]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -493,7 +493,7 @@ fn test_write_float_list_be_to_le() {
     let data = create_float_list_be(&[1.5, 2.5, 3.5]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -508,7 +508,7 @@ fn test_write_double_list_be_to_le() {
     let data = create_double_list_be(&[1.5, 2.5, 3.5]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -523,7 +523,7 @@ fn test_write_string_list_be_to_le() {
     let data = create_string_list_be(&["a", "bb", "ccc"]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -540,7 +540,7 @@ fn test_write_byte_array_list_be_to_le() {
     let data = create_byte_array_list_be(&[arr1, arr2]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -557,7 +557,7 @@ fn test_write_int_array_list_be_to_le() {
     let data = create_int_array_list_be(&[arr1, arr2]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -574,7 +574,7 @@ fn test_write_long_array_list_be_to_le() {
     let data = create_long_array_list_be(&[arr1, arr2]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -591,7 +591,7 @@ fn test_write_nested_list_be_to_le() {
     let data = create_nested_list_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(outer) = owned {
@@ -612,7 +612,7 @@ fn test_write_nested_compound_list_be_to_le() {
     let data = create_nested_compound_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -633,7 +633,7 @@ fn test_write_compound_all_types_be_to_le() {
     let data = create_compound_with_all_types_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::Compound(comp) = owned {
@@ -653,10 +653,10 @@ fn test_write_to_writer_int_be_to_le() {
     let data = create_int_nbt_be(999);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let mut buffer = Cursor::new(Vec::new());
     write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
-    
+
     let output = buffer.into_inner();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_int(), Some(999));
@@ -667,10 +667,10 @@ fn test_write_to_writer_list_be_to_le() {
     let data = create_int_list_be(&[1, 2, 3]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let mut buffer = Cursor::new(Vec::new());
     write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
-    
+
     let output = buffer.into_inner();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
@@ -685,10 +685,10 @@ fn test_write_to_writer_compound_be_to_le() {
     let data = create_compound_with_all_types_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     let mut buffer = Cursor::new(Vec::new());
     write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
-    
+
     let output = buffer.into_inner();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert!(owned.is_compound());

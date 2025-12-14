@@ -1,8 +1,8 @@
 //! Tests for ScopedReadableValue trait implementations - targeting trait_impl.rs and trait_impl_own.rs
 
 use na_nbt::{
-    read_borrowed, read_owned, ScopedReadableValue, ScopedReadableList, ScopedReadableCompound,
-    OwnedValue, Tag,
+    OwnedValue, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag,
+    read_borrowed, read_owned,
 };
 use zerocopy::byteorder::BigEndian as BE;
 
@@ -145,27 +145,30 @@ fn test_immutable_scoped_as_long() {
     let data = create_long_nbt(123456789012345i64);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    assert_eq!(ScopedReadableValue::as_long(&root), Some(123456789012345i64));
+    assert_eq!(
+        ScopedReadableValue::as_long(&root),
+        Some(123456789012345i64)
+    );
     assert!(ScopedReadableValue::is_long(&root));
 }
 
 #[test]
 fn test_immutable_scoped_as_float() {
-    let data = create_float_nbt(3.14);
+    let data = create_float_nbt(std::f32::consts::PI);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let f = ScopedReadableValue::as_float(&root).unwrap();
-    assert!((f - 3.14).abs() < 0.001);
+    assert!((f - std::f32::consts::PI).abs() < 0.001);
     assert!(ScopedReadableValue::is_float(&root));
 }
 
 #[test]
 fn test_immutable_scoped_as_double() {
-    let data = create_double_nbt(2.718281828);
+    let data = create_double_nbt(std::f64::consts::E);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let d = ScopedReadableValue::as_double(&root).unwrap();
-    assert!((d - 2.718281828).abs() < 0.0001);
+    assert!((d - std::f64::consts::E).abs() < 0.0001);
     assert!(ScopedReadableValue::is_double(&root));
 }
 
@@ -285,25 +288,28 @@ fn test_owned_scoped_as_int() {
 fn test_owned_scoped_as_long() {
     let data = create_long_nbt(123456789012345i64);
     let owned = read_owned::<BE, BE>(&data).unwrap();
-    assert_eq!(ScopedReadableValue::as_long(&owned), Some(123456789012345i64));
+    assert_eq!(
+        ScopedReadableValue::as_long(&owned),
+        Some(123456789012345i64)
+    );
     assert!(ScopedReadableValue::is_long(&owned));
 }
 
 #[test]
 fn test_owned_scoped_as_float() {
-    let data = create_float_nbt(3.14);
+    let data = create_float_nbt(std::f32::consts::PI);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let f = ScopedReadableValue::as_float(&owned).unwrap();
-    assert!((f - 3.14).abs() < 0.001);
+    assert!((f - std::f32::consts::PI).abs() < 0.001);
     assert!(ScopedReadableValue::is_float(&owned));
 }
 
 #[test]
 fn test_owned_scoped_as_double() {
-    let data = create_double_nbt(2.718281828);
+    let data = create_double_nbt(std::f64::consts::E);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let d = ScopedReadableValue::as_double(&owned).unwrap();
-    assert!((d - 2.718281828).abs() < 0.0001);
+    assert!((d - std::f64::consts::E).abs() < 0.0001);
     assert!(ScopedReadableValue::is_double(&owned));
 }
 
@@ -403,7 +409,7 @@ fn test_immutable_type_mismatch_returns_none() {
     let data = create_byte_nbt(42);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    
+
     assert_eq!(ScopedReadableValue::as_short(&root), None);
     assert_eq!(ScopedReadableValue::as_int(&root), None);
     assert_eq!(ScopedReadableValue::as_long(&root), None);
@@ -416,7 +422,7 @@ fn test_immutable_type_mismatch_returns_none() {
     assert!(ScopedReadableValue::as_int_array(&root).is_none());
     assert!(ScopedReadableValue::as_long_array(&root).is_none());
     assert_eq!(ScopedReadableValue::as_end(&root), None);
-    
+
     assert!(!ScopedReadableValue::is_short(&root));
     assert!(!ScopedReadableValue::is_int(&root));
     assert!(!ScopedReadableValue::is_long(&root));
@@ -435,7 +441,7 @@ fn test_immutable_type_mismatch_returns_none() {
 fn test_owned_type_mismatch_returns_none() {
     let data = create_byte_nbt(42);
     let owned = read_owned::<BE, BE>(&data).unwrap();
-    
+
     assert_eq!(ScopedReadableValue::as_short(&owned), None);
     assert_eq!(ScopedReadableValue::as_int(&owned), None);
     assert_eq!(ScopedReadableValue::as_long(&owned), None);
@@ -448,7 +454,7 @@ fn test_owned_type_mismatch_returns_none() {
     assert!(ScopedReadableValue::as_int_array(&owned).is_none());
     assert!(ScopedReadableValue::as_long_array(&owned).is_none());
     assert_eq!(ScopedReadableValue::as_end(&owned), None);
-    
+
     assert!(!ScopedReadableValue::is_short(&owned));
     assert!(!ScopedReadableValue::is_int(&owned));
     assert!(!ScopedReadableValue::is_long(&owned));
@@ -471,22 +477,22 @@ fn test_immutable_scoped_list_methods() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let list = ScopedReadableValue::as_list_scoped(&root).unwrap();
-    
+
     assert_eq!(list.len(), 3);
     assert!(!list.is_empty());
     assert_eq!(list.tag_id(), Tag::Int);
-    
+
     let v0 = list.get(0).unwrap();
     assert_eq!(v0.as_int(), Some(1));
-    
+
     let v1 = list.get(1).unwrap();
     assert_eq!(v1.as_int(), Some(2));
-    
+
     let v2 = list.get(2).unwrap();
     assert_eq!(v2.as_int(), Some(3));
-    
+
     assert!(list.get(3).is_none());
-    
+
     // Test iter
     let mut count = 0;
     for v in list.iter() {
@@ -501,11 +507,11 @@ fn test_owned_scoped_list_methods() {
     let data = create_int_list_nbt();
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let list = ScopedReadableValue::as_list_scoped(&owned).unwrap();
-    
+
     assert_eq!(list.len(), 3);
     assert!(!list.is_empty());
     assert_eq!(list.tag_id(), Tag::Int);
-    
+
     let v0 = list.get(0).unwrap();
     assert_eq!(v0.as_int(), Some(1));
 }
@@ -518,13 +524,13 @@ fn test_immutable_scoped_compound_methods() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let comp = ScopedReadableValue::as_compound_scoped(&root).unwrap();
-    
+
     // Test get
     let x = ScopedReadableCompound::get_scoped(&comp, "x").unwrap();
     assert_eq!(ScopedReadableValue::as_int(&x), Some(42));
-    
+
     assert!(ScopedReadableCompound::get_scoped(&comp, "nonexistent").is_none());
-    
+
     // Test iter
     let mut count = 0;
     for (k, v) in ScopedReadableCompound::iter_scoped(&comp) {
@@ -540,7 +546,7 @@ fn test_owned_scoped_compound_methods() {
     let data = create_compound_nbt();
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let comp = ScopedReadableValue::as_compound_scoped(&owned).unwrap();
-    
+
     // Test get
     let x = ScopedReadableCompound::get_scoped(&comp, "x").unwrap();
     assert_eq!(ScopedReadableValue::as_int(&x), Some(42));
