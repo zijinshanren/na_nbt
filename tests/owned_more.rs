@@ -1,7 +1,7 @@
 //! Additional tests for OwnedList and OwnedCompound variants
 
-use na_nbt::{OwnedValue, read_owned};
-use zerocopy::byteorder::BigEndian as BE;
+use na_nbt::{OwnedValue, ScopedReadableValue, Tag, ValueScoped, read_owned};
+use zerocopy::byteorder::{self, BigEndian as BE};
 
 fn create_string_list_nbt_be(values: &[&str]) -> Vec<u8> {
     let len = values.len() as u32;
@@ -118,4 +118,63 @@ fn owned_compound_insert_replace_arr_int() {
     } else {
         panic!("expected compound");
     }
+}
+
+#[test]
+fn owned_construct() {
+    let mut v = OwnedValue::<BE>::from(());
+    assert_eq!(v.tag_id(), Tag::End);
+    assert!(!v.is_byte());
+    assert_eq!(v.as_byte(), None);
+    assert_eq!(v.as_byte_mut(), None);
+    assert!(!v.update_byte(|x| x + 2));
+    assert!(!v.set_byte(2));
+
+    let v = OwnedValue::<BE>::from(1i8);
+    assert_eq!(v.tag_id(), Tag::Byte);
+    assert_eq!(v.as_byte().unwrap(), 1);
+
+    let v = OwnedValue::<BE>::from(byteorder::I16::new(12));
+    assert_eq!(v.tag_id(), Tag::Short);
+    assert_eq!(v.as_short().unwrap(), 12);
+
+    let v = OwnedValue::<BE>::from(byteorder::I32::new(1234567890));
+    assert_eq!(v.tag_id(), Tag::Int);
+    assert_eq!(v.as_int().unwrap(), 1234567890);
+
+    let v = OwnedValue::<BE>::from(byteorder::I64::new(1234567890123456789));
+    assert_eq!(v.tag_id(), Tag::Long);
+    assert_eq!(v.as_long().unwrap(), 1234567890123456789);
+
+    let v = OwnedValue::<BE>::from(byteorder::F32::new(1.2345));
+    assert_eq!(v.tag_id(), Tag::Float);
+    assert!(v.as_float().unwrap() - 1.2345 < 0.0001);
+
+    let v = OwnedValue::<BE>::from(byteorder::F64::new(1.23456789012345));
+    assert_eq!(v.tag_id(), Tag::Double);
+    assert!((v.as_double().unwrap() - 1.23456789012345).abs() < 0.0001);
+
+    let v = OwnedValue::<BE>::from([1i8, 2, 3].as_slice());
+    assert_eq!(v.tag_id(), Tag::ByteArray);
+    assert_eq!(v.as_byte_array().unwrap(), &[1, 2, 3]);
+
+    let v = OwnedValue::<BE>::from([1i8, 2, 3]);
+    assert_eq!(v.tag_id(), Tag::ByteArray);
+    assert_eq!(v.as_byte_array().unwrap(), &[1, 2, 3]);
+
+    let v = OwnedValue::<BE>::from([byteorder::I32::new(123), 234.into(), 345.into()].as_slice());
+    assert_eq!(v.tag_id(), Tag::IntArray);
+    assert_eq!(v.as_int_array().unwrap(), &[123, 234, 345]);
+
+    let v = OwnedValue::<BE>::from([byteorder::I32::new(123), 234.into(), 345.into()]);
+    assert_eq!(v.tag_id(), Tag::IntArray);
+    assert_eq!(v.as_int_array().unwrap(), &[123, 234, 345]);
+
+    let v = OwnedValue::<BE>::from([byteorder::I64::new(123), 234.into(), 345.into()].as_slice());
+    assert_eq!(v.tag_id(), Tag::LongArray);
+    assert_eq!(v.as_long_array().unwrap(), &[123, 234, 345]);
+
+    let v = OwnedValue::<BE>::from([byteorder::I64::new(123), 234.into(), 345.into()]);
+    assert_eq!(v.tag_id(), Tag::LongArray);
+    assert_eq!(v.as_long_array().unwrap(), &[123, 234, 345]);
 }
