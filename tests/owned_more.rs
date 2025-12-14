@@ -1,6 +1,6 @@
 //! Additional tests for OwnedList and OwnedCompound variants
 
-use na_nbt::{read_owned, OwnedValue};
+use na_nbt::{OwnedValue, read_owned};
 use zerocopy::byteorder::BigEndian as BE;
 
 fn create_string_list_nbt_be(values: &[&str]) -> Vec<u8> {
@@ -50,13 +50,21 @@ fn create_byte_array_list_nbt_be(vectors: &[&[i8]]) -> Vec<u8> {
 #[test]
 fn owned_list_string_push_and_get() {
     let data = create_string_list_nbt_be(&["a", "b"]);
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     if let OwnedValue::List(mut list) = owned {
         assert_eq!(list.len(), 2);
         list.push("c");
         assert_eq!(list.len(), 3);
-        assert_eq!(list.get(2).unwrap().as_string().unwrap().decode().to_string(), "c");
+        assert_eq!(
+            list.get(2)
+                .unwrap()
+                .as_string()
+                .unwrap()
+                .decode()
+                .to_string(),
+            "c"
+        );
     } else {
         panic!("expected list");
     }
@@ -65,7 +73,7 @@ fn owned_list_string_push_and_get() {
 #[test]
 fn owned_list_byte_array_push_and_get() {
     let data = create_byte_array_list_nbt_be(&[&[1i8, 2], &[3i8]]);
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     if let OwnedValue::List(mut list) = owned {
         assert_eq!(list.len(), 2);
@@ -83,7 +91,7 @@ fn owned_list_byte_array_push_and_get() {
 fn owned_compound_insert_replace_arr_int() {
     use zerocopy::byteorder::I32 as I32BE;
     let data = vec![0x0A, 0x00, 0x00, 0x00];
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     if let OwnedValue::Compound(mut compound) = owned {
         compound.insert("x", 42i32);

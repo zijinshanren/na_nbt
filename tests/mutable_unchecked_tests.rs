@@ -1,4 +1,4 @@
-use na_nbt::{read_owned, OwnedValue};
+use na_nbt::{OwnedValue, read_owned};
 use zerocopy::byteorder::BigEndian as BE;
 
 fn create_compound_with_lists() -> Vec<u8> {
@@ -53,50 +53,61 @@ fn create_compound_with_lists() -> Vec<u8> {
 #[test]
 fn owned_list_push_insert_unchecked_various() {
     let data = create_compound_with_lists();
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     if let OwnedValue::Compound(mut c) = owned {
         // Int list unchecked insert/push
-        if let Some(mut mv) = c.get_mut("ints") {
-            if let na_nbt::MutableValue::List(ref mut l) = mv {
-                unsafe { l.push_unchecked(3i32) };
-                assert_eq!(l.get(2).unwrap().as_int(), Some(3));
-            }
+        if let Some(mut mv) = c.get_mut("ints")
+            && let na_nbt::MutableValue::List(ref mut l) = mv
+        {
+            unsafe { l.push_unchecked(3i32) };
+            assert_eq!(l.get(2).unwrap().as_int(), Some(3));
         }
 
         // String list unchecked push
-        if let Some(mut mv) = c.get_mut("strs") {
-            if let na_nbt::MutableValue::List(ref mut l) = mv {
-                unsafe { l.push_unchecked("bb") };
-                assert_eq!(l.get(1).unwrap().as_string().unwrap().decode().to_string(), "bb");
-            }
+        if let Some(mut mv) = c.get_mut("strs")
+            && let na_nbt::MutableValue::List(ref mut l) = mv
+        {
+            unsafe { l.push_unchecked("bb") };
+            assert_eq!(
+                l.get(1).unwrap().as_string().unwrap().decode().to_string(),
+                "bb"
+            );
         }
 
         // ByteArray list unchecked push/insert
-        if let Some(mut mv) = c.get_mut("bas") {
-            if let na_nbt::MutableValue::List(ref mut l) = mv {
-                unsafe { l.push_unchecked(vec![7i8, 8i8]) };
-                assert_eq!(l.get(1).unwrap().as_byte_array().unwrap()[0], 7i8);
-            }
+        if let Some(mut mv) = c.get_mut("bas")
+            && let na_nbt::MutableValue::List(ref mut l) = mv
+        {
+            unsafe { l.push_unchecked(vec![7i8, 8i8]) };
+            assert_eq!(l.get(1).unwrap().as_byte_array().unwrap()[0], 7i8);
         }
 
         // Compound list: push an OwnedValue::Compound via OwnedList::push_unchecked
-        if let Some(mut mv) = c.get_mut("comps") {
-            if let na_nbt::MutableValue::List(ref mut l) = mv {
-                // Construct OwnedCompound with a single int 'b' = 2
-                let comp_data = vec![0x0A, 0x00, 0x00, 0x03, 0x00, 0x01, b'b',
-                    0x00, 0x00, 0x00, 0x02, 0x00];
-                let owned_comp = read_owned::<BE, BE>(&comp_data).unwrap();
-                unsafe { l.push_unchecked(owned_comp) };
-                // Reacquire view after potential reallocation
-            }
+        if let Some(mut mv) = c.get_mut("comps")
+            && let na_nbt::MutableValue::List(ref mut l) = mv
+        {
+            // Construct OwnedCompound with a single int 'b' = 2
+            let comp_data = vec![
+                0x0A, 0x00, 0x00, 0x03, 0x00, 0x01, b'b', 0x00, 0x00, 0x00, 0x02, 0x00,
+            ];
+            let owned_comp = read_owned::<BE, BE>(&comp_data).unwrap();
+            unsafe { l.push_unchecked(owned_comp) };
+            // Reacquire view after potential reallocation
         }
-        if let Some(mut mv) = c.get_mut("comps") {
-            if let na_nbt::MutableValue::List(ref mut l) = mv {
-                // verify last element's inner int
-                let got = l.get(1).unwrap().as_compound().unwrap().get("b").unwrap().as_int();
-                assert_eq!(got, Some(2));
-            }
+        if let Some(mut mv) = c.get_mut("comps")
+            && let na_nbt::MutableValue::List(ref mut l) = mv
+        {
+            // verify last element's inner int
+            let got = l
+                .get(1)
+                .unwrap()
+                .as_compound()
+                .unwrap()
+                .get("b")
+                .unwrap()
+                .as_int();
+            assert_eq!(got, Some(2));
         }
     } else {
         panic!("expected compound");

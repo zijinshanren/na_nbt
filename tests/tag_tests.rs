@@ -105,13 +105,6 @@ fn test_tag_debug() {
 }
 
 #[test]
-fn test_tag_clone() {
-    let tag = Tag::Compound;
-    let cloned = tag.clone();
-    assert_eq!(tag, cloned);
-}
-
-#[test]
 fn test_tag_copy() {
     let tag = Tag::List;
     let copied: Tag = tag; // Copy

@@ -2196,7 +2196,7 @@ mod tests {
     fn string_view_own_write() {
         use std::io::Write;
         let mut v = StringViewOwn::from(String::from("Hello"));
-        write!(v, " {}", "world").unwrap();
+        write!(v, " world").unwrap();
         assert_eq!(v.decode().to_string(), "Hello world");
     }
 

@@ -1,8 +1,8 @@
 //! Edge case tests for errors and boundaries
 
-use na_nbt::{read_borrowed, read_owned, write_value_to_writer, Error};
-use zerocopy::byteorder::BigEndian as BE;
+use na_nbt::{Error, read_borrowed, read_owned, write_value_to_writer};
 use std::io::{self, Write};
+use zerocopy::byteorder::BigEndian as BE;
 
 fn create_byte_nbt(value: i8) -> Vec<u8> {
     vec![0x01, 0x00, 0x00, value as u8]
@@ -15,7 +15,7 @@ fn test_trailing_data_borrowed() {
     let res = read_borrowed::<BE>(&data);
     match res {
         Err(Error::TrailingData(1)) => {}
-        other => panic!("unexpected result"),
+        _ => panic!("unexpected result"),
     }
 }
 
@@ -26,7 +26,7 @@ fn test_trailing_data_owned() {
     let res = read_owned::<BE, BE>(&data);
     match res {
         Err(Error::TrailingData(2)) => {}
-        other => panic!("unexpected result"),
+        _ => panic!("unexpected result"),
     }
 }
 
@@ -37,7 +37,7 @@ fn test_invalid_tag_type_borrowed() {
     let res = read_borrowed::<BE>(&data);
     match res {
         Err(Error::InvalidTagType(0xFF)) => {}
-        other => panic!("unexpected result"),
+        _ => panic!("unexpected result"),
     }
 }
 
@@ -47,7 +47,7 @@ fn test_invalid_tag_type_owned() {
     let res = read_owned::<BE, BE>(&data);
     match res {
         Err(Error::InvalidTagType(0xFF)) => {}
-        other => panic!("unexpected result"),
+        _ => panic!("unexpected result"),
     }
 }
 
@@ -72,14 +72,14 @@ fn test_eof_in_name_borrowed() {
     let res = read_borrowed::<BE>(&data);
     match res {
         Err(Error::EndOfFile) => {}
-        other => panic!("unexpected result"),
+        _ => panic!("unexpected result"),
     }
 }
 
 struct BadWriter;
 impl Write for BadWriter {
     fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-        Err(io::Error::new(io::ErrorKind::Other, "write fail"))
+        Err(io::Error::other("write fail"))
     }
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
@@ -111,7 +111,7 @@ fn test_owned_list_get_out_of_range() {
 #[test]
 fn test_mutable_get_mut_out_of_range() {
     let data = vec![0x09, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x01, 0x02];
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
     if let na_nbt::OwnedValue::List(mut list) = owned {
         assert!(list.get_mut(10).is_none());
     } else {

@@ -83,7 +83,7 @@ fn test_borrowed_invalid_tag_in_compound() {
     // If we put 0xFF where tag ID is expected:
     // Compound structure: [TagID] [NameLen] [Name] [Payload]
     // 0xFF
-    let res = read_borrowed::<BE>(&data);
+    let _res = read_borrowed::<BE>(&data);
     // It will try to read name len, then name, then payload... wait.
     // No, state machine checks tag_id.
     // But it reads NameLen and Name BEFORE checking tag_id match.

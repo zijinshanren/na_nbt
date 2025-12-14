@@ -3041,18 +3041,6 @@ fn test_mutable_value_get_scoped() {
 /// Test ScopedReadableValue trait on OwnedValue
 #[test]
 fn test_owned_value_scoped_readable_trait_is_methods() {
-    let data = create_all_types_be();
-    let doc = read_owned::<BE, BE>(&data).unwrap();
-
-    // First get the compound root to access typed values
-    let root_compound = doc.as_compound().unwrap();
-
-    // Get individual OwnedValues by extracting from list (which we can iterate)
-    // For direct OwnedValue trait testing, we need to test on values we own
-    // But doc.get() returns ImmutableValue, not &OwnedValue
-    // So we test using the ImmutableValue (from mutable module) instead
-    // which already has ScopedReadableValue impl
-
     // Let's create individual OwnedValue values to test trait on them
     let byte_val = OwnedValue::<BE>::Byte(0x7F);
     let short_val = OwnedValue::<BE>::Short(zerocopy::byteorder::I16::<BE>::new(0x1234));
@@ -3180,7 +3168,7 @@ fn test_owned_value_scoped_readable_trait_get_scoped() {
     assert_eq!(x.as_byte(), Some(0x7F));
 
     // Also test on list within compound
-    let list = doc.get("lb").unwrap().as_list().unwrap();
+    let _list = doc.get("lb").unwrap().as_list().unwrap();
     // OwnedList::get is tested via its trait impl
 }
 
@@ -3299,14 +3287,12 @@ fn test_owned_value_scoped_writable_trait_array_mut_methods() {
     let mut doc = read_owned::<BE, BE>(&data).unwrap(); // doc is OwnedValue
 
     // Test get_mut via trait on OwnedValue (doc is compound)
-    let mut ba_val = ScopedWritableValue::get_mut(&mut doc, "ba").unwrap();
+    let ba_val = ScopedWritableValue::get_mut(&mut doc, "ba").unwrap();
     assert!(ba_val.is_byte_array());
-    drop(ba_val);
 
     // Test as_compound_mut_scoped via trait on OwnedValue
     let compound_view = ScopedWritableValue::as_compound_mut_scoped(&mut doc).unwrap();
     assert!(compound_view.get("b").is_some());
-    drop(compound_view);
 
     // For array mut methods on OwnedValue, we need OwnedValue variants directly
     // Create an OwnedValue::ByteArray to test
@@ -3314,7 +3300,7 @@ fn test_owned_value_scoped_writable_trait_array_mut_methods() {
 
     let mut lib = doc.get_mut("lb").unwrap();
     // Actually, test via parsed list
-    let mut list = lib.as_list_mut().unwrap();
+    let list = lib.as_list_mut().unwrap();
     assert!(ScopedReadableList::len(list) == 2);
 }
 
@@ -3327,8 +3313,6 @@ fn test_owned_value_scoped_writable_trait_get_mut() {
     let mut compound_val = doc.get_mut("c").unwrap();
     let mut x_val = ScopedWritableValue::get_mut(&mut compound_val, "x").unwrap();
     ScopedWritableValue::set_byte(&mut x_val, 99);
-    drop(x_val);
-    drop(compound_val);
 
     // Verify
     let x_check = doc.get("c").unwrap().get("x").unwrap();
@@ -3338,8 +3322,6 @@ fn test_owned_value_scoped_writable_trait_get_mut() {
     let mut list_val = doc.get_mut("lb").unwrap();
     let mut item = ScopedWritableValue::get_mut(&mut list_val, 0usize).unwrap();
     ScopedWritableValue::set_byte(&mut item, 77);
-    drop(item);
-    drop(list_val);
 
     // Verify
     let item_check = doc.get("lb").unwrap().get(0).unwrap();
@@ -3375,12 +3357,11 @@ fn test_owned_list_scoped_writable_trait() {
     let mut doc = read_owned::<BE, BE>(&data).unwrap();
 
     let mut lb = doc.get_mut("lb").unwrap();
-    let mut list = lb.as_list_mut().unwrap();
+    let list = lb.as_list_mut().unwrap();
 
     // Test get_mut via trait
     let mut item = ScopedWritableList::get_mut(list, 0).unwrap();
     ScopedWritableValue::set_byte(&mut item, 99);
-    drop(item);
 
     // Verify
     let item_check = ScopedReadableList::get_scoped(list, 0).unwrap();
@@ -3432,12 +3413,11 @@ fn test_owned_compound_scoped_writable_trait() {
     let mut doc = read_owned::<BE, BE>(&data).unwrap();
 
     let mut c = doc.get_mut("c").unwrap();
-    let mut compound = c.as_compound_mut().unwrap();
+    let compound = c.as_compound_mut().unwrap();
 
     // Test get_mut via trait
     let mut x_mut = ScopedWritableCompound::get_mut(compound, "x").unwrap();
     ScopedWritableValue::set_byte(&mut x_mut, 88);
-    drop(x_mut);
 
     // Verify
     let x_check = ScopedReadableCompound::get_scoped(compound, "x").unwrap();
@@ -3491,7 +3471,6 @@ fn test_owned_value_visit_mut_scoped() {
             *b = 42;
         }
     });
-    drop(byte_val);
     assert_eq!(doc.get("b").unwrap().as_byte(), Some(42));
 
     // Test visit_mut_scoped on short
@@ -3501,7 +3480,6 @@ fn test_owned_value_visit_mut_scoped() {
             s.set(4242);
         }
     });
-    drop(short_val);
     assert_eq!(doc.get("s").unwrap().as_short(), Some(4242));
 
     // Test visit_mut_scoped on int
@@ -3511,7 +3489,6 @@ fn test_owned_value_visit_mut_scoped() {
             i.set(424242);
         }
     });
-    drop(int_val);
     assert_eq!(doc.get("i").unwrap().as_int(), Some(424242));
 
     // Test visit_mut_scoped on long
@@ -3521,7 +3498,6 @@ fn test_owned_value_visit_mut_scoped() {
             l.set(42424242i64);
         }
     });
-    drop(long_val);
     assert_eq!(doc.get("l").unwrap().as_long(), Some(42424242i64));
 
     // Test visit_mut_scoped on float
@@ -3531,7 +3507,6 @@ fn test_owned_value_visit_mut_scoped() {
             f.set(42.42f32);
         }
     });
-    drop(float_val);
 
     // Test visit_mut_scoped on double
     let mut double_val = doc.get_mut("d").unwrap();
@@ -3540,7 +3515,6 @@ fn test_owned_value_visit_mut_scoped() {
             d.set(42.4242f64);
         }
     });
-    drop(double_val);
 
     // Test visit_mut_scoped on byte_array
     let mut ba_val = doc.get_mut("ba").unwrap();
@@ -3549,7 +3523,6 @@ fn test_owned_value_visit_mut_scoped() {
             assert_eq!(arr.len(), 3);
         }
     });
-    drop(ba_val);
 
     // Test visit_mut_scoped on string
     let mut str_val = doc.get_mut("st").unwrap();
@@ -3558,7 +3531,6 @@ fn test_owned_value_visit_mut_scoped() {
             s.push_str("!");
         }
     });
-    drop(str_val);
 
     // Test visit_mut_scoped on list
     let mut list_val = doc.get_mut("lb").unwrap();
@@ -3567,7 +3539,6 @@ fn test_owned_value_visit_mut_scoped() {
             assert_eq!(list.len(), 2);
         }
     });
-    drop(list_val);
 
     // Test visit_mut_scoped on compound
     let mut compound_val = doc.get_mut("c").unwrap();
@@ -3576,7 +3547,6 @@ fn test_owned_value_visit_mut_scoped() {
             let _ = compound.get("x");
         }
     });
-    drop(compound_val);
 
     // Test visit_mut_scoped on int_array
     let mut ia_val = doc.get_mut("ia").unwrap();
@@ -3585,7 +3555,6 @@ fn test_owned_value_visit_mut_scoped() {
             assert_eq!(arr.len(), 2);
         }
     });
-    drop(ia_val);
 
     // Test visit_mut_scoped on long_array
     let mut la_val = doc.get_mut("la").unwrap();
@@ -3594,5 +3563,4 @@ fn test_owned_value_visit_mut_scoped() {
             assert_eq!(arr.len(), 2);
         }
     });
-    drop(la_val);
 }

@@ -1,4 +1,4 @@
-use na_nbt::{read_borrowed, read_owned, OwnedValue, ImmutableValue};
+use na_nbt::{read_borrowed, read_owned};
 use zerocopy::byteorder::BigEndian as BE;
 
 fn create_compound_with_list() -> Vec<u8> {

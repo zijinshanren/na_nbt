@@ -44,6 +44,7 @@ fn test_error_is_std_error() {
     assert_error::<Error>();
 }
 
+#[allow(clippy::unnecessary_literal_unwrap)]
 #[test]
 fn test_result_type() {
     let ok_result: na_nbt::Result<i32> = Ok(42);

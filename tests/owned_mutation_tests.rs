@@ -1,6 +1,6 @@
 //! Tests for OwnedList and OwnedCompound mutation APIs
 
-use na_nbt::{read_owned, OwnedValue};
+use na_nbt::{OwnedValue, read_owned};
 use zerocopy::byteorder::BigEndian as BE;
 
 fn create_int_list_nbt_be(values: &[i32]) -> Vec<u8> {
@@ -8,7 +8,8 @@ fn create_int_list_nbt_be(values: &[i32]) -> Vec<u8> {
     let len_bytes = len.to_be_bytes();
     let mut result = vec![
         0x09, // Tag::List
-        0x00, 0x00, // empty name
+        0x00,
+        0x00, // empty name
         0x03, // element type = Int
         len_bytes[0],
         len_bytes[1],
@@ -37,7 +38,7 @@ fn create_compound_int_entry_be(name: &str, value: i32) -> Vec<u8> {
 #[test]
 fn owned_list_push_pop_remove() {
     let data = create_int_list_nbt_be(&[10, 20, 30]);
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     if let OwnedValue::List(mut list) = owned {
         assert_eq!(list.len(), 3);
@@ -71,7 +72,7 @@ fn owned_list_push_pop_remove() {
 #[test]
 fn owned_compound_insert_remove_get_mut() {
     let data = create_compound_int_entry_be("a", 100);
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     if let OwnedValue::Compound(mut compound) = owned {
         assert!(compound.get("a").is_some());
@@ -89,7 +90,16 @@ fn owned_compound_insert_remove_get_mut() {
         assert!((compound.get("f").unwrap().as_float().unwrap() - 3.5).abs() < 0.0001);
 
         compound.insert("s", "hello");
-        assert_eq!(compound.get("s").unwrap().as_string().unwrap().decode().to_string(), "hello");
+        assert_eq!(
+            compound
+                .get("s")
+                .unwrap()
+                .as_string()
+                .unwrap()
+                .decode()
+                .to_string(),
+            "hello"
+        );
 
         // Remove 'b'
         let removed = compound.remove("b").unwrap();
@@ -100,10 +110,10 @@ fn owned_compound_insert_remove_get_mut() {
         }
 
         // Test get_mut on existing value
-        if let Some(mut v) = compound.get_mut("a") {
-            if let na_nbt::MutableValue::Int(val) = v {
-                *val = 999i32.into();
-            }
+        if let Some(v) = compound.get_mut("a")
+            && let na_nbt::MutableValue::Int(val) = v
+        {
+            *val = 999i32.into();
         }
 
         assert_eq!(compound.get("a").unwrap().as_int(), Some(999));

@@ -1,4 +1,4 @@
-use na_nbt::{read_owned, OwnedValue};
+use na_nbt::{OwnedValue, read_owned};
 use zerocopy::byteorder::BigEndian as BE;
 
 fn create_compound_mixed_be() -> Vec<u8> {
@@ -33,7 +33,7 @@ fn create_compound_mixed_be() -> Vec<u8> {
     result.extend_from_slice(&0x00000002u32.to_be_bytes());
     result.extend_from_slice(&1i32.to_be_bytes());
     result.extend_from_slice(&2i32.to_be_bytes());
-    
+
     // short sh = 6
     result.push(0x02);
     result.extend_from_slice(&0x0002u16.to_be_bytes());
@@ -60,7 +60,7 @@ fn create_compound_mixed_be() -> Vec<u8> {
 #[test]
 fn owned_compound_mutations_and_visits() {
     let data = create_compound_mixed_be();
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     use na_nbt::ScopedReadableValue;
     use na_nbt::ValueScoped;
@@ -80,30 +80,38 @@ fn owned_compound_mutations_and_visits() {
         assert_eq!(c.get("a").unwrap().as_int(), Some(25));
 
         // Mutate string via direct StringViewMut
-        if let Some(mut mv) = c.get_mut("s") {
-            if let na_nbt::MutableValue::String(ref mut sview) = mv {
-                sview.push_str("bar");
-            }
+        if let Some(mut mv) = c.get_mut("s")
+            && let na_nbt::MutableValue::String(ref mut sview) = mv
+        {
+            sview.push_str("bar");
         }
 
-        assert_eq!(c.get("s").unwrap().as_string().unwrap().decode().to_string(), "foobar");
+        assert_eq!(
+            c.get("s")
+                .unwrap()
+                .as_string()
+                .unwrap()
+                .decode()
+                .to_string(),
+            "foobar"
+        );
 
         // Mutate byte array
-        if let Some(mut mv) = c.get_mut("ba") {
-            if let na_nbt::MutableValue::ByteArray(ref mut bv) = mv {
-                let slice = bv.as_mut_slice();
-                slice[0] = 9i8; // set first element
-            }
+        if let Some(mut mv) = c.get_mut("ba")
+            && let na_nbt::MutableValue::ByteArray(ref mut bv) = mv
+        {
+            let slice = bv.as_mut_slice();
+            slice[0] = 9i8; // set first element
         }
 
         assert_eq!(c.get("ba").unwrap().as_byte_array().unwrap()[0], 9i8);
 
         // Mutate list by pushing an int
-        if let Some(mut mv) = c.get_mut("li") {
-            if let na_nbt::MutableValue::List(ref mut l) = mv {
-                l.push(42i32);
-                assert_eq!(l.get(2).unwrap().as_int(), Some(42));
-            }
+        if let Some(mut mv) = c.get_mut("li")
+            && let na_nbt::MutableValue::List(ref mut l) = mv
+        {
+            l.push(42i32);
+            assert_eq!(l.get(2).unwrap().as_int(), Some(42));
         }
 
         // Test visit scoped on ImmutableValue obtained from get()
@@ -125,28 +133,27 @@ fn owned_list_push_various_types() {
     data.extend_from_slice(&0x0003u16.to_be_bytes());
     data.extend_from_slice(b"one");
 
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
 
     if let OwnedValue::List(mut l) = owned {
         assert_eq!(l.len(), 1);
         l.push("two");
         assert_eq!(l.len(), 2);
-        assert_eq!(l.get(1).unwrap().as_string().unwrap().decode().to_string(), "two");
+        assert_eq!(
+            l.get(1).unwrap().as_string().unwrap().decode().to_string(),
+            "two"
+        );
     } else {
         panic!("expected list");
     }
 
-    // Test calling trait methods on OwnedValue (wrapper trait impls)
-    use na_nbt::ScopedWritableValue;
-    use na_nbt::ScopedReadableValue;
-
     // OwnedValue root Int: set via trait and read back via trait
-    let mut owned_val = read_owned::<BE, BE>(&vec![0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07]).unwrap();
+    let mut owned_val = read_owned::<BE, BE>(&[0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07]).unwrap();
     assert!(na_nbt::ScopedWritableValue::set_int(&mut owned_val, 12));
     assert_eq!(na_nbt::ScopedReadableValue::as_int(&owned_val), Some(12));
 
     // Also cover trait methods on MutableValue via the ScopedWritableValue/ScopedReadableValue impls
-    let mut c2 = read_owned::<BE, BE>(&create_compound_mixed_be()).unwrap();
+    let c2 = read_owned::<BE, BE>(&create_compound_mixed_be()).unwrap();
     if let OwnedValue::Compound(mut comp2) = c2 {
         if let Some(mut mv) = comp2.get_mut("a") {
             assert!(na_nbt::ScopedWritableValue::set_int(&mut mv, 99));
@@ -183,19 +190,32 @@ fn owned_value_visit_owned_and_mutable() {
 fn into_owned_value_insert_various_types() {
     // empty root compound
     let data = vec![0x0A, 0x00, 0x00, 0x00];
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
     if let OwnedValue::Compound(mut c) = owned {
         c.insert("d", std::f64::consts::PI);
         assert!((c.get("d").unwrap().as_double().unwrap() - std::f64::consts::PI).abs() < 0.0001);
 
         c.insert("ba1", vec![1i8, 2i8, 3i8]);
-        assert_eq!(c.get("ba1").unwrap().as_byte_array().unwrap(), &[1i8, 2i8, 3i8]);
+        assert_eq!(
+            c.get("ba1").unwrap().as_byte_array().unwrap(),
+            &[1i8, 2i8, 3i8]
+        );
 
         use zerocopy::byteorder;
-        c.insert("ia", vec![byteorder::I32::<BE>::new(0), byteorder::I32::<BE>::new(1), byteorder::I32::<BE>::new(2)]);
+        c.insert(
+            "ia",
+            vec![
+                byteorder::I32::<BE>::new(0),
+                byteorder::I32::<BE>::new(1),
+                byteorder::I32::<BE>::new(2),
+            ],
+        );
         assert_eq!(c.get("ia").unwrap().as_int_array().unwrap()[1].get(), 1);
 
-        c.insert("la", vec![byteorder::I64::<BE>::new(0), byteorder::I64::<BE>::new(1)]);
+        c.insert(
+            "la",
+            vec![byteorder::I64::<BE>::new(0), byteorder::I64::<BE>::new(1)],
+        );
         assert_eq!(c.get("la").unwrap().as_long_array().unwrap()[1].get(), 1);
 
         // Test inserting array by slice and by [i8;N]
@@ -211,8 +231,7 @@ fn into_owned_value_insert_various_types() {
 
 #[test]
 fn trait_impls_explicit_calls() {
-    use na_nbt::{ScopedWritableValue, ScopedReadableValue};
-    use zerocopy::byteorder;
+    use na_nbt::{ScopedReadableValue, ScopedWritableValue};
 
     // Build a compound with many types
     let mut data = vec![0x0A, 0x00, 0x00];
@@ -238,7 +257,7 @@ fn trait_impls_explicit_calls() {
     data.extend_from_slice(&1.234f64.to_be_bytes());
     data.push(0x00); // end
 
-    let mut owned = read_owned::<BE, BE>(&data).unwrap();
+    let owned = read_owned::<BE, BE>(&data).unwrap();
     if let OwnedValue::Compound(mut comp) = owned {
         // Set byte via ScopedWritableValue on MutableValue
         if let Some(mut mv) = comp.get_mut("b") {
@@ -262,8 +281,14 @@ fn trait_impls_explicit_calls() {
             assert_eq!(ScopedReadableValue::as_float(&mv), Some(7.25));
         }
         if let Some(mut mv) = comp.get_mut("d") {
-            assert!(ScopedWritableValue::set_double(&mut mv, std::f64::consts::TAU));
-            assert_eq!(ScopedReadableValue::as_double(&mv), Some(std::f64::consts::TAU));
+            assert!(ScopedWritableValue::set_double(
+                &mut mv,
+                std::f64::consts::TAU
+            ));
+            assert_eq!(
+                ScopedReadableValue::as_double(&mv),
+                Some(std::f64::consts::TAU)
+            );
         }
     } else {
         panic!("expected compound");
@@ -272,7 +297,7 @@ fn trait_impls_explicit_calls() {
 
 #[test]
 fn trait_impl_more_mut_calls() {
-    let mut owned = read_owned::<BE, BE>(&create_compound_mixed_be()).unwrap();
+    let owned = read_owned::<BE, BE>(&create_compound_mixed_be()).unwrap();
     if let OwnedValue::Compound(mut c) = owned {
         // short
         if let Some(mut mv) = c.get_mut("sh") {
@@ -294,27 +319,35 @@ fn trait_impl_more_mut_calls() {
         }
 
         // Byte array mutation via as_byte_array_mut
-        if let Some(mut mv) = c.get_mut("ba") {
-            if let na_nbt::MutableValue::ByteArray(ref mut bv) = mv {
-                let s = bv.as_mut_slice();
-                if !s.is_empty() {
-                    s[0] = 99i8;
-                }
+        if let Some(mut mv) = c.get_mut("ba")
+            && let na_nbt::MutableValue::ByteArray(ref mut bv) = mv
+        {
+            let s = bv.as_mut_slice();
+            if !s.is_empty() {
+                s[0] = 99i8;
             }
         }
 
         // String mutation via as_string_mut
-        if let Some(mut mv) = c.get_mut("s") {
-            if let na_nbt::MutableValue::String(ref mut sv) = mv {
-                sv.push_str("baz");
-            }
+        if let Some(mut mv) = c.get_mut("s")
+            && let na_nbt::MutableValue::String(ref mut sv) = mv
+        {
+            sv.push_str("baz");
         }
 
         // Verify changes
         assert_eq!(c.get("sh").unwrap().as_short(), Some(320));
         assert_eq!(c.get("f").unwrap().as_float().unwrap(), 2.0);
         assert_eq!(c.get("d").unwrap().as_double().unwrap(), 2.5);
-        assert!(c.get("s").unwrap().as_string().unwrap().decode().to_string().contains("baz"));
+        assert!(
+            c.get("s")
+                .unwrap()
+                .as_string()
+                .unwrap()
+                .decode()
+                .to_string()
+                .contains("baz")
+        );
     } else {
         panic!("expected compound");
     }

@@ -1,4 +1,4 @@
-use na_nbt::{read_owned, OwnedValue, ImmutableValue};
+use na_nbt::{OwnedValue, read_owned};
 use zerocopy::byteorder::{BigEndian, LittleEndian};
 
 fn create_primitive_list_be(tag: u8, element_size: usize, data: &[u8]) -> Vec<u8> {
@@ -19,7 +19,9 @@ fn test_read_fallback_primitives() {
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
     if let OwnedValue::List(l) = owned {
         assert_eq!(l.get(0).unwrap().as_short(), Some(0x1234));
-    } else { panic!("Expected list"); }
+    } else {
+        panic!("Expected list");
+    }
 
     // Long (Tag 4)
     let val_long: i64 = 0x1234567890ABCDEF;
@@ -27,7 +29,9 @@ fn test_read_fallback_primitives() {
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
     if let OwnedValue::List(l) = owned {
         assert_eq!(l.get(0).unwrap().as_long(), Some(0x1234567890ABCDEF));
-    } else { panic!("Expected list"); }
+    } else {
+        panic!("Expected list");
+    }
 
     // Float (Tag 5)
     let val_float: f32 = 1.234;
@@ -38,7 +42,9 @@ fn test_read_fallback_primitives() {
         // Wait, f32 to_be_bytes then read as LE means the *memory* will be LE representation of the float.
         // The value should remain the same.
         assert_eq!(l.get(0).unwrap().as_float(), Some(1.234));
-    } else { panic!("Expected list"); }
+    } else {
+        panic!("Expected list");
+    }
 
     // Double (Tag 6)
     let val_double: f64 = 123.456789;
@@ -46,7 +52,9 @@ fn test_read_fallback_primitives() {
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
     if let OwnedValue::List(l) = owned {
         assert_eq!(l.get(0).unwrap().as_double(), Some(123.456789));
-    } else { panic!("Expected list"); }
+    } else {
+        panic!("Expected list");
+    }
 }
 
 #[test]
@@ -58,13 +66,17 @@ fn test_read_fallback_arrays() {
     data.extend_from_slice(&1u16.to_be_bytes()); // Name len
     data.push(b'b'); // Name
     data.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
-    for b in &bytes { data.push(*b as u8); }
+    for b in &bytes {
+        data.push(*b as u8);
+    }
     data.push(0x00); // End
 
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
     if let OwnedValue::Compound(c) = owned {
         assert_eq!(c.get("b").unwrap().as_byte_array(), Some(bytes.as_slice()));
-    } else { panic!("Expected compound"); }
+    } else {
+        panic!("Expected compound");
+    }
 
     // IntArray (Tag 11) - Needs swap
     let ints: Vec<i32> = vec![0x12345678, 0x0ABCDEF0];
@@ -73,7 +85,9 @@ fn test_read_fallback_arrays() {
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'i');
     data.extend_from_slice(&(ints.len() as u32).to_be_bytes());
-    for i in &ints { data.extend_from_slice(&(*i).to_be_bytes()); }
+    for i in &ints {
+        data.extend_from_slice(&(*i).to_be_bytes());
+    }
     data.push(0x00);
 
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
@@ -82,7 +96,9 @@ fn test_read_fallback_arrays() {
         let arr = val.as_int_array().unwrap();
         assert_eq!(arr[0].get(), 0x12345678);
         assert_eq!(arr[1].get(), 0x0ABCDEF0);
-    } else { panic!("Expected compound"); }
+    } else {
+        panic!("Expected compound");
+    }
 
     // LongArray (Tag 12) - Needs swap
     let longs: Vec<i64> = vec![0x1234567890ABCDEF, 0x0FEDCBA098765432];
@@ -91,7 +107,9 @@ fn test_read_fallback_arrays() {
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'l');
     data.extend_from_slice(&(longs.len() as u32).to_be_bytes());
-    for l in &longs { data.extend_from_slice(&(*l).to_be_bytes()); }
+    for l in &longs {
+        data.extend_from_slice(&(*l).to_be_bytes());
+    }
     data.push(0x00);
 
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
@@ -100,7 +118,9 @@ fn test_read_fallback_arrays() {
         let arr = val.as_long_array().unwrap();
         assert_eq!(arr[0].get(), 0x1234567890ABCDEF);
         assert_eq!(arr[1].get(), 0x0FEDCBA098765432);
-    } else { panic!("Expected compound"); }
+    } else {
+        panic!("Expected compound");
+    }
 }
 
 #[test]
@@ -118,6 +138,7 @@ fn test_read_fallback_string() {
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
     if let OwnedValue::Compound(c) = owned {
         assert_eq!(c.get("s").unwrap().as_string().unwrap().decode(), s);
-    } else { panic!("Expected compound"); }
+    } else {
+        panic!("Expected compound");
+    }
 }
-

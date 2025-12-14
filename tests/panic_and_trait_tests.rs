@@ -14,16 +14,6 @@ fn create_int_list_be(ints: &[i32]) -> Vec<u8> {
     data
 }
 
-fn create_byte_list_be(bytes: &[i8]) -> Vec<u8> {
-    let mut data = vec![0x09, 0x00, 0x00];
-    data.push(0x01); // byte tag
-    data.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
-    for b in bytes {
-        data.push(*b as u8);
-    }
-    data
-}
-
 // ==================== List Remove Panic Tests ====================
 
 #[test]
@@ -284,7 +274,7 @@ fn test_compound_remove_nonexistent_returns_none() {
 #[test]
 fn test_list_many_push_pop_cycles() {
     let data = create_int_list_be(&[]);
-    let owned = read_owned::<BE, BE>(&data).unwrap();
+    let _owned = read_owned::<BE, BE>(&data).unwrap();
     // Empty int list - need to push first element with correct type
     // Actually, empty list has End tag - we need a list with at least one element
     let data = create_int_list_be(&[0]);
@@ -296,7 +286,7 @@ fn test_list_many_push_pop_cycles() {
 
         // Push many elements
         for i in 0..100 {
-            list.push(i as i32);
+            list.push(i);
         }
         assert_eq!(list.len(), 100);
 
@@ -319,7 +309,7 @@ fn test_compound_many_insert_remove_cycles() {
         // Insert many elements
         for i in 0..50 {
             let key = format!("key{}", i);
-            comp.insert(&key, i as i32);
+            comp.insert(&key, i);
         }
 
         // Verify all exist

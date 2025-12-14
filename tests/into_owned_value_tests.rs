@@ -1,8 +1,8 @@
 //! Tests for IntoOwnedValue trait implementations - targeting into_owned_value.rs coverage
 
-use na_nbt::{read_owned, OwnedList, OwnedCompound, OwnedValue};
-use zerocopy::byteorder::BigEndian as BE;
+use na_nbt::{OwnedValue, read_owned};
 use zerocopy::byteorder;
+use zerocopy::byteorder::BigEndian as BE;
 
 // ==================== Helper Functions ====================
 
@@ -408,7 +408,10 @@ fn test_compound_insert_int_array() {
     let data = create_empty_compound();
     let mut owned = read_owned::<BE, BE>(&data).unwrap();
     if let OwnedValue::Compound(ref mut comp) = owned {
-        comp.insert("ia", vec![byteorder::I32::<BE>::new(10), byteorder::I32::<BE>::new(20)]);
+        comp.insert(
+            "ia",
+            vec![byteorder::I32::<BE>::new(10), byteorder::I32::<BE>::new(20)],
+        );
         assert!(comp.get("ia").is_some());
     } else {
         panic!("expected compound");
@@ -420,7 +423,13 @@ fn test_compound_insert_long_array() {
     let data = create_empty_compound();
     let mut owned = read_owned::<BE, BE>(&data).unwrap();
     if let OwnedValue::Compound(ref mut comp) = owned {
-        comp.insert("la", vec![byteorder::I64::<BE>::new(100), byteorder::I64::<BE>::new(200)]);
+        comp.insert(
+            "la",
+            vec![
+                byteorder::I64::<BE>::new(100),
+                byteorder::I64::<BE>::new(200),
+            ],
+        );
         assert!(comp.get("la").is_some());
     } else {
         panic!("expected compound");
@@ -456,7 +465,7 @@ fn test_compound_insert_owned_value() {
 fn test_compound_insert_owned_list() {
     let list_data = create_int_list();
     let list_owned = read_owned::<BE, BE>(&list_data).unwrap();
-    
+
     let data = create_empty_compound();
     let mut owned = read_owned::<BE, BE>(&data).unwrap();
     if let OwnedValue::Compound(ref mut comp) = owned {
@@ -473,7 +482,7 @@ fn test_compound_insert_owned_list() {
 fn test_compound_insert_owned_compound() {
     let inner_data = create_empty_compound();
     let inner_owned = read_owned::<BE, BE>(&inner_data).unwrap();
-    
+
     let data = create_empty_compound();
     let mut owned = read_owned::<BE, BE>(&data).unwrap();
     if let OwnedValue::Compound(ref mut comp) = owned {
@@ -507,18 +516,18 @@ fn create_list_of_lists() -> Vec<u8> {
     let mut data = vec![0x09, 0x00, 0x00];
     data.push(0x09); // List tag
     data.extend_from_slice(&2u32.to_be_bytes()); // 2 inner lists
-    
+
     // First inner list [1, 2]
     data.push(0x03); // Int
     data.extend_from_slice(&2u32.to_be_bytes());
     data.extend_from_slice(&1i32.to_be_bytes());
     data.extend_from_slice(&2i32.to_be_bytes());
-    
+
     // Second inner list [3]
     data.push(0x03); // Int
     data.extend_from_slice(&1u32.to_be_bytes());
     data.extend_from_slice(&3i32.to_be_bytes());
-    
+
     data
 }
 
@@ -526,11 +535,11 @@ fn create_list_of_lists() -> Vec<u8> {
 fn test_list_push_owned_list() {
     let data = create_list_of_lists();
     let mut owned = read_owned::<BE, BE>(&data).unwrap();
-    
+
     // Create a new inner list
     let inner_data = create_int_list();
     let inner_owned = read_owned::<BE, BE>(&inner_data).unwrap();
-    
+
     if let OwnedValue::List(ref mut list) = owned {
         if let OwnedValue::List(inner_list) = inner_owned {
             list.push(inner_list);
@@ -545,14 +554,14 @@ fn create_list_of_compounds() -> Vec<u8> {
     let mut data = vec![0x09, 0x00, 0x00];
     data.push(0x0A); // Compound tag
     data.extend_from_slice(&1u32.to_be_bytes()); // 1 compound
-    
+
     // Compound { "x": 1 }
     data.push(0x03);
     data.extend_from_slice(&1u16.to_be_bytes());
     data.push(b'x');
     data.extend_from_slice(&1i32.to_be_bytes());
     data.push(0x00);
-    
+
     data
 }
 
@@ -560,11 +569,11 @@ fn create_list_of_compounds() -> Vec<u8> {
 fn test_list_push_owned_compound() {
     let data = create_list_of_compounds();
     let mut owned = read_owned::<BE, BE>(&data).unwrap();
-    
+
     // Create a new inner compound
     let inner_data = create_empty_compound();
     let inner_owned = read_owned::<BE, BE>(&inner_data).unwrap();
-    
+
     if let OwnedValue::List(ref mut list) = owned {
         if let OwnedValue::Compound(inner_comp) = inner_owned {
             list.push(inner_comp);

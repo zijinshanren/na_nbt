@@ -1,6 +1,6 @@
 //! Tests for trait implementations wrappers
 
-use na_nbt::{read_borrowed, Value, ReadableValue};
+use na_nbt::{ReadableValue, Value, read_borrowed};
 use zerocopy::byteorder::BigEndian as BE;
 
 fn create_byte_nbt(value: i8) -> Vec<u8> {
@@ -52,18 +52,12 @@ fn test_value_visit_list_compound() {
     let data = create_empty_list_nbt_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let list_tag = root.visit(|v| match v {
-        Value::List(_) => true,
-        _ => false,
-    });
+    let list_tag = root.visit(|v| matches!(v, Value::List(_)));
     assert!(list_tag);
 
     let data = create_empty_compound_nbt_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let comp_tag = root.visit(|v| match v {
-        Value::Compound(_) => true,
-        _ => false,
-    });
+    let comp_tag = root.visit(|v| matches!(v, Value::Compound(_)));
     assert!(comp_tag);
 }
