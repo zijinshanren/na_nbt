@@ -1,9 +1,4 @@
-use std::{
-    hint::unreachable_unchecked,
-    marker::PhantomData,
-    mem::{ManuallyDrop, MaybeUninit},
-    ptr,
-};
+use std::{hint::unreachable_unchecked, marker::PhantomData, mem::ManuallyDrop, ptr};
 
 use zerocopy::byteorder;
 
@@ -215,22 +210,65 @@ impl<O: ByteOrder> From<Vec<byteorder::I64<O>>> for OwnedValue<O> {
 impl<O: ByteOrder> OwnedValue<O> {
     pub(crate) unsafe fn write(self, dst: *mut u8) {
         unsafe {
-            let me = ManuallyDrop::new(self);
-            ptr::copy_nonoverlapping(
-                (&*me as *const Self as *const u8).add(1),
-                dst,
-                tag_size(me.tag_id()),
-            );
+            match self {
+                OwnedValue::End => {}
+                OwnedValue::Byte(value) => {
+                    ptr::write(dst.cast(), value.to_ne_bytes());
+                }
+                OwnedValue::Short(value) => {
+                    ptr::write(dst.cast(), value.to_bytes());
+                }
+                OwnedValue::Int(value) => {
+                    ptr::write(dst.cast(), value.to_bytes());
+                }
+                OwnedValue::Long(value) => {
+                    ptr::write(dst.cast(), value.to_bytes());
+                }
+                OwnedValue::Float(value) => {
+                    ptr::write(dst.cast(), value.to_bytes());
+                }
+                OwnedValue::Double(value) => {
+                    ptr::write(dst.cast(), value.to_bytes());
+                }
+                OwnedValue::ByteArray(value) => {
+                    value.write(dst);
+                }
+                OwnedValue::String(value) => {
+                    value.write(dst);
+                }
+                OwnedValue::List(value) => {
+                    value.write(dst);
+                }
+                OwnedValue::Compound(value) => {
+                    value.write(dst);
+                }
+                OwnedValue::IntArray(value) => {
+                    value.write(dst);
+                }
+                OwnedValue::LongArray(value) => {
+                    value.write(dst);
+                }
+            }
         }
     }
 
     pub(crate) unsafe fn read(tag_id: Tag, src: *mut u8) -> Self {
         unsafe {
-            let mut uninit = MaybeUninit::<OwnedValue<O>>::uninit();
-            let ptr = uninit.as_mut_ptr() as *mut u8;
-            *ptr = tag_id as u8;
-            ptr::copy_nonoverlapping(src, ptr.add(1), tag_size(tag_id));
-            uninit.assume_init()
+            match tag_id {
+                Tag::End => OwnedValue::End,
+                Tag::Byte => OwnedValue::Byte(ptr::read(src.cast())),
+                Tag::Short => OwnedValue::Short(ptr::read(src.cast())),
+                Tag::Int => OwnedValue::Int(ptr::read(src.cast())),
+                Tag::Long => OwnedValue::Long(ptr::read(src.cast())),
+                Tag::Float => OwnedValue::Float(ptr::read(src.cast())),
+                Tag::Double => OwnedValue::Double(ptr::read(src.cast())),
+                Tag::ByteArray => OwnedValue::ByteArray(VecViewOwn::read(src.cast())),
+                Tag::String => OwnedValue::String(StringViewOwn::read(src.cast())),
+                Tag::List => OwnedValue::List(OwnedList::read(src.cast())),
+                Tag::Compound => OwnedValue::Compound(OwnedCompound::read(src.cast())),
+                Tag::IntArray => OwnedValue::IntArray(VecViewOwn::read(src.cast())),
+                Tag::LongArray => OwnedValue::LongArray(VecViewOwn::read(src.cast())),
+            }
         }
     }
 }
