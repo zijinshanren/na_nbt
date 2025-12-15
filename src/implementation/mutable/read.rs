@@ -33,10 +33,12 @@ unsafe fn read_compound<O: ByteOrder>(
 
             if tag_id == 0 {
                 cold_path();
-                compound_data.extend_from_slice(slice::from_raw_parts(
-                    start,
-                    current_pos.byte_offset_from_unsigned(start),
-                ));
+                let raw_len = current_pos.byte_offset_from_unsigned(start);
+                let len = compound_data.len();
+                compound_data.reserve(raw_len);
+                let write_ptr = compound_data.as_mut_ptr().add(len);
+                ptr::copy_nonoverlapping(start, write_ptr, raw_len);
+                compound_data.set_len(len + raw_len);
                 return Ok(OwnedValue::Compound(OwnedCompound {
                     data: compound_data.into(),
                     _marker: PhantomData,
