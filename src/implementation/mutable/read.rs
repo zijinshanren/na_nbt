@@ -13,6 +13,7 @@ macro_rules! change_endian {
     };
 }
 
+#[inline(always)]
 unsafe fn read_compound<O: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
@@ -80,6 +81,7 @@ unsafe fn read_compound<O: ByteOrder>(
     }
 }
 
+#[inline(always)]
 unsafe fn read_list<O: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
@@ -245,6 +247,7 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
     }
 }
 
+#[inline(always)]
 unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
@@ -379,6 +382,7 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
     }
 }
 
+#[inline(always)]
 unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
