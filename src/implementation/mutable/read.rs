@@ -7,7 +7,12 @@ use crate::{
     implementation::mutable::util::{SIZE_DYN, tag_size},
 };
 
-#[inline(never)]
+macro_rules! change_endian {
+    ($value:expr, $type:ident, $from:ident, $to:ident) => {
+        byteorder::$type::<$to>::new(byteorder::$type::<$from>::from_bytes($value).get())
+    };
+}
+
 unsafe fn read_compound<O: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
@@ -34,11 +39,15 @@ unsafe fn read_compound<O: ByteOrder>(
             if tag_id == 0 {
                 cold_path();
                 let raw_len = current_pos.byte_offset_from_unsigned(start);
-                let len = compound_data.len();
-                compound_data.reserve(raw_len);
-                let write_ptr = compound_data.as_mut_ptr().add(len);
-                ptr::copy_nonoverlapping(start, write_ptr, raw_len);
-                compound_data.set_len(len + raw_len);
+                if raw_len == 1 {
+                    compound_data.push(0);
+                } else {
+                    let len = compound_data.len();
+                    compound_data.reserve(raw_len);
+                    let write_ptr = compound_data.as_mut_ptr().add(len);
+                    ptr::copy_nonoverlapping(start, write_ptr, raw_len);
+                    compound_data.set_len(len + raw_len);
+                }
                 return Ok(OwnedValue::Compound(OwnedCompound {
                     data: compound_data.into(),
                     _marker: PhantomData,
@@ -71,7 +80,6 @@ unsafe fn read_compound<O: ByteOrder>(
     }
 }
 
-#[inline(never)]
 unsafe fn read_list<O: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
@@ -137,7 +145,6 @@ pub unsafe fn read_unsafe_impl<O: ByteOrder>(
         assert_unchecked(tag_id > 6);
         match tag_id {
             7 => {
-                // ByteArray: element size is 1 byte
                 check_bounds!(4);
                 let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
                 *current_pos = current_pos.add(4);
@@ -158,24 +165,22 @@ pub unsafe fn read_unsafe_impl<O: ByteOrder>(
             9 => read_list::<O>(current_pos, end_pos),
             10 => read_compound::<O>(current_pos, end_pos),
             11 => {
-                // IntArray: element size is 4 bytes
                 check_bounds!(4);
                 let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
                 *current_pos = current_pos.add(4);
                 check_bounds!(len * 4);
                 let value: &[byteorder::I32<O>] = slice::from_raw_parts((*current_pos).cast(), len);
                 *current_pos = current_pos.add(len * 4);
-                Ok(value.into())
+                Ok(OwnedValue::IntArray(value.into()))
             }
             12 => {
-                // LongArray: element size is 8 bytes
                 check_bounds!(4);
                 let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
                 *current_pos = current_pos.add(4);
                 check_bounds!(len * 8);
                 let value: &[byteorder::I64<O>] = slice::from_raw_parts((*current_pos).cast(), len);
                 *current_pos = current_pos.add(len * 8);
-                Ok(value.into())
+                Ok(OwnedValue::LongArray(value.into()))
             }
             _ => Err(Error::InvalidTagType(tag_id)),
         }
@@ -240,7 +245,6 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
     }
 }
 
-#[inline(never)]
 unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
@@ -299,7 +303,7 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
                 }
                 2 => {
                     check_bounds!(2);
-                    let value = u16::from_ne_bytes(*(*current_pos).cast()).swap_bytes();
+                    let value = byteorder::U16::<O>::from_bytes(*(*current_pos).cast());
                     *current_pos = current_pos.add(2);
                     let raw_len = 1 + 2 + name_len;
                     let len = compound_data.len();
@@ -310,12 +314,15 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
-                    ptr::write(write_ptr.add(raw_len).cast(), value.to_ne_bytes());
+                    ptr::write(
+                        write_ptr.add(raw_len).cast(),
+                        byteorder::U16::<R>::new(value.get()).to_bytes(),
+                    );
                     compound_data.set_len(len + raw_len + 2);
                 }
                 3 | 5 => {
                     check_bounds!(4);
-                    let value = u32::from_ne_bytes(*(*current_pos).cast()).swap_bytes();
+                    let value = byteorder::U32::<O>::from_bytes(*(*current_pos).cast());
                     *current_pos = current_pos.add(4);
                     let raw_len = 1 + 2 + name_len;
                     let len = compound_data.len();
@@ -326,12 +333,15 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
-                    ptr::write(write_ptr.add(raw_len).cast(), value.to_ne_bytes());
+                    ptr::write(
+                        write_ptr.add(raw_len).cast(),
+                        byteorder::U32::<R>::new(value.get()).to_bytes(),
+                    );
                     compound_data.set_len(len + raw_len + 4);
                 }
                 4 | 6 => {
                     check_bounds!(8);
-                    let value = u64::from_ne_bytes(*(*current_pos).cast()).swap_bytes();
+                    let value = byteorder::U64::<O>::from_bytes(*(*current_pos).cast());
                     *current_pos = current_pos.add(8);
                     let raw_len = 1 + 2 + name_len;
                     let len = compound_data.len();
@@ -342,7 +352,10 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
-                    ptr::write(write_ptr.add(raw_len).cast(), value.to_ne_bytes());
+                    ptr::write(
+                        write_ptr.add(raw_len).cast(),
+                        byteorder::U64::<R>::new(value.get()).to_bytes(),
+                    );
                     compound_data.set_len(len + raw_len + 8);
                 }
                 7..=12 => {
@@ -366,7 +379,6 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
     }
 }
 
-#[inline(never)]
 unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
     current_pos: &mut *const u8,
     end_pos: *const u8,
@@ -428,7 +440,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 );
                 let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 2]>(), len);
                 for element in s {
-                    *element = u16::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U16, O, R).to_bytes();
                 }
                 *current_pos = current_pos.add(len * 2);
                 list_data.set_len(1 + 4 + len * 2);
@@ -448,7 +460,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 );
                 let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 4]>(), len);
                 for element in s {
-                    *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U32, O, R).to_bytes();
                 }
                 *current_pos = current_pos.add(len * 4);
                 list_data.set_len(1 + 4 + len * 4);
@@ -468,7 +480,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 );
                 let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 8]>(), len);
                 for element in s {
-                    *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U64, O, R).to_bytes();
                 }
                 *current_pos = current_pos.add(len * 8);
                 list_data.set_len(1 + 4 + len * 8);
@@ -547,7 +559,7 @@ pub unsafe fn read_unsafe_fallback_impl<O: ByteOrder, R: ByteOrder>(
                 let mut value =
                     Vec::<[u8; 4]>::from(slice::from_raw_parts((*current_pos).cast(), len));
                 for element in value.iter_mut() {
-                    *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U32, O, R).to_bytes();
                 }
                 *current_pos = current_pos.add(len * 4);
                 Ok(OwnedValue::IntArray(
@@ -562,7 +574,7 @@ pub unsafe fn read_unsafe_fallback_impl<O: ByteOrder, R: ByteOrder>(
                 let mut value =
                     Vec::<[u8; 8]>::from(slice::from_raw_parts((*current_pos).cast(), len));
                 for element in value.iter_mut() {
-                    *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U64, O, R).to_bytes();
                 }
                 *current_pos = current_pos.add(len * 8);
                 Ok(OwnedValue::LongArray(

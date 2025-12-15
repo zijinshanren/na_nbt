@@ -4,6 +4,12 @@ use zerocopy::byteorder;
 
 use crate::{ByteOrder, Error, Result, Tag, cold_path};
 
+macro_rules! change_endian {
+    ($value:expr, $type:ident, $from:ident, $to:ident) => {
+        byteorder::$type::<$to>::new(byteorder::$type::<$from>::from_bytes($value).get())
+    };
+}
+
 pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) -> Result<usize> {
     unsafe {
         let buf_start = buf;
@@ -18,21 +24,21 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) 
             Tag::Short => {
                 let s = slice::from_raw_parts_mut(buf.cast::<[u8; 2]>(), len as usize);
                 for element in s {
-                    *element = u16::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U16, O, R).to_bytes();
                 }
                 buf = buf.add(2 * len as usize);
             }
             Tag::Int | Tag::Float => {
                 let s = slice::from_raw_parts_mut(buf.cast::<[u8; 4]>(), len as usize);
                 for element in s {
-                    *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U32, O, R).to_bytes();
                 }
                 buf = buf.add(4 * len as usize);
             }
             Tag::Long | Tag::Double => {
                 let s = slice::from_raw_parts_mut(buf.cast::<[u8; 8]>(), len as usize);
                 for element in s {
-                    *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                    *element = change_endian!(*element, U64, O, R).to_bytes();
                 }
                 buf = buf.add(8 * len as usize);
             }
@@ -69,7 +75,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) 
                     buf = buf.add(4);
                     let s = slice::from_raw_parts_mut(buf.cast::<[u8; 4]>(), array_len as usize);
                     for element in s {
-                        *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                        *element = change_endian!(*element, U32, O, R).to_bytes();
                     }
                     buf = buf.add(4 * array_len as usize);
                 }
@@ -81,7 +87,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(mut buf: *mut u8) 
                     buf = buf.add(4);
                     let s = slice::from_raw_parts_mut(buf.cast::<[u8; 8]>(), array_len as usize);
                     for element in s {
-                        *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                        *element = change_endian!(*element, U64, O, R).to_bytes();
                     }
                     buf = buf.add(8 * array_len as usize);
                 }
@@ -115,21 +121,21 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                 Tag::Short => {
                     ptr::write(
                         buf.cast(),
-                        u16::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
+                        change_endian!(*buf.cast(), U16, O, R).to_bytes(),
                     );
                     buf = buf.add(2);
                 }
                 Tag::Int | Tag::Float => {
                     ptr::write(
                         buf.cast(),
-                        u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
+                        change_endian!(*buf.cast(), U32, O, R).to_bytes(),
                     );
                     buf = buf.add(4);
                 }
                 Tag::Long | Tag::Double => {
                     ptr::write(
                         buf.cast(),
-                        u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes(),
+                        change_endian!(*buf.cast(), U64, O, R).to_bytes(),
                     );
                     buf = buf.add(8);
                 }
@@ -157,7 +163,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     buf = buf.add(4);
                     let s = slice::from_raw_parts_mut(buf.cast::<[u8; 4]>(), array_len as usize);
                     for element in s {
-                        *element = u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                        *element = change_endian!(*element, U32, O, R).to_bytes();
                     }
                     buf = buf.add(4 * array_len as usize);
                 }
@@ -167,7 +173,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     buf = buf.add(4);
                     let s = slice::from_raw_parts_mut(buf.cast::<[u8; 8]>(), array_len as usize);
                     for element in s {
-                        *element = u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes();
+                        *element = change_endian!(*element, U64, O, R).to_bytes();
                     }
                     buf = buf.add(8 * array_len as usize);
                 }
@@ -205,7 +211,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: Write
                 let s = slice::from_raw_parts(buf.cast(), len as usize);
                 for element in s {
                     writer
-                        .write_all(&u16::from_ne_bytes(*element).swap_bytes().to_ne_bytes())
+                        .write_all(&change_endian!(*element, U16, O, R).to_bytes())
                         .map_err(Error::IO)?;
                 }
                 buf = buf.add(2 * len as usize);
@@ -214,7 +220,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: Write
                 let s = slice::from_raw_parts(buf.cast(), len as usize);
                 for element in s {
                     writer
-                        .write_all(&u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes())
+                        .write_all(&change_endian!(*element, U32, O, R).to_bytes())
                         .map_err(Error::IO)?;
                 }
                 buf = buf.add(4 * len as usize);
@@ -223,7 +229,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: Write
                 let s = slice::from_raw_parts(buf.cast(), len as usize);
                 for element in s {
                     writer
-                        .write_all(&u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes())
+                        .write_all(&change_endian!(*element, U64, O, R).to_bytes())
                         .map_err(Error::IO)?;
                 }
                 buf = buf.add(8 * len as usize);
@@ -276,7 +282,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: Write
                     let s = slice::from_raw_parts(buf.cast(), array_len as usize);
                     for element in s {
                         writer
-                            .write_all(&u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes())
+                            .write_all(&change_endian!(*element, U32, O, R).to_bytes())
                             .map_err(Error::IO)?;
                     }
                     buf = buf.add(4 * array_len as usize);
@@ -292,7 +298,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: Write
                     let s = slice::from_raw_parts(buf.cast(), array_len as usize);
                     for element in s {
                         writer
-                            .write_all(&u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes())
+                            .write_all(&change_endian!(*element, U64, O, R).to_bytes())
                             .map_err(Error::IO)?;
                     }
                     buf = buf.add(8 * array_len as usize);
@@ -340,19 +346,19 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: W
                 }
                 Tag::Short => {
                     writer
-                        .write_all(&u16::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes())
+                        .write_all(&change_endian!(*buf.cast(), U16, O, R).to_bytes())
                         .map_err(Error::IO)?;
                     buf = buf.add(2);
                 }
                 Tag::Int | Tag::Float => {
                     writer
-                        .write_all(&u32::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes())
+                        .write_all(&change_endian!(*buf.cast(), U32, O, R).to_bytes())
                         .map_err(Error::IO)?;
                     buf = buf.add(4);
                 }
                 Tag::Long | Tag::Double => {
                     writer
-                        .write_all(&u64::from_ne_bytes(*buf.cast()).swap_bytes().to_ne_bytes())
+                        .write_all(&change_endian!(*buf.cast(), U64, O, R).to_bytes())
                         .map_err(Error::IO)?;
                     buf = buf.add(8);
                 }
@@ -395,7 +401,7 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: W
                     let s = slice::from_raw_parts(buf.cast(), array_len as usize);
                     for element in s {
                         writer
-                            .write_all(&u32::from_ne_bytes(*element).swap_bytes().to_ne_bytes())
+                            .write_all(&change_endian!(*element, U32, O, R).to_bytes())
                             .map_err(Error::IO)?;
                     }
                     buf = buf.add(4 * array_len as usize);
@@ -409,7 +415,7 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder, W: W
                     let s = slice::from_raw_parts(buf.cast(), array_len as usize);
                     for element in s {
                         writer
-                            .write_all(&u64::from_ne_bytes(*element).swap_bytes().to_ne_bytes())
+                            .write_all(&change_endian!(*element, U64, O, R).to_bytes())
                             .map_err(Error::IO)?;
                     }
                     buf = buf.add(8 * array_len as usize);
