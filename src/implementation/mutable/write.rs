@@ -1,9 +1,9 @@
-use std::{hint::unreachable_unchecked, ptr, slice};
+use std::{hint::unreachable_unchecked, io::Write, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Result, Tag, cold_path,
+    ByteOrder, Error, Result, Tag, cold_path,
     implementation::mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
 };
 
@@ -680,6 +680,462 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                         *element = change_endian!(*element, U64, O, R).to_bytes();
                     }
                     out.set_len(old_len + len_bytes);
+                    data = data.add(SIZE_DYN);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+pub unsafe fn write_compound_to_writer<O: ByteOrder>(
+    mut data: *const u8,
+    writer: &mut impl Write,
+) -> Result<()> {
+    unsafe {
+        let mut start = data;
+
+        loop {
+            let tag_id = Tag::from_u8_unchecked(*data);
+            data = data.add(1);
+
+            if tag_id == Tag::End {
+                cold_path();
+                let raw_len = data.byte_offset_from_unsigned(start);
+                writer
+                    .write_all(slice::from_raw_parts(start, raw_len))
+                    .map_err(Error::IO)?;
+                return Ok(());
+            }
+
+            let name_len = byteorder::U16::<O>::from_bytes(*data.cast()).get();
+            data = data.add(2 + name_len as usize);
+
+            if tag_id.is_primitive() {
+                data = data.add(tag_size(tag_id));
+            } else {
+                match tag_id {
+                    Tag::ByteArray => {
+                        let raw_len = data.byte_offset_from_unsigned(start);
+                        writer
+                            .write_all(slice::from_raw_parts(start, raw_len))
+                            .map_err(Error::IO)?;
+
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+
+                        writer
+                            .write_all(&byteorder::U32::<O>::new(len as u32).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len))
+                            .map_err(Error::IO)?;
+                    }
+                    Tag::String => {
+                        let raw_len = data.byte_offset_from_unsigned(start);
+                        writer
+                            .write_all(slice::from_raw_parts(start, raw_len))
+                            .map_err(Error::IO)?;
+
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+
+                        writer
+                            .write_all(&byteorder::U16::<O>::new(len as u16).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len))
+                            .map_err(Error::IO)?;
+                    }
+                    Tag::List => {
+                        let raw_len = data.byte_offset_from_unsigned(start);
+                        writer
+                            .write_all(slice::from_raw_parts(start, raw_len))
+                            .map_err(Error::IO)?;
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        write_list_to_writer::<O>(ptr, writer)?;
+                    }
+                    Tag::Compound => {
+                        let raw_len = data.byte_offset_from_unsigned(start);
+                        writer
+                            .write_all(slice::from_raw_parts(start, raw_len))
+                            .map_err(Error::IO)?;
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        write_compound_to_writer::<O>(ptr, writer)?;
+                    }
+                    Tag::IntArray => {
+                        let raw_len = data.byte_offset_from_unsigned(start);
+                        writer
+                            .write_all(slice::from_raw_parts(start, raw_len))
+                            .map_err(Error::IO)?;
+
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+
+                        writer
+                            .write_all(&byteorder::U32::<O>::new(len as u32).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len * 4))
+                            .map_err(Error::IO)?;
+                    }
+                    Tag::LongArray => {
+                        let raw_len = data.byte_offset_from_unsigned(start);
+                        writer
+                            .write_all(slice::from_raw_parts(start, raw_len))
+                            .map_err(Error::IO)?;
+
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+
+                        writer
+                            .write_all(&byteorder::U32::<O>::new(len as u32).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len * 8))
+                            .map_err(Error::IO)?;
+                    }
+                    _ => unreachable_unchecked(),
+                }
+                data = data.add(SIZE_DYN);
+                start = data;
+            }
+        }
+    }
+}
+
+pub unsafe fn write_list_to_writer<O: ByteOrder>(
+    mut data: *const u8,
+    writer: &mut impl Write,
+) -> Result<()> {
+    unsafe {
+        let tag_id = list_tag_id(data);
+        let len = list_len::<O>(data);
+        if tag_id.is_primitive() {
+            writer
+                .write_all(slice::from_raw_parts(data, 1 + 4 + tag_size(tag_id) * len))
+                .map_err(Error::IO)?;
+        } else {
+            writer
+                .write_all(slice::from_raw_parts(data, 1 + 4))
+                .map_err(Error::IO)?;
+            data = data.add(1 + 4);
+            match tag_id {
+                Tag::ByteArray => {
+                    for _ in 0..len {
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                        writer
+                            .write_all(&byteorder::U32::<O>::new(len as u32).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len))
+                            .map_err(Error::IO)?;
+                        data = data.add(SIZE_DYN);
+                    }
+                }
+                Tag::String => {
+                    for _ in 0..len {
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                        writer
+                            .write_all(&byteorder::U16::<O>::new(len as u16).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len))
+                            .map_err(Error::IO)?;
+                        data = data.add(SIZE_DYN);
+                    }
+                }
+                Tag::List => {
+                    for _ in 0..len {
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        write_list_to_writer::<O>(ptr, writer)?;
+                        data = data.add(SIZE_DYN);
+                    }
+                }
+                Tag::Compound => {
+                    for _ in 0..len {
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        write_compound_to_writer::<O>(ptr, writer)?;
+                        data = data.add(SIZE_DYN);
+                    }
+                }
+                Tag::IntArray => {
+                    for _ in 0..len {
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                        writer
+                            .write_all(&byteorder::U32::<O>::new(len as u32).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len * 4))
+                            .map_err(Error::IO)?;
+                        data = data.add(SIZE_DYN);
+                    }
+                }
+                Tag::LongArray => {
+                    for _ in 0..len {
+                        let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                        let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                        writer
+                            .write_all(&byteorder::U32::<O>::new(len as u32).to_bytes())
+                            .map_err(Error::IO)?;
+                        writer
+                            .write_all(slice::from_raw_parts(ptr, len * 8))
+                            .map_err(Error::IO)?;
+                        data = data.add(SIZE_DYN);
+                    }
+                }
+                _ => unreachable_unchecked(),
+            }
+        }
+        Ok(())
+    }
+}
+
+pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
+    mut data: *const u8,
+    writer: &mut impl Write,
+) -> Result<()> {
+    unsafe {
+        loop {
+            let start = data;
+            let tag_id = Tag::from_u8_unchecked(*data);
+            data = data.add(1);
+
+            if tag_id == Tag::End {
+                cold_path();
+                writer.write_all(&[0]).map_err(Error::IO)?;
+                return Ok(());
+            }
+
+            let name_len = byteorder::U16::<O>::from_bytes(*data.cast()).get() as usize;
+            data = data.add(2 + name_len);
+
+            let mut temp = [0u8; 1 + 2];
+            ptr::write(temp.as_mut_ptr(), *start);
+            ptr::write(
+                temp.as_mut_ptr().add(1).cast(),
+                byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+            );
+            writer.write_all(&temp).map_err(Error::IO)?;
+            writer
+                .write_all(slice::from_raw_parts(start.add(3), name_len))
+                .map_err(Error::IO)?;
+
+            match tag_id {
+                Tag::End => unreachable_unchecked(),
+                Tag::Byte => {
+                    writer
+                        .write_all(slice::from_raw_parts(data, 1))
+                        .map_err(Error::IO)?;
+                    data = data.add(1);
+                }
+                Tag::Short => {
+                    writer
+                        .write_all(&change_endian!(*data.cast(), U16, O, R).to_bytes())
+                        .map_err(Error::IO)?;
+                    data = data.add(2);
+                }
+                Tag::Int | Tag::Float => {
+                    writer
+                        .write_all(&change_endian!(*data.cast(), U32, O, R).to_bytes())
+                        .map_err(Error::IO)?;
+                    data = data.add(4);
+                }
+                Tag::Long | Tag::Double => {
+                    writer
+                        .write_all(&change_endian!(*data.cast(), U64, O, R).to_bytes())
+                        .map_err(Error::IO)?;
+                    data = data.add(8);
+                }
+                Tag::ByteArray => {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U32::<R>::new(len as u32).to_bytes())
+                        .map_err(Error::IO)?;
+                    writer
+                        .write_all(slice::from_raw_parts(ptr, len))
+                        .map_err(Error::IO)?;
+                    data = data.add(SIZE_DYN);
+                }
+                Tag::String => {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U16::<R>::new(len as u16).to_bytes())
+                        .map_err(Error::IO)?;
+                    writer
+                        .write_all(slice::from_raw_parts(ptr, len))
+                        .map_err(Error::IO)?;
+                    data = data.add(SIZE_DYN);
+                }
+                Tag::List => {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    write_list_to_writer_fallback::<O, R>(ptr, writer)?;
+                    data = data.add(SIZE_DYN);
+                }
+                Tag::Compound => {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    write_compound_to_writer_fallback::<O, R>(ptr, writer)?;
+                    data = data.add(SIZE_DYN);
+                }
+                Tag::IntArray => {
+                    let ptr =
+                        ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
+                    let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U32::<R>::new(len as u32).to_bytes())
+                        .map_err(Error::IO)?;
+                    let s = slice::from_raw_parts(ptr.cast(), len);
+                    for element in s {
+                        writer
+                            .write_all(&change_endian!(*element, U32, O, R).to_bytes())
+                            .map_err(Error::IO)?;
+                    }
+                    data = data.add(SIZE_DYN);
+                }
+                Tag::LongArray => {
+                    let ptr =
+                        ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
+                    let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U32::<R>::new(len as u32).to_bytes())
+                        .map_err(Error::IO)?;
+                    let s = slice::from_raw_parts(ptr.cast(), len);
+                    for element in s {
+                        writer
+                            .write_all(&change_endian!(*element, U64, O, R).to_bytes())
+                            .map_err(Error::IO)?;
+                    }
+                    data = data.add(SIZE_DYN);
+                }
+            }
+        }
+    }
+}
+
+pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
+    mut data: *const u8,
+    writer: &mut impl Write,
+) -> Result<()> {
+    unsafe {
+        let tag_id = list_tag_id(data);
+        let len = list_len::<O>(data);
+
+        let mut temp = [0u8; 1 + 4];
+        ptr::write(temp.as_mut_ptr(), tag_id as u8);
+        ptr::write(
+            temp.as_mut_ptr().add(1).cast(),
+            byteorder::U32::<R>::new(len as u32).to_bytes(),
+        );
+        writer.write_all(&temp).map_err(Error::IO)?;
+        data = data.add(1 + 4);
+
+        match tag_id {
+            Tag::End => {}
+            Tag::Byte => {
+                writer
+                    .write_all(slice::from_raw_parts(data, len))
+                    .map_err(Error::IO)?;
+            }
+            Tag::Short => {
+                let s = slice::from_raw_parts(data.cast(), len);
+                for element in s {
+                    writer
+                        .write_all(&change_endian!(*element, U16, O, R).to_bytes())
+                        .map_err(Error::IO)?;
+                }
+            }
+            Tag::Int | Tag::Float => {
+                let s = slice::from_raw_parts(data.cast(), len);
+                for element in s {
+                    writer
+                        .write_all(&change_endian!(*element, U32, O, R).to_bytes())
+                        .map_err(Error::IO)?;
+                }
+            }
+            Tag::Long | Tag::Double => {
+                let s = slice::from_raw_parts(data.cast(), len);
+                for element in s {
+                    writer
+                        .write_all(&change_endian!(*element, U64, O, R).to_bytes())
+                        .map_err(Error::IO)?;
+                }
+            }
+            Tag::ByteArray => {
+                for _ in 0..len {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    let arr_len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U32::<R>::new(arr_len as u32).to_bytes())
+                        .map_err(Error::IO)?;
+                    writer
+                        .write_all(slice::from_raw_parts(ptr, arr_len))
+                        .map_err(Error::IO)?;
+                    data = data.add(SIZE_DYN);
+                }
+            }
+            Tag::String => {
+                for _ in 0..len {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    let str_len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U16::<R>::new(str_len as u16).to_bytes())
+                        .map_err(Error::IO)?;
+                    writer
+                        .write_all(slice::from_raw_parts(ptr, str_len))
+                        .map_err(Error::IO)?;
+                    data = data.add(SIZE_DYN);
+                }
+            }
+            Tag::List => {
+                for _ in 0..len {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    write_list_to_writer_fallback::<O, R>(ptr, writer)?;
+                    data = data.add(SIZE_DYN);
+                }
+            }
+            Tag::Compound => {
+                for _ in 0..len {
+                    let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                    write_compound_to_writer_fallback::<O, R>(ptr, writer)?;
+                    data = data.add(SIZE_DYN);
+                }
+            }
+            Tag::IntArray => {
+                for _ in 0..len {
+                    let ptr =
+                        ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
+                    let arr_len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U32::<R>::new(arr_len as u32).to_bytes())
+                        .map_err(Error::IO)?;
+                    let s = slice::from_raw_parts(ptr.cast(), arr_len);
+                    for element in s {
+                        writer
+                            .write_all(&change_endian!(*element, U32, O, R).to_bytes())
+                            .map_err(Error::IO)?;
+                    }
+                    data = data.add(SIZE_DYN);
+                }
+            }
+            Tag::LongArray => {
+                for _ in 0..len {
+                    let ptr =
+                        ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
+                    let arr_len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                    writer
+                        .write_all(&byteorder::U32::<R>::new(arr_len as u32).to_bytes())
+                        .map_err(Error::IO)?;
+                    let s = slice::from_raw_parts(ptr.cast(), arr_len);
+                    for element in s {
+                        writer
+                            .write_all(&change_endian!(*element, U64, O, R).to_bytes())
+                            .map_err(Error::IO)?;
+                    }
                     data = data.add(SIZE_DYN);
                 }
             }

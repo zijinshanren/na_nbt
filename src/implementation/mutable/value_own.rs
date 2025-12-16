@@ -18,7 +18,7 @@ use crate::{
     },
     index::Index,
     view::{StringViewMut, StringViewOwn, VecViewMut, VecViewOwn},
-    write_owned_to_vec,
+    write_owned_to_vec, write_owned_to_writer,
 };
 
 impl<T> VecViewOwn<T> {
@@ -478,7 +478,7 @@ impl<O: ByteOrder> OwnedValue<O> {
 
     #[inline]
     pub fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
-        todo!()
+        self.visit_scoped(|value| write_owned_to_writer::<O, TARGET>(value, writer))
     }
 }
 

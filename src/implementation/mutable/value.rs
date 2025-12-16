@@ -12,7 +12,7 @@ use crate::{
         },
     },
     index::Index,
-    write_owned_to_vec,
+    write_owned_to_vec, write_owned_to_writer,
 };
 
 #[derive(Clone)]
@@ -320,7 +320,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
     #[inline]
     pub fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
-        todo!()
+        self.visit_scoped(|value| write_owned_to_writer::<O, TARGET>(value, writer))
     }
 }
 

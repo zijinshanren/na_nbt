@@ -10,21 +10,25 @@ mod value_mut;
 mod value_own;
 mod write;
 
-use std::{any::TypeId, ptr};
+use std::{any::TypeId, io::Write, ptr};
 
 pub(crate) use into_owned_value::IntoOwnedValue;
 pub use value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue};
 pub use value_mut::{MutableCompound, MutableList, MutableValue};
 pub use value_own::{OwnedCompound, OwnedList, OwnedValue};
 
-use zerocopy::byteorder;
+use zerocopy::{IntoBytes, byteorder};
 
 use crate::{
     ByteOrder, Error, Result, Tag, ValueScoped, cold_path,
     implementation::mutable::{
         read::{read_unsafe, read_unsafe_fallback},
         trait_impl::Config,
-        write::{write_compound, write_compound_fallback, write_list, write_list_fallback},
+        write::{
+            write_compound, write_compound_fallback, write_compound_to_writer,
+            write_compound_to_writer_fallback, write_list, write_list_fallback,
+            write_list_to_writer, write_list_to_writer_fallback,
+        },
     },
 };
 
@@ -247,6 +251,154 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 }
                 buf.set_len(1 + 2 + 4 + len);
                 Ok(buf)
+            }
+        }
+    }
+}
+
+pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
+    value: ValueScoped<'a, Config<SOURCE>>,
+    mut writer: impl Write,
+) -> Result<()> {
+    unsafe {
+        match value {
+            ValueScoped::End => writer.write_all(&[0]).map_err(Error::IO),
+            ValueScoped::Byte(value) => writer
+                .write_all(&[Tag::Byte as u8, 0u8, 0u8, value as u8])
+                .map_err(Error::IO),
+            ValueScoped::Short(value) => {
+                let mut buf = [0u8; 1 + 2 + 2];
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Short as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::I16::<TARGET>::new(value).to_bytes(),
+                );
+                writer.write_all(&buf).map_err(Error::IO)
+            }
+            ValueScoped::Int(value) => {
+                let mut buf = [0u8; 1 + 2 + 4];
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Int as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::I32::<TARGET>::new(value).to_bytes(),
+                );
+                writer.write_all(&buf).map_err(Error::IO)
+            }
+            ValueScoped::Long(value) => {
+                let mut buf = [0u8; 1 + 2 + 8];
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Long as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::I64::<TARGET>::new(value).to_bytes(),
+                );
+                writer.write_all(&buf).map_err(Error::IO)
+            }
+            ValueScoped::Float(value) => {
+                let mut buf = [0u8; 1 + 2 + 4];
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Float as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::F32::<TARGET>::new(value).to_bytes(),
+                );
+                writer.write_all(&buf).map_err(Error::IO)
+            }
+            ValueScoped::Double(value) => {
+                let mut buf = [0u8; 1 + 2 + 8];
+                ptr::write(buf.as_mut_ptr().cast(), [Tag::Double as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf.as_mut_ptr().add(3).cast(),
+                    byteorder::F64::<TARGET>::new(value).to_bytes(),
+                );
+                writer.write_all(&buf).map_err(Error::IO)
+            }
+            ValueScoped::ByteArray(value) => {
+                let mut buf_head = [0u8; 1 + 2 + 4];
+                ptr::write(
+                    buf_head.as_mut_ptr().cast(),
+                    [Tag::ByteArray as u8, 0u8, 0u8],
+                );
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U32::<TARGET>::new(value.len() as u32).to_bytes(),
+                );
+                writer.write_all(&buf_head).map_err(Error::IO)?;
+                writer.write_all(value.as_bytes()).map_err(Error::IO)
+            }
+            ValueScoped::String(value) => {
+                let mut buf_head = [0u8; 1 + 2 + 2];
+                ptr::write(buf_head.as_mut_ptr().cast(), [Tag::String as u8, 0u8, 0u8]);
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U16::<TARGET>::new(value.data.len() as u16).to_bytes(),
+                );
+                writer.write_all(&buf_head).map_err(Error::IO)?;
+                writer.write_all(value.data.as_bytes()).map_err(Error::IO)
+            }
+            ValueScoped::List(value) => {
+                writer
+                    .write_all(&[Tag::List as u8, 0u8, 0u8])
+                    .map_err(Error::IO)?;
+                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                    write_list_to_writer::<TARGET>(value.data, &mut writer)?;
+                } else {
+                    write_list_to_writer_fallback::<SOURCE, TARGET>(value.data, &mut writer)?;
+                }
+                Ok(())
+            }
+            ValueScoped::Compound(value) => {
+                writer
+                    .write_all(&[Tag::Compound as u8, 0u8, 0u8])
+                    .map_err(Error::IO)?;
+                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                    write_compound_to_writer::<TARGET>(value.data, &mut writer)?;
+                } else {
+                    write_compound_to_writer_fallback::<SOURCE, TARGET>(value.data, &mut writer)?;
+                }
+                Ok(())
+            }
+            ValueScoped::IntArray(value) => {
+                let mut buf_head = [0u8; 1 + 2 + 4];
+                ptr::write(
+                    buf_head.as_mut_ptr().cast(),
+                    [Tag::IntArray as u8, 0u8, 0u8],
+                );
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U32::<TARGET>::new(value.len() as u32).to_bytes(),
+                );
+                writer.write_all(&buf_head).map_err(Error::IO)?;
+                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                    writer.write_all(value.as_bytes()).map_err(Error::IO)
+                } else {
+                    for element in value {
+                        writer
+                            .write_all(&byteorder::I32::<TARGET>::new(element.get()).to_bytes())
+                            .map_err(Error::IO)?;
+                    }
+                    Ok(())
+                }
+            }
+            ValueScoped::LongArray(value) => {
+                let mut buf_head = [0u8; 1 + 2 + 4];
+                ptr::write(
+                    buf_head.as_mut_ptr().cast(),
+                    [Tag::LongArray as u8, 0u8, 0u8],
+                );
+                ptr::write(
+                    buf_head.as_mut_ptr().add(3).cast(),
+                    byteorder::U32::<TARGET>::new(value.len() as u32).to_bytes(),
+                );
+                writer.write_all(&buf_head).map_err(Error::IO)?;
+                if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                    writer.write_all(value.as_bytes()).map_err(Error::IO)
+                } else {
+                    for element in value {
+                        writer
+                            .write_all(&byteorder::I64::<TARGET>::new(element.get()).to_bytes())
+                            .map_err(Error::IO)?;
+                    }
+                    Ok(())
+                }
             }
         }
     }

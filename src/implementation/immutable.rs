@@ -375,8 +375,8 @@ pub(crate) fn write_value_to_writer<
                     writer.write_all(value.data.as_bytes()).map_err(Error::IO)
                 } else {
                     let size_written = write::write_list_to_writer_fallback::<SOURCE, TARGET>(
-                        &mut writer,
                         value.data.as_ptr(),
+                        &mut writer,
                     )?;
                     debug_assert!(size_written == value.data.len());
                     Ok(())
@@ -390,8 +390,8 @@ pub(crate) fn write_value_to_writer<
                     writer.write_all(value.data.as_bytes()).map_err(Error::IO)
                 } else {
                     let size_written = write::write_compound_to_writer_fallback::<SOURCE, TARGET>(
-                        &mut writer,
                         value.data.as_ptr(),
+                        &mut writer,
                     )?;
                     debug_assert!(size_written == value.data.len());
                     Ok(())

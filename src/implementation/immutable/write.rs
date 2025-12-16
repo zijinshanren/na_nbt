@@ -183,8 +183,8 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
 }
 
 pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
-    writer: &mut impl Write,
     mut buf: *const u8,
+    writer: &mut impl Write,
 ) -> Result<usize> {
     unsafe {
         let buf_start = buf;
@@ -262,13 +262,13 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
             }
             Tag::List => {
                 for _ in 0..len {
-                    let list_size = write_list_to_writer_fallback::<O, R>(writer, buf)?;
+                    let list_size = write_list_to_writer_fallback::<O, R>(buf, writer)?;
                     buf = buf.add(list_size);
                 }
             }
             Tag::Compound => {
                 for _ in 0..len {
-                    let compound_size = write_compound_to_writer_fallback::<O, R>(writer, buf)?;
+                    let compound_size = write_compound_to_writer_fallback::<O, R>(buf, writer)?;
                     buf = buf.add(compound_size);
                 }
             }
@@ -310,8 +310,8 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
 }
 
 pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
-    writer: &mut impl Write,
     mut buf: *const u8,
+    writer: &mut impl Write,
 ) -> Result<usize> {
     unsafe {
         let buf_start = buf;
@@ -320,7 +320,7 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
             buf = buf.add(1);
             if tag_id == Tag::End {
                 cold_path();
-                writer.write_all(&[tag_id as u8]).map_err(Error::IO)?;
+                writer.write_all(&[0]).map_err(Error::IO)?;
                 return Ok(buf.byte_offset_from_unsigned(buf_start));
             }
 
@@ -385,11 +385,11 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                     buf = buf.add(string_len as usize);
                 }
                 Tag::List => {
-                    let list_size = write_list_to_writer_fallback::<O, R>(writer, buf)?;
+                    let list_size = write_list_to_writer_fallback::<O, R>(buf, writer)?;
                     buf = buf.add(list_size);
                 }
                 Tag::Compound => {
-                    let compound_size = write_compound_to_writer_fallback::<O, R>(writer, buf)?;
+                    let compound_size = write_compound_to_writer_fallback::<O, R>(buf, writer)?;
                     buf = buf.add(compound_size);
                 }
                 Tag::IntArray => {
