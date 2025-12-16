@@ -15,6 +15,13 @@ use crate::{
     write_owned_to_vec, write_owned_to_writer,
 };
 
+/// A zero-copy, immutable NBT value (Pointer-based).
+///
+/// This type provides an immutable view into NBT data using direct pointers and slices.
+/// It is distinct from [`crate::immutable::BorrowedValue`], which uses a mark-based approach.
+///
+/// This type is typically used when you need a lightweight, immutable view of data that might
+/// be part of a mutable structure or when the mark-based overhead is not desired.
 #[derive(Clone)]
 pub enum ImmutableValue<'s, O: ByteOrder> {
     End,

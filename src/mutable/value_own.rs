@@ -41,19 +41,37 @@ impl StringViewOwn {
     }
 }
 
+/// An owned, mutable NBT value.
+///
+/// This type owns its data and allows modification. It is useful when you need to create or edit NBT structures.
+///
+/// The generic parameter `O` specifies the byte order (endianness) used for storage.
 pub enum OwnedValue<O: ByteOrder> {
+    /// End tag (0).
     End,
+    /// Byte tag (1).
     Byte(i8),
+    /// Short tag (2).
     Short(byteorder::I16<O>),
+    /// Int tag (3).
     Int(byteorder::I32<O>),
+    /// Long tag (4).
     Long(byteorder::I64<O>),
+    /// Float tag (5).
     Float(byteorder::F32<O>),
+    /// Double tag (6).
     Double(byteorder::F64<O>),
+    /// Byte array tag (7).
     ByteArray(VecViewOwn<i8>),
+    /// String tag (8).
     String(StringViewOwn),
+    /// List tag (9).
     List(OwnedList<O>),
+    /// Compound tag (10).
     Compound(OwnedCompound<O>),
+    /// Int array tag (11).
     IntArray(VecViewOwn<byteorder::I32<O>>),
+    /// Long array tag (12).
     LongArray(VecViewOwn<byteorder::I64<O>>),
 }
 

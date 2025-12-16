@@ -18,19 +18,36 @@ use crate::{
     write_owned_to_vec, write_owned_to_writer,
 };
 
+/// A mutable view into an NBT value.
+///
+/// This type allows modifying NBT data in place. It is typically used when traversing or modifying
+/// an [`OwnedValue`](crate::OwnedValue) or when working with [`WritableValue`](crate::WritableValue).
 pub enum MutableValue<'s, O: ByteOrder> {
+    /// End tag (0).
     End,
+    /// Byte tag (1).
     Byte(&'s mut i8),
+    /// Short tag (2).
     Short(&'s mut byteorder::I16<O>),
+    /// Int tag (3).
     Int(&'s mut byteorder::I32<O>),
+    /// Long tag (4).
     Long(&'s mut byteorder::I64<O>),
+    /// Float tag (5).
     Float(&'s mut byteorder::F32<O>),
+    /// Double tag (6).
     Double(&'s mut byteorder::F64<O>),
+    /// Byte array tag (7).
     ByteArray(VecViewMut<'s, i8>),
+    /// String tag (8).
     String(StringViewMut<'s>),
+    /// List tag (9).
     List(MutableList<'s, O>),
+    /// Compound tag (10).
     Compound(MutableCompound<'s, O>),
+    /// Int array tag (11).
     IntArray(VecViewMut<'s, byteorder::I32<O>>),
+    /// Long array tag (12).
     LongArray(VecViewMut<'s, byteorder::I64<O>>),
 }
 

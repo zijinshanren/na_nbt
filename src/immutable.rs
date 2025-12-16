@@ -12,8 +12,23 @@ mod util;
 mod value;
 mod write;
 
-pub type BorrowedValue<'s, O> = value::ImmutableValue<'s, O, ()>;
+/// A borrowed, immutable NBT value.
+///
+/// This type is returned by [`read_borrowed`] and holds a reference to the source data.
+pub type BorrowedValue<'s, O> = value::ReadonlyValue<'s, O, ()>;
 
+/// Reads an NBT document from a byte slice.
+///
+/// This function performs a zero-copy parse of the NBT data. The returned [`BorrowedDocument`]
+/// borrows from the input slice.
+///
+/// # Arguments
+///
+/// * `source` - The byte slice containing the NBT data.
+///
+/// # Returns
+///
+/// A `Result` containing the parsed `BorrowedDocument` or an error.
 pub fn read_borrowed<'s, O: ByteOrder>(source: &'s [u8]) -> Result<BorrowedDocument<'s, O>> {
     unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| BorrowedDocument {
@@ -24,6 +39,7 @@ pub fn read_borrowed<'s, O: ByteOrder>(source: &'s [u8]) -> Result<BorrowedDocum
     }
 }
 
+/// A document that borrows its data from a slice.
 pub struct BorrowedDocument<'s, O: ByteOrder> {
     mark: Vec<mark::Mark>,
     source: *const u8,
@@ -31,6 +47,7 @@ pub struct BorrowedDocument<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
+    /// Returns the root value of the document.
     #[inline]
     pub fn root<'doc>(&'doc self) -> BorrowedValue<'doc, O> {
         let root_tag = unsafe { *self.source.cast() };
@@ -56,8 +73,23 @@ impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
 unsafe impl<'s, O: ByteOrder> Send for BorrowedDocument<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for BorrowedDocument<'s, O> {}
 
-pub type SharedValue<O> = value::ImmutableValue<'static, O, Arc<SharedDocument>>;
+/// A shared, immutable NBT value.
+///
+/// This type is returned by [`read_shared`] and owns the source data via an `Arc`.
+pub type SharedValue<O> = value::ReadonlyValue<'static, O, Arc<SharedDocument>>;
 
+/// Reads an NBT document from a `Bytes` object.
+///
+/// This function performs a zero-copy parse of the NBT data. The returned [`SharedValue`]
+/// shares ownership of the data via an `Arc`.
+///
+/// # Arguments
+///
+/// * `source` - The `Bytes` object containing the NBT data.
+///
+/// # Returns
+///
+/// A `Result` containing the root `SharedValue` or an error.
 pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
     Ok(unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {
@@ -67,12 +99,14 @@ pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
     })
 }
 
+/// A document that shares ownership of its data.
 pub struct SharedDocument {
     mark: Vec<mark::Mark>,
     source: Bytes,
 }
 
 impl SharedDocument {
+    /// Returns the root value of the document.
     #[inline]
     pub fn root<O: ByteOrder>(self: Arc<Self>) -> SharedValue<O> {
         let root_tag = unsafe { Tag::from_u8_unchecked(*self.source.get_unchecked(0)) };
@@ -97,19 +131,19 @@ impl SharedDocument {
 }
 
 pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>(
-    value: &value::ImmutableValue<'s, SOURCE, D>,
+    value: &value::ReadonlyValue<'s, SOURCE, D>,
 ) -> Result<Vec<u8>> {
     unsafe {
         match value {
-            value::ImmutableValue::End => Ok(vec![0]),
-            value::ImmutableValue::Byte(value) => {
+            value::ReadonlyValue::End => Ok(vec![0]),
+            value::ReadonlyValue::Byte(value) => {
                 let mut buf = Vec::<u8>::with_capacity(4);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::Byte as u8, 0u8, 0u8, *value as u8]);
                 buf.set_len(4);
                 Ok(buf)
             }
-            value::ImmutableValue::Short(value) => {
+            value::ReadonlyValue::Short(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 2);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::Short as u8, 0u8, 0u8]);
@@ -120,7 +154,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(1 + 2 + 2);
                 Ok(buf)
             }
-            value::ImmutableValue::Int(value) => {
+            value::ReadonlyValue::Int(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::Int as u8, 0u8, 0u8]);
@@ -131,7 +165,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(1 + 2 + 4);
                 Ok(buf)
             }
-            value::ImmutableValue::Long(value) => {
+            value::ReadonlyValue::Long(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::Long as u8, 0u8, 0u8]);
@@ -142,7 +176,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(1 + 2 + 8);
                 Ok(buf)
             }
-            value::ImmutableValue::Float(value) => {
+            value::ReadonlyValue::Float(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::Float as u8, 0u8, 0u8]);
@@ -153,7 +187,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(1 + 2 + 4);
                 Ok(buf)
             }
-            value::ImmutableValue::Double(value) => {
+            value::ReadonlyValue::Double(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::Double as u8, 0u8, 0u8]);
@@ -164,7 +198,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(1 + 2 + 8);
                 Ok(buf)
             }
-            value::ImmutableValue::ByteArray(value) => {
+            value::ReadonlyValue::ByteArray(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
                 let len = value.data.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + 4 + len);
@@ -178,7 +212,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(3 + 4 + len);
                 Ok(buf)
             }
-            value::ImmutableValue::String(value) => {
+            value::ReadonlyValue::String(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
                 let len = value.data.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + 2 + len);
@@ -192,7 +226,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(3 + 2 + len);
                 Ok(buf)
             }
-            value::ImmutableValue::List(value) => {
+            value::ReadonlyValue::List(value) => {
                 let payload = value.data;
                 let payload_len = payload.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
@@ -207,7 +241,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(3 + payload_len);
                 Ok(buf)
             }
-            value::ImmutableValue::Compound(value) => {
+            value::ReadonlyValue::Compound(value) => {
                 let payload = value.data;
                 let payload_len = payload.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
@@ -222,7 +256,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(3 + payload_len);
                 Ok(buf)
             }
-            value::ImmutableValue::IntArray(value) => {
+            value::ReadonlyValue::IntArray(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
                 let len = value.data.len();
                 let len_bytes = std::mem::size_of_val(value.data);
@@ -251,7 +285,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 buf.set_len(3 + 4 + len_bytes);
                 Ok(buf)
             }
-            value::ImmutableValue::LongArray(value) => {
+            value::ReadonlyValue::LongArray(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
                 let len = value.data.len();
                 let len_bytes = std::mem::size_of_val(value.data);
@@ -290,16 +324,16 @@ pub(crate) fn write_value_to_writer<
     SOURCE: ByteOrder,
     TARGET: ByteOrder,
 >(
-    value: &value::ImmutableValue<'s, SOURCE, D>,
+    value: &value::ReadonlyValue<'s, SOURCE, D>,
     mut writer: impl Write,
 ) -> Result<()> {
     unsafe {
         match value {
-            value::ImmutableValue::End => writer.write_all(&[0]).map_err(Error::IO),
-            value::ImmutableValue::Byte(value) => writer
+            value::ReadonlyValue::End => writer.write_all(&[0]).map_err(Error::IO),
+            value::ReadonlyValue::Byte(value) => writer
                 .write_all(&[Tag::Byte as u8, 0u8, 0u8, *value as u8])
                 .map_err(Error::IO),
-            value::ImmutableValue::Short(value) => {
+            value::ReadonlyValue::Short(value) => {
                 let mut buf = [0u8; 1 + 2 + 2];
                 ptr::write(buf.as_mut_ptr().cast(), [Tag::Short as u8, 0u8, 0u8]);
                 ptr::write(
@@ -308,7 +342,7 @@ pub(crate) fn write_value_to_writer<
                 );
                 writer.write_all(&buf).map_err(Error::IO)
             }
-            value::ImmutableValue::Int(value) => {
+            value::ReadonlyValue::Int(value) => {
                 let mut buf = [0u8; 1 + 2 + 4];
                 ptr::write(buf.as_mut_ptr().cast(), [Tag::Int as u8, 0u8, 0u8]);
                 ptr::write(
@@ -317,7 +351,7 @@ pub(crate) fn write_value_to_writer<
                 );
                 writer.write_all(&buf).map_err(Error::IO)
             }
-            value::ImmutableValue::Long(value) => {
+            value::ReadonlyValue::Long(value) => {
                 let mut buf = [0u8; 1 + 2 + 8];
                 ptr::write(buf.as_mut_ptr().cast(), [Tag::Long as u8, 0u8, 0u8]);
                 ptr::write(
@@ -326,7 +360,7 @@ pub(crate) fn write_value_to_writer<
                 );
                 writer.write_all(&buf).map_err(Error::IO)
             }
-            value::ImmutableValue::Float(value) => {
+            value::ReadonlyValue::Float(value) => {
                 let mut buf = [0u8; 1 + 2 + 4];
                 ptr::write(buf.as_mut_ptr().cast(), [Tag::Float as u8, 0u8, 0u8]);
                 ptr::write(
@@ -335,7 +369,7 @@ pub(crate) fn write_value_to_writer<
                 );
                 writer.write_all(&buf).map_err(Error::IO)
             }
-            value::ImmutableValue::Double(value) => {
+            value::ReadonlyValue::Double(value) => {
                 let mut buf = [0u8; 1 + 2 + 8];
                 ptr::write(buf.as_mut_ptr().cast(), [Tag::Double as u8, 0u8, 0u8]);
                 ptr::write(
@@ -344,7 +378,7 @@ pub(crate) fn write_value_to_writer<
                 );
                 writer.write_all(&buf).map_err(Error::IO)
             }
-            value::ImmutableValue::ByteArray(value) => {
+            value::ReadonlyValue::ByteArray(value) => {
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
@@ -357,7 +391,7 @@ pub(crate) fn write_value_to_writer<
                 writer.write_all(&buf_head).map_err(Error::IO)?;
                 writer.write_all(value.data.as_bytes()).map_err(Error::IO)
             }
-            value::ImmutableValue::String(value) => {
+            value::ReadonlyValue::String(value) => {
                 let mut buf_head = [0u8; 1 + 2 + 2];
                 ptr::write(buf_head.as_mut_ptr().cast(), [Tag::String as u8, 0u8, 0u8]);
                 ptr::write(
@@ -367,7 +401,7 @@ pub(crate) fn write_value_to_writer<
                 writer.write_all(&buf_head).map_err(Error::IO)?;
                 writer.write_all(value.data.as_bytes()).map_err(Error::IO)
             }
-            value::ImmutableValue::List(value) => {
+            value::ReadonlyValue::List(value) => {
                 writer
                     .write_all(&[Tag::List as u8, 0u8, 0u8])
                     .map_err(Error::IO)?;
@@ -382,7 +416,7 @@ pub(crate) fn write_value_to_writer<
                     Ok(())
                 }
             }
-            value::ImmutableValue::Compound(value) => {
+            value::ReadonlyValue::Compound(value) => {
                 writer
                     .write_all(&[Tag::Compound as u8, 0u8, 0u8])
                     .map_err(Error::IO)?;
@@ -397,7 +431,7 @@ pub(crate) fn write_value_to_writer<
                     Ok(())
                 }
             }
-            value::ImmutableValue::IntArray(value) => {
+            value::ReadonlyValue::IntArray(value) => {
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
@@ -419,7 +453,7 @@ pub(crate) fn write_value_to_writer<
                     Ok(())
                 }
             }
-            value::ImmutableValue::LongArray(value) => {
+            value::ReadonlyValue::LongArray(value) => {
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),

@@ -32,6 +32,29 @@ use crate::{
     },
 };
 
+/// Reads an NBT document into an owned, mutable value.
+///
+/// This function parses the NBT data and returns an [`OwnedValue`] that can be modified.
+/// It supports converting between different byte orders (e.g., reading BigEndian data into a LittleEndian structure).
+///
+/// # Arguments
+///
+/// * `source` - The byte slice containing the NBT data.
+///
+/// # Generic Parameters
+///
+/// * `SOURCE`: The byte order of the input data.
+/// * `STORE`: The byte order to use for the in-memory representation.
+///
+/// # Performance
+///
+/// *   If `SOURCE == STORE`, there is a fast path for reading.
+/// *   If `STORE` matches the `TARGET` byte order used in `write_to` methods, there is a fast path for writing.
+/// *   Otherwise, a fallback implementation is used.
+///
+/// # Returns
+///
+/// A `Result` containing the parsed `OwnedValue` or an error.
 pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<OwnedValue<STORE>> {
     unsafe {
         macro_rules! check_bounds {

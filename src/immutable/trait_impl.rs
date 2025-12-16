@@ -5,13 +5,13 @@ use crate::{
     Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, Value,
     ValueScoped,
     immutable::value::{
-        Document, ImmutableCompound, ImmutableCompoundIter, ImmutableList, ImmutableListIter,
-        ImmutableString, ImmutableValue,
+        Document, ImmutableCompoundIter, ImmutableListIter, ReadonlyCompound, ReadonlyList,
+        ReadonlyString, ReadonlyValue,
     },
     index::Index,
 };
 
-impl<'doc, D: Document> ReadableString<'doc> for ImmutableString<'doc, D> {
+impl<'doc, D: Document> ReadableString<'doc> for ReadonlyString<'doc, D> {
     #[inline]
     fn raw_bytes(&self) -> &[u8] {
         self.raw_bytes()
@@ -29,15 +29,15 @@ pub struct Config<O: ByteOrder, D: Document> {
 
 impl<O: ByteOrder, D: Document> ReadableConfig for Config<O, D> {
     type ByteOrder = O;
-    type Value<'doc> = ImmutableValue<'doc, O, D>;
-    type String<'doc> = ImmutableString<'doc, D>;
-    type List<'doc> = ImmutableList<'doc, O, D>;
+    type Value<'doc> = ReadonlyValue<'doc, O, D>;
+    type String<'doc> = ReadonlyString<'doc, D>;
+    type List<'doc> = ReadonlyList<'doc, O, D>;
     type ListIter<'doc> = ImmutableListIter<'doc, O, D>;
-    type Compound<'doc> = ImmutableCompound<'doc, O, D>;
+    type Compound<'doc> = ReadonlyCompound<'doc, O, D>;
     type CompoundIter<'doc> = ImmutableCompoundIter<'doc, O, D>;
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ImmutableValue<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
     type Config = Config<O, D>;
 
     #[inline]
@@ -213,19 +213,19 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ImmutableVal
         'doc: 'a,
     {
         match self {
-            ImmutableValue::End => match_fn(ValueScoped::End),
-            ImmutableValue::Byte(value) => match_fn(ValueScoped::Byte(*value)),
-            ImmutableValue::Short(value) => match_fn(ValueScoped::Short(*value)),
-            ImmutableValue::Int(value) => match_fn(ValueScoped::Int(*value)),
-            ImmutableValue::Long(value) => match_fn(ValueScoped::Long(*value)),
-            ImmutableValue::Float(value) => match_fn(ValueScoped::Float(*value)),
-            ImmutableValue::Double(value) => match_fn(ValueScoped::Double(*value)),
-            ImmutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value.as_slice())),
-            ImmutableValue::String(value) => match_fn(ValueScoped::String(value.clone())),
-            ImmutableValue::List(value) => match_fn(ValueScoped::List(value.clone())),
-            ImmutableValue::Compound(value) => match_fn(ValueScoped::Compound(value.clone())),
-            ImmutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.as_slice())),
-            ImmutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.as_slice())),
+            ReadonlyValue::End => match_fn(ValueScoped::End),
+            ReadonlyValue::Byte(value) => match_fn(ValueScoped::Byte(*value)),
+            ReadonlyValue::Short(value) => match_fn(ValueScoped::Short(*value)),
+            ReadonlyValue::Int(value) => match_fn(ValueScoped::Int(*value)),
+            ReadonlyValue::Long(value) => match_fn(ValueScoped::Long(*value)),
+            ReadonlyValue::Float(value) => match_fn(ValueScoped::Float(*value)),
+            ReadonlyValue::Double(value) => match_fn(ValueScoped::Double(*value)),
+            ReadonlyValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value.as_slice())),
+            ReadonlyValue::String(value) => match_fn(ValueScoped::String(value.clone())),
+            ReadonlyValue::List(value) => match_fn(ValueScoped::List(value.clone())),
+            ReadonlyValue::Compound(value) => match_fn(ValueScoped::Compound(value.clone())),
+            ReadonlyValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.as_slice())),
+            ReadonlyValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.as_slice())),
         }
     }
 
@@ -240,7 +240,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ImmutableVal
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ImmutableValue<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
     #[inline]
     fn as_string<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::String<'doc>>
     where
@@ -278,24 +278,24 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ImmutableValue<'do
         'doc: 'a,
     {
         match self {
-            ImmutableValue::End => match_fn(Value::End),
-            ImmutableValue::Byte(value) => match_fn(Value::Byte(*value)),
-            ImmutableValue::Short(value) => match_fn(Value::Short(*value)),
-            ImmutableValue::Int(value) => match_fn(Value::Int(*value)),
-            ImmutableValue::Long(value) => match_fn(Value::Long(*value)),
-            ImmutableValue::Float(value) => match_fn(Value::Float(*value)),
-            ImmutableValue::Double(value) => match_fn(Value::Double(*value)),
-            ImmutableValue::ByteArray(value) => match_fn(Value::ByteArray(value.as_slice())),
-            ImmutableValue::String(value) => match_fn(Value::String(value)),
-            ImmutableValue::List(value) => match_fn(Value::List(value)),
-            ImmutableValue::Compound(value) => match_fn(Value::Compound(value)),
-            ImmutableValue::IntArray(value) => match_fn(Value::IntArray(value.as_slice())),
-            ImmutableValue::LongArray(value) => match_fn(Value::LongArray(value.as_slice())),
+            ReadonlyValue::End => match_fn(Value::End),
+            ReadonlyValue::Byte(value) => match_fn(Value::Byte(*value)),
+            ReadonlyValue::Short(value) => match_fn(Value::Short(*value)),
+            ReadonlyValue::Int(value) => match_fn(Value::Int(*value)),
+            ReadonlyValue::Long(value) => match_fn(Value::Long(*value)),
+            ReadonlyValue::Float(value) => match_fn(Value::Float(*value)),
+            ReadonlyValue::Double(value) => match_fn(Value::Double(*value)),
+            ReadonlyValue::ByteArray(value) => match_fn(Value::ByteArray(value.as_slice())),
+            ReadonlyValue::String(value) => match_fn(Value::String(value)),
+            ReadonlyValue::List(value) => match_fn(Value::List(value)),
+            ReadonlyValue::Compound(value) => match_fn(Value::Compound(value)),
+            ReadonlyValue::IntArray(value) => match_fn(Value::IntArray(value.as_slice())),
+            ReadonlyValue::LongArray(value) => match_fn(Value::LongArray(value.as_slice())),
         }
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ImmutableList<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<'doc, O, D> {
     type Config = Config<O, D>;
 
     #[inline]
@@ -330,7 +330,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ImmutableList
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ImmutableList<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, O, D> {
     #[inline]
     fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'doc>> {
         self.get(index)
@@ -343,7 +343,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ImmutableList<'doc,
 }
 
 impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
-    for ImmutableCompound<'doc, O, D>
+    for ReadonlyCompound<'doc, O, D>
 {
     type Config = Config<O, D>;
 
@@ -364,7 +364,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableCompound<'doc> for ImmutableCompound<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ReadableCompound<'doc> for ReadonlyCompound<'doc, O, D> {
     #[inline]
     fn get(&self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'doc>> {
         self.get(key)
