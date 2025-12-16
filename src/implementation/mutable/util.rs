@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, ptr, slice};
+use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
@@ -18,7 +18,9 @@ pub const unsafe fn tag_size(tag_id: Tag) -> usize {
     const TAG_SIZES: [usize; 13] = [
         0, 1, 2, 4, 8, 4, 8, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN,
     ];
-    TAG_SIZES[tag_id as usize]
+    let tag_id = tag_id as usize;
+    unsafe { assert_unchecked(tag_id < 13) };
+    TAG_SIZES[tag_id]
 }
 
 #[inline]
