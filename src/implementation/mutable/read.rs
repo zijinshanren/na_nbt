@@ -265,8 +265,6 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
         let mut compound_data = Vec::<u8>::with_capacity(128);
 
         loop {
-            let start = *current_pos;
-
             check_bounds!(1);
             let tag_id = **current_pos;
             *current_pos = current_pos.add(1);
@@ -283,98 +281,94 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
             check_bounds!(2);
             let name_len = byteorder::U16::<O>::from_bytes(*current_pos.cast()).get() as usize;
             *current_pos = current_pos.add(2);
+            let name_start = *current_pos;
             check_bounds!(name_len);
             *current_pos = current_pos.add(name_len);
 
             assert_unchecked(tag_id != 0);
+
+            let header_len = 1 + 2 + name_len;
+            let len = compound_data.len();
+
             match tag_id {
                 1 => {
-                    check_bounds!(1);
-                    let value = *(*current_pos);
-                    *current_pos = current_pos.add(1);
-                    let raw_len = 1 + 2 + name_len;
-                    let len = compound_data.len();
-                    compound_data.reserve(raw_len + 1);
+                    compound_data.reserve(header_len + 1);
                     let write_ptr = compound_data.as_mut_ptr().add(len);
-                    ptr::copy_nonoverlapping(start, write_ptr, raw_len);
+                    ptr::write(write_ptr.cast(), tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
-                    ptr::write(write_ptr.add(raw_len).cast(), value);
-                    compound_data.set_len(len + raw_len + 1);
+                    ptr::copy_nonoverlapping(name_start, write_ptr.add(1 + 2), name_len);
+                    check_bounds!(1);
+                    ptr::write(write_ptr.add(header_len).cast(), *(*current_pos));
+                    *current_pos = current_pos.add(1);
+                    compound_data.set_len(len + header_len + 1);
                 }
                 2 => {
-                    check_bounds!(2);
-                    let value = byteorder::U16::<O>::from_bytes(*(*current_pos).cast());
-                    *current_pos = current_pos.add(2);
-                    let raw_len = 1 + 2 + name_len;
-                    let len = compound_data.len();
-                    compound_data.reserve(raw_len + 2);
+                    compound_data.reserve(header_len + 2);
                     let write_ptr = compound_data.as_mut_ptr().add(len);
-                    ptr::copy_nonoverlapping(start, write_ptr, raw_len);
+                    ptr::write(write_ptr.cast(), tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
+                    ptr::copy_nonoverlapping(name_start, write_ptr.add(1 + 2), name_len);
+                    check_bounds!(2);
                     ptr::write(
-                        write_ptr.add(raw_len).cast(),
-                        byteorder::U16::<R>::new(value.get()).to_bytes(),
+                        write_ptr.add(header_len).cast(),
+                        change_endian!(*(*current_pos).cast(), U16, O, R).to_bytes(),
                     );
-                    compound_data.set_len(len + raw_len + 2);
+                    *current_pos = current_pos.add(2);
+                    compound_data.set_len(len + header_len + 2);
                 }
                 3 | 5 => {
-                    check_bounds!(4);
-                    let value = byteorder::U32::<O>::from_bytes(*(*current_pos).cast());
-                    *current_pos = current_pos.add(4);
-                    let raw_len = 1 + 2 + name_len;
-                    let len = compound_data.len();
-                    compound_data.reserve(raw_len + 4);
+                    compound_data.reserve(header_len + 4);
                     let write_ptr = compound_data.as_mut_ptr().add(len);
-                    ptr::copy_nonoverlapping(start, write_ptr, raw_len);
+                    ptr::write(write_ptr.cast(), tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
+                    ptr::copy_nonoverlapping(name_start, write_ptr.add(1 + 2), name_len);
+                    check_bounds!(4);
                     ptr::write(
-                        write_ptr.add(raw_len).cast(),
-                        byteorder::U32::<R>::new(value.get()).to_bytes(),
+                        write_ptr.add(header_len).cast(),
+                        change_endian!(*(*current_pos).cast(), U32, O, R).to_bytes(),
                     );
-                    compound_data.set_len(len + raw_len + 4);
+                    *current_pos = current_pos.add(4);
+                    compound_data.set_len(len + header_len + 4);
                 }
                 4 | 6 => {
-                    check_bounds!(8);
-                    let value = byteorder::U64::<O>::from_bytes(*(*current_pos).cast());
-                    *current_pos = current_pos.add(8);
-                    let raw_len = 1 + 2 + name_len;
-                    let len = compound_data.len();
-                    compound_data.reserve(raw_len + 8);
+                    compound_data.reserve(header_len + 8);
                     let write_ptr = compound_data.as_mut_ptr().add(len);
-                    ptr::copy_nonoverlapping(start, write_ptr, raw_len);
+                    ptr::write(write_ptr.cast(), tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
+                    ptr::copy_nonoverlapping(name_start, write_ptr.add(1 + 2), name_len);
+                    check_bounds!(8);
                     ptr::write(
-                        write_ptr.add(raw_len).cast(),
-                        byteorder::U64::<R>::new(value.get()).to_bytes(),
+                        write_ptr.add(header_len).cast(),
+                        change_endian!(*(*current_pos).cast(), U64, O, R).to_bytes(),
                     );
-                    compound_data.set_len(len + raw_len + 8);
+                    *current_pos = current_pos.add(8);
+                    compound_data.set_len(len + header_len + 8);
                 }
                 7..=12 => {
                     let value_size = tag_size(Tag::from_u8_unchecked(tag_id));
-                    let raw_len = 1 + 2 + name_len;
-                    let len = compound_data.len();
-                    compound_data.reserve(raw_len + value_size);
+                    compound_data.reserve(header_len + value_size);
                     let write_ptr = compound_data.as_mut_ptr().add(len);
-                    ptr::copy_nonoverlapping(start, write_ptr, raw_len);
+                    ptr::write(write_ptr.cast(), tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
                         byteorder::U16::<R>::new(name_len as u16).to_bytes(),
                     );
+                    ptr::copy_nonoverlapping(name_start, write_ptr.add(1 + 2), name_len);
                     read_unsafe_fallback_impl::<O, R>(tag_id, current_pos, end_pos)?
-                        .write(write_ptr.add(raw_len));
-                    compound_data.set_len(len + raw_len + value_size);
+                        .write(write_ptr.add(header_len));
+                    compound_data.set_len(len + header_len + value_size);
                 }
                 _ => return Err(Error::InvalidTagType(tag_id)),
             }
