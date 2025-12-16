@@ -387,11 +387,11 @@ unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ReadonlyList<'doc, O, D> {
 
 impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyList<'doc, O, D> {
     type Item = ReadonlyValue<'doc, O, D>;
-    type IntoIter = ImmutableListIter<'doc, O, D>;
+    type IntoIter = ReadonlyListIter<'doc, O, D>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        ImmutableListIter {
+        ReadonlyListIter {
             tag_id: self.tag_id(),
             remaining: self.len() as u32,
             data: unsafe { self.data.as_ptr().add(1 + 4) },
@@ -501,8 +501,8 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 
     #[inline]
-    pub fn iter(&self) -> ImmutableListIter<'doc, O, D> {
-        ImmutableListIter {
+    pub fn iter(&self) -> ReadonlyListIter<'doc, O, D> {
+        ReadonlyListIter {
             tag_id: self.tag_id(),
             remaining: self.len() as u32,
             data: unsafe { self.data.as_ptr().add(1 + 4) },
@@ -514,7 +514,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
 }
 
 #[derive(Clone)]
-pub struct ImmutableListIter<'doc, O: ByteOrder, D: Document> {
+pub struct ReadonlyListIter<'doc, O: ByteOrder, D: Document> {
     tag_id: Tag,
     remaining: u32,
     data: *const u8,
@@ -523,10 +523,10 @@ pub struct ImmutableListIter<'doc, O: ByteOrder, D: Document> {
     _marker: PhantomData<(&'doc (), O)>,
 }
 
-unsafe impl<'doc, O: ByteOrder, D: Document> Send for ImmutableListIter<'doc, O, D> {}
-unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ImmutableListIter<'doc, O, D> {}
+unsafe impl<'doc, O: ByteOrder, D: Document> Send for ReadonlyListIter<'doc, O, D> {}
+unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ReadonlyListIter<'doc, O, D> {}
 
-impl<'doc, O: ByteOrder, D: Document> Iterator for ImmutableListIter<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyListIter<'doc, O, D> {
     type Item = ReadonlyValue<'doc, O, D>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -555,7 +555,7 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ImmutableListIter<'doc, O, D>
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ExactSizeIterator for ImmutableListIter<'doc, O, D> {}
+impl<'doc, O: ByteOrder, D: Document> ExactSizeIterator for ReadonlyListIter<'doc, O, D> {}
 
 #[derive(Clone)]
 pub struct ReadonlyCompound<'doc, O: ByteOrder, D: Document> {
@@ -570,11 +570,11 @@ unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ReadonlyCompound<'doc, O, 
 
 impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyCompound<'doc, O, D> {
     type Item = (ReadonlyString<'doc, D>, ReadonlyValue<'doc, O, D>);
-    type IntoIter = ImmutableCompoundIter<'doc, O, D>;
+    type IntoIter = ReadonlyCompoundIter<'doc, O, D>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        ImmutableCompoundIter {
+        ReadonlyCompoundIter {
             data: self.data.as_ptr(),
             mark: self.mark,
             doc: self.doc,
@@ -616,8 +616,8 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     }
 
     #[inline]
-    pub fn iter(&self) -> ImmutableCompoundIter<'doc, O, D> {
-        ImmutableCompoundIter {
+    pub fn iter(&self) -> ReadonlyCompoundIter<'doc, O, D> {
+        ReadonlyCompoundIter {
             data: self.data.as_ptr(),
             mark: self.mark,
             doc: self.doc.clone(),
@@ -627,17 +627,17 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
 }
 
 #[derive(Clone)]
-pub struct ImmutableCompoundIter<'doc, O: ByteOrder, D: Document> {
+pub struct ReadonlyCompoundIter<'doc, O: ByteOrder, D: Document> {
     data: *const u8,
     mark: *const Mark,
     doc: D,
     _marker: PhantomData<(&'doc (), O)>,
 }
 
-unsafe impl<'doc, O: ByteOrder, D: Document> Send for ImmutableCompoundIter<'doc, O, D> {}
-unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ImmutableCompoundIter<'doc, O, D> {}
+unsafe impl<'doc, O: ByteOrder, D: Document> Send for ReadonlyCompoundIter<'doc, O, D> {}
+unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ReadonlyCompoundIter<'doc, O, D> {}
 
-impl<'doc, O: ByteOrder, D: Document> Iterator for ImmutableCompoundIter<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyCompoundIter<'doc, O, D> {
     type Item = (ReadonlyString<'doc, D>, ReadonlyValue<'doc, O, D>);
 
     fn next(&mut self) -> Option<Self::Item> {

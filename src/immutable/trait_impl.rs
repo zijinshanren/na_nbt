@@ -5,7 +5,7 @@ use crate::{
     Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, Value,
     ValueScoped,
     immutable::value::{
-        Document, ImmutableCompoundIter, ImmutableListIter, ReadonlyCompound, ReadonlyList,
+        Document, ReadonlyCompoundIter, ReadonlyListIter, ReadonlyCompound, ReadonlyList,
         ReadonlyString, ReadonlyValue,
     },
     index::Index,
@@ -32,9 +32,9 @@ impl<O: ByteOrder, D: Document> ReadableConfig for Config<O, D> {
     type Value<'doc> = ReadonlyValue<'doc, O, D>;
     type String<'doc> = ReadonlyString<'doc, D>;
     type List<'doc> = ReadonlyList<'doc, O, D>;
-    type ListIter<'doc> = ImmutableListIter<'doc, O, D>;
+    type ListIter<'doc> = ReadonlyListIter<'doc, O, D>;
     type Compound<'doc> = ReadonlyCompound<'doc, O, D>;
-    type CompoundIter<'doc> = ImmutableCompoundIter<'doc, O, D>;
+    type CompoundIter<'doc> = ReadonlyCompoundIter<'doc, O, D>;
 }
 
 impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValue<'doc, O, D> {

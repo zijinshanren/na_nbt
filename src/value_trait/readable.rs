@@ -9,7 +9,7 @@ use crate::{
 
 /// A trait for values that can be read as NBT data.
 ///
-/// This trait abstracts over different NBT representations (e.g., [`ImmutableValue`](crate::ImmutableValue),
+/// This trait abstracts over different NBT representations (e.g., [`ReadonlyValue`](crate::ReadonlyValue),
 /// [`OwnedValue`](crate::OwnedValue)), allowing you to write generic code that works with any of them.
 pub trait ReadableValue<'doc>: ScopedReadableValue<'doc> + Send + Sync + Sized + Clone {
     /// Returns the value as a string, if it is one.

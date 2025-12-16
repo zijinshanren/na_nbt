@@ -5,7 +5,7 @@
 //! It provides multiple ways to interact with NBT data:
 //!
 //! *   **Immutable (Zero-Copy)**: Extremely fast parsing and reading with minimal memory allocation.
-//!     See [`ImmutableValue`] and [`read_borrowed`].
+//!     See [`ReadonlyValue`] and [`read_borrowed`].
 //! *   **Mutable (Owned)**: Full modification capabilities with an owned data structure.
 //!     See [`OwnedValue`] and [`read_owned`].
 //! *   **Generic Abstraction**: Traits like [`ReadableValue`] and [`WritableValue`] allow writing code

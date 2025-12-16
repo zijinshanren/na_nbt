@@ -12,6 +12,11 @@ mod util;
 mod value;
 mod write;
 
+pub use value::{
+    ReadonlyArray, ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter,
+    ReadonlyString, ReadonlyValue,
+};
+
 /// A borrowed, immutable NBT value.
 ///
 /// This type is returned by [`read_borrowed`] and holds a reference to the source data.
