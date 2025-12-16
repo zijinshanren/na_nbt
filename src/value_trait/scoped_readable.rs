@@ -1,18 +1,38 @@
 use std::io::Write;
 
-use zerocopy::byteorder;
-
 use crate::{
     ByteOrder, Result, Tag,
     index::Index,
     value_trait::{ReadableConfig, ValueScoped},
 };
 
-/// A trait for values that can be read as NBT data with scoped lifetimes.
+/// Core trait for reading NBT values.
 ///
-/// This trait is the base for [`ReadableValue`](crate::ReadableValue) and provides methods
-/// for checking types and accessing primitive values. It is designed to work with values
-/// that may have lifetimes tied to a specific scope.
+/// This is the primary trait for generic NBT code. All value types implement it:
+/// - [`BorrowedValue`](crate::BorrowedValue)
+/// - [`SharedValue`](crate::SharedValue)
+/// - [`OwnedValue`](crate::OwnedValue)
+/// - [`MutableValue`](crate::MutableValue)
+/// - [`ImmutableValue`](crate::ImmutableValue)
+///
+/// # Usage
+///
+/// Accept `impl ScopedReadableValue<'doc>` to write functions that work with any value type:
+///
+/// ```rust
+/// use na_nbt::{ScopedReadableValue, Tag};
+///
+/// fn is_number<'doc>(value: &impl ScopedReadableValue<'doc>) -> bool {
+///     matches!(value.tag_id(), Tag::Byte | Tag::Short | Tag::Int | Tag::Long | Tag::Float | Tag::Double)
+/// }
+/// ```
+///
+/// # Key Methods
+///
+/// - `tag_id()` - Get the NBT tag type
+/// - `as_*()` - Try to get a specific type (returns `Option`)
+/// - `is_*()` - Check if value is a specific type
+/// - `visit_scoped()` - Pattern match on the value type
 pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     /// The configuration associated with this value.
     type Config: ReadableConfig;
@@ -55,10 +75,12 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     /// Returns `true` if the value is a double.
     fn is_double(&self) -> bool;
 
-    /// Returns the value as a byte array, if it is one.
-    fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
+    fn as_byte_array_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::ByteArray<'a>>
     where
         'doc: 'a;
+
     /// Returns `true` if the value is a byte array.
     fn is_byte_array(&self) -> bool;
 
@@ -83,21 +105,19 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     /// Returns `true` if the value is a compound.
     fn is_compound(&self) -> bool;
 
-    /// Returns the value as an int array, if it is one.
-    fn as_int_array<'a>(
-        &'a self,
-    ) -> Option<&'a [byteorder::I32<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_int_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntArray<'a>>
     where
         'doc: 'a;
+
     /// Returns `true` if the value is an int array.
     fn is_int_array(&self) -> bool;
 
-    /// Returns the value as a long array, if it is one.
-    fn as_long_array<'a>(
+    fn as_long_array_scoped<'a>(
         &'a self,
-    ) -> Option<&'a [byteorder::I64<<Self::Config as ReadableConfig>::ByteOrder>]>
+    ) -> Option<<Self::Config as ReadableConfig>::LongArray<'a>>
     where
         'doc: 'a;
+
     /// Returns `true` if the value is a long array.
     fn is_long_array(&self) -> bool;
 

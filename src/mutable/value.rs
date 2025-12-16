@@ -18,7 +18,6 @@ use crate::{
 /// A zero-copy, immutable NBT value (Pointer-based).
 ///
 /// This type provides an immutable view into NBT data using direct pointers and slices.
-/// It is distinct from [`crate::immutable::BorrowedValue`], which uses a mark-based approach.
 ///
 /// This type is typically used when you need a lightweight, immutable view of data that might
 /// be part of a mutable structure or when the mark-based overhead is not desired.
@@ -210,7 +209,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
     }
 
     #[inline]
-    pub fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
+    pub fn as_byte_array<'a>(&'a self) -> Option<&'a &'s [i8]>
     where
         's: 'a,
     {
@@ -274,7 +273,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
     }
 
     #[inline]
-    pub fn as_int_array<'a>(&'a self) -> Option<&'a [byteorder::I32<O>]>
+    pub fn as_int_array<'a>(&'a self) -> Option<&'a &'s [byteorder::I32<O>]>
     where
         's: 'a,
     {
@@ -290,7 +289,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
     }
 
     #[inline]
-    pub fn as_long_array<'a>(&'a self) -> Option<&'a [byteorder::I64<O>]>
+    pub fn as_long_array<'a>(&'a self) -> Option<&'a &'s [byteorder::I64<O>]>
     where
         's: 'a,
     {

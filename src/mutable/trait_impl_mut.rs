@@ -103,7 +103,7 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
     }
 
     #[inline]
-    fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
+    fn as_byte_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteArray<'a>>
     where
         'doc: 'a,
     {
@@ -155,9 +155,7 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
     }
 
     #[inline]
-    fn as_int_array<'a>(
-        &'a self,
-    ) -> Option<&'a [byteorder::I32<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_int_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntArray<'a>>
     where
         'doc: 'a,
     {
@@ -170,9 +168,7 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
     }
 
     #[inline]
-    fn as_long_array<'a>(
-        &'a self,
-    ) -> Option<&'a [byteorder::I64<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_long_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongArray<'a>>
     where
         'doc: 'a,
     {
@@ -207,7 +203,7 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
             MutableValue::Long(value) => match_fn(ValueScoped::Long(value.get())),
             MutableValue::Float(value) => match_fn(ValueScoped::Float(value.get())),
             MutableValue::Double(value) => match_fn(ValueScoped::Double(value.get())),
-            MutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
+            MutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value.as_slice())),
             MutableValue::String(value) => match_fn(ValueScoped::String(ImmutableString {
                 data: value.as_mutf8_bytes(),
             })),
@@ -219,8 +215,8 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             })),
-            MutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value)),
-            MutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value)),
+            MutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.as_slice())),
+            MutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.as_slice())),
         }
     }
 

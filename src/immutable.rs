@@ -17,9 +17,21 @@ pub use value::{
     ReadonlyString, ReadonlyValue,
 };
 
-/// A borrowed, immutable NBT value.
+/// A zero-copy NBT value that borrows from a byte slice.
 ///
-/// This type is returned by [`read_borrowed`] and holds a reference to the source data.
+/// This is the return type of [`read_borrowed`]. It provides fast, read-only access
+/// to NBT data without copying. The value is only valid while the source slice lives.
+///
+/// # Example
+///
+/// ```rust
+/// use na_nbt::read_borrowed;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
+/// let doc = read_borrowed::<BigEndian>(&data).unwrap();
+/// let root = doc.root(); // BorrowedValue<BigEndian>
+/// ```
 pub type BorrowedValue<'s, O> = value::ReadonlyValue<'s, O, ()>;
 
 /// Reads an NBT document from a byte slice.
@@ -78,23 +90,44 @@ impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
 unsafe impl<'s, O: ByteOrder> Send for BorrowedDocument<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for BorrowedDocument<'s, O> {}
 
-/// A shared, immutable NBT value.
+/// A shared, immutable NBT value with `Arc`-based ownership.
 ///
-/// This type is returned by [`read_shared`] and owns the source data via an `Arc`.
+/// This type is returned by [`read_shared`]. Unlike [`BorrowedValue`], it owns its data
+/// via `Arc`, so it can be cloned and passed across threads without lifetime concerns.
+///
+/// The `'static` lifetime indicates the value doesn't borrow from external data.
 pub type SharedValue<O> = value::ReadonlyValue<'static, O, Arc<SharedDocument>>;
 
-/// Reads an NBT document from a `Bytes` object.
+/// Reads an NBT document from a `Bytes` buffer with shared ownership.
 ///
-/// This function performs a zero-copy parse of the NBT data. The returned [`SharedValue`]
-/// shares ownership of the data via an `Arc`.
+/// The returned [`SharedValue`] owns the data via `Arc`, making it `Clone`, `Send`, `Sync`,
+/// and `'static`. Use this when you need to pass NBT values across threads or store them
+/// without worrying about lifetimes.
+///
+/// # Example
+///
+/// ```rust
+/// use na_nbt::read_shared;
+/// use bytes::Bytes;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]); // Empty compound
+/// let root = read_shared::<BigEndian>(data).unwrap();
+///
+/// // Can be cloned and sent to another thread
+/// let handle = std::thread::spawn(move || {
+///     assert!(root.as_compound().is_some());
+/// });
+/// handle.join().unwrap();
+/// ```
 ///
 /// # Arguments
 ///
-/// * `source` - The `Bytes` object containing the NBT data.
+/// * `source` - A [`Bytes`](bytes::Bytes) buffer containing NBT data
 ///
 /// # Returns
 ///
-/// A `Result` containing the root `SharedValue` or an error.
+/// The root NBT value, or an error if parsing fails.
 pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
     Ok(unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {

@@ -13,12 +13,12 @@ pub enum Value<'a, 'doc, C: ReadableConfig> {
     Long(i64),
     Float(f32),
     Double(f64),
-    ByteArray(&'a [i8]),
+    ByteArray(&'a C::ByteArray<'doc>),
     String(&'a C::String<'doc>),
     List(&'a C::List<'doc>),
     Compound(&'a C::Compound<'doc>),
-    IntArray(&'a [byteorder::I32<C::ByteOrder>]),
-    LongArray(&'a [byteorder::I64<C::ByteOrder>]),
+    IntArray(&'a C::IntArray<'doc>),
+    LongArray(&'a C::LongArray<'doc>),
 }
 
 pub enum ValueScoped<'a, C: ReadableConfig> {
@@ -29,12 +29,12 @@ pub enum ValueScoped<'a, C: ReadableConfig> {
     Long(i64),
     Float(f32),
     Double(f64),
-    ByteArray(&'a [i8]),
+    ByteArray(C::ByteArray<'a>),
     String(C::String<'a>),
     List(C::List<'a>),
     Compound(C::Compound<'a>),
-    IntArray(&'a [byteorder::I32<C::ByteOrder>]),
-    LongArray(&'a [byteorder::I64<C::ByteOrder>]),
+    IntArray(C::IntArray<'a>),
+    LongArray(C::LongArray<'a>),
 }
 
 pub enum ValueMut<'a, 's: 'a, C: WritableConfig> {

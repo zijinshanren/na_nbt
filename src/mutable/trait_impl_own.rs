@@ -91,7 +91,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     }
 
     #[inline]
-    fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
+    fn as_byte_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteArray<'a>>
     where
         'static: 'a,
     {
@@ -143,9 +143,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     }
 
     #[inline]
-    fn as_int_array<'a>(
-        &'a self,
-    ) -> Option<&'a [byteorder::I32<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_int_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntArray<'a>>
     where
         'static: 'a,
     {
@@ -158,9 +156,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     }
 
     #[inline]
-    fn as_long_array<'a>(
-        &'a self,
-    ) -> Option<&'a [byteorder::I64<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_long_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongArray<'a>>
     where
         'static: 'a,
     {
@@ -195,7 +191,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
             OwnedValue::Long(value) => match_fn(ValueScoped::Long(value.get())),
             OwnedValue::Float(value) => match_fn(ValueScoped::Float(value.get())),
             OwnedValue::Double(value) => match_fn(ValueScoped::Double(value.get())),
-            OwnedValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
+            OwnedValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value.as_slice())),
             OwnedValue::String(value) => match_fn(ValueScoped::String(ImmutableString {
                 data: value.as_mutf8_bytes(),
             })),
@@ -207,8 +203,8 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             })),
-            OwnedValue::IntArray(value) => match_fn(ValueScoped::IntArray(value)),
-            OwnedValue::LongArray(value) => match_fn(ValueScoped::LongArray(value)),
+            OwnedValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.as_slice())),
+            OwnedValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.as_slice())),
         }
     }
 

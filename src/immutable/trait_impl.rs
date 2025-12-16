@@ -1,11 +1,13 @@
 use std::{io::Write, marker::PhantomData};
 
+use zerocopy::byteorder;
+
 use crate::{
     ByteOrder, ReadableCompound, ReadableConfig, ReadableList, ReadableString, ReadableValue,
-    Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, Value,
-    ValueScoped,
+    ReadonlyArray, Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag,
+    Value, ValueScoped,
     immutable::value::{
-        Document, ReadonlyCompoundIter, ReadonlyListIter, ReadonlyCompound, ReadonlyList,
+        Document, ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter,
         ReadonlyString, ReadonlyValue,
     },
     index::Index,
@@ -31,10 +33,13 @@ impl<O: ByteOrder, D: Document> ReadableConfig for Config<O, D> {
     type ByteOrder = O;
     type Value<'doc> = ReadonlyValue<'doc, O, D>;
     type String<'doc> = ReadonlyString<'doc, D>;
+    type ByteArray<'doc> = ReadonlyArray<'doc, i8, D>;
     type List<'doc> = ReadonlyList<'doc, O, D>;
     type ListIter<'doc> = ReadonlyListIter<'doc, O, D>;
     type Compound<'doc> = ReadonlyCompound<'doc, O, D>;
     type CompoundIter<'doc> = ReadonlyCompoundIter<'doc, O, D>;
+    type IntArray<'doc> = ReadonlyArray<'doc, byteorder::I32<O>, D>;
+    type LongArray<'doc> = ReadonlyArray<'doc, byteorder::I64<O>, D>;
 }
 
 impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
@@ -116,11 +121,11 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
+    fn as_byte_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteArray<'a>>
     where
         'doc: 'a,
     {
-        self.as_byte_array()
+        self.as_byte_array().cloned()
     }
 
     #[inline]
@@ -168,13 +173,11 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    fn as_int_array<'a>(
-        &'a self,
-    ) -> Option<&'a [zerocopy::byteorder::I32<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_int_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntArray<'a>>
     where
         'doc: 'a,
     {
-        self.as_int_array()
+        self.as_int_array().cloned()
     }
 
     #[inline]
@@ -183,13 +186,11 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    fn as_long_array<'a>(
-        &'a self,
-    ) -> Option<&'a [zerocopy::byteorder::I64<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_long_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongArray<'a>>
     where
         'doc: 'a,
     {
-        self.as_long_array()
+        self.as_long_array().cloned()
     }
 
     #[inline]
@@ -220,12 +221,12 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
             ReadonlyValue::Long(value) => match_fn(ValueScoped::Long(*value)),
             ReadonlyValue::Float(value) => match_fn(ValueScoped::Float(*value)),
             ReadonlyValue::Double(value) => match_fn(ValueScoped::Double(*value)),
-            ReadonlyValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value.as_slice())),
+            ReadonlyValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value.clone())),
             ReadonlyValue::String(value) => match_fn(ValueScoped::String(value.clone())),
             ReadonlyValue::List(value) => match_fn(ValueScoped::List(value.clone())),
             ReadonlyValue::Compound(value) => match_fn(ValueScoped::Compound(value.clone())),
-            ReadonlyValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.as_slice())),
-            ReadonlyValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.as_slice())),
+            ReadonlyValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.clone())),
+            ReadonlyValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.clone())),
         }
     }
 
@@ -241,6 +242,14 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn as_byte_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::ByteArray<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_byte_array()
+    }
+
     #[inline]
     fn as_string<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::String<'doc>>
     where
@@ -266,6 +275,22 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
+    fn as_int_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::IntArray<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_int_array()
+    }
+
+    #[inline]
+    fn as_long_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::LongArray<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_long_array()
+    }
+
+    #[inline]
     fn get<I: Index>(&self, index: I) -> Option<<Self::Config as ReadableConfig>::Value<'doc>> {
         self.get(index)
     }
@@ -285,12 +310,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
             ReadonlyValue::Long(value) => match_fn(Value::Long(*value)),
             ReadonlyValue::Float(value) => match_fn(Value::Float(*value)),
             ReadonlyValue::Double(value) => match_fn(Value::Double(*value)),
-            ReadonlyValue::ByteArray(value) => match_fn(Value::ByteArray(value.as_slice())),
+            ReadonlyValue::ByteArray(value) => match_fn(Value::ByteArray(value)),
             ReadonlyValue::String(value) => match_fn(Value::String(value)),
             ReadonlyValue::List(value) => match_fn(Value::List(value)),
             ReadonlyValue::Compound(value) => match_fn(Value::Compound(value)),
-            ReadonlyValue::IntArray(value) => match_fn(Value::IntArray(value.as_slice())),
-            ReadonlyValue::LongArray(value) => match_fn(Value::LongArray(value.as_slice())),
+            ReadonlyValue::IntArray(value) => match_fn(Value::IntArray(value)),
+            ReadonlyValue::LongArray(value) => match_fn(Value::LongArray(value)),
         }
     }
 }

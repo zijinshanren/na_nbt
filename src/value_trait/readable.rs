@@ -7,11 +7,19 @@ use crate::{
     },
 };
 
-/// A trait for values that can be read as NBT data.
+/// Extended trait for reading NBT values with full lifetime access.
 ///
-/// This trait abstracts over different NBT representations (e.g., [`ReadonlyValue`](crate::ReadonlyValue),
-/// [`OwnedValue`](crate::OwnedValue)), allowing you to write generic code that works with any of them.
+/// This trait extends [`ScopedReadableValue`] with methods that return references tied
+/// to the document lifetime rather than the borrow scope. This allows storing references
+/// to nested values.
+///
+/// Most code should use [`ScopedReadableValue`] instead, as it is implemented by more types.
 pub trait ReadableValue<'doc>: ScopedReadableValue<'doc> + Send + Sync + Sized + Clone {
+    /// Returns the value as a byte array, if it is one.
+    fn as_byte_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::ByteArray<'doc>>
+    where
+        'doc: 'a;
+
     /// Returns the value as a string, if it is one.
     fn as_string<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::String<'doc>>
     where
@@ -24,6 +32,16 @@ pub trait ReadableValue<'doc>: ScopedReadableValue<'doc> + Send + Sync + Sized +
 
     /// Returns the value as a compound, if it is one.
     fn as_compound<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::Compound<'doc>>
+    where
+        'doc: 'a;
+
+    /// Returns the value as an int array, if it is one.
+    fn as_int_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::IntArray<'doc>>
+    where
+        'doc: 'a;
+
+    /// Returns the value as a long array, if it is one.
+    fn as_long_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::LongArray<'doc>>
     where
         'doc: 'a;
 

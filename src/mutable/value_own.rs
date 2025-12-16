@@ -43,9 +43,30 @@ impl StringViewOwn {
 
 /// An owned, mutable NBT value.
 ///
-/// This type owns its data and allows modification. It is useful when you need to create or edit NBT structures.
+/// Unlike [`BorrowedValue`](crate::BorrowedValue), this type owns its data and can be
+/// modified. Use this when you need to:
+/// - Modify NBT data
+/// - Keep the value after the source slice is dropped
+/// - Build NBT structures from scratch
 ///
-/// The generic parameter `O` specifies the byte order (endianness) used for storage.
+/// # Example
+///
+/// ```rust
+/// use na_nbt::{read_owned, OwnedValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
+/// let mut root: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data).unwrap();
+///
+/// if let OwnedValue::Compound(ref mut c) = root {
+///     c.insert("key", 42i32);
+/// }
+/// ```
+///
+/// # Generic Parameter
+///
+/// `O` specifies the byte order for multi-byte values in memory. Choose based on your
+/// write target to avoid conversion overhead.
 pub enum OwnedValue<O: ByteOrder> {
     /// End tag (0).
     End,

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, io::Write, marker::PhantomData, slice};
+use std::{borrow::Cow, io::Write, marker::PhantomData, ops::Deref, slice};
 
 use zerocopy::byteorder;
 
@@ -13,18 +13,26 @@ pub trait Document: Send + Sync + Clone + 'static {}
 
 impl<T: Send + Sync + Clone + 'static> Document for T {}
 
-/// A zero-copy, immutable NBT value (Mark-based).
+/// A zero-copy, immutable NBT value.
 ///
-/// This type is optimized for fast reading and low memory usage using a "mark" system
-/// to navigate the data without parsing everything upfront. It references the underlying
-/// data source directly.
+/// This is the core type for zero-copy NBT parsing. It references the original byte
+/// slice directly without copying data, making parsing extremely fast.
 ///
-/// This is distinct from [`crate::mutable::ImmutableValue`], which is a pointer-based immutable view.
+/// # Type Aliases
 ///
-/// The generic parameters are:
-/// * `'doc`: The lifetime of the underlying data.
-/// * `O`: The byte order (endianness) of the data.
-/// * `D`: The document type, which manages the lifetime of the data source (e.g., `()` for borrowed slices, `Arc<SharedDocument>` for shared ownership).
+/// You typically use this through type aliases:
+/// - [`BorrowedValue`](crate::BorrowedValue) - When data lives in a borrowed slice
+/// - [`SharedValue`](crate::SharedValue) - When data is wrapped in `Arc` for sharing
+///
+/// # Generic Parameters
+///
+/// - `'doc`: Lifetime of the underlying byte data
+/// - `O`: Byte order ([`BigEndian`](zerocopy::byteorder::BigEndian) or [`LittleEndian`](zerocopy::byteorder::LittleEndian))
+/// - `D`: Document type managing data ownership (`()` for borrowed, `Arc<...>` for shared)
+///
+/// # See Also
+///
+/// - [`ImmutableValue`](crate::ImmutableValue) - A different type for immutable views of owned data
 #[derive(Clone)]
 pub enum ReadonlyValue<'doc, O: ByteOrder, D: Document> {
     /// End tag (0).
@@ -223,12 +231,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
+    pub fn as_byte_array<'a>(&'a self) -> Option<&'a ReadonlyArray<'doc, i8, D>>
     where
         'doc: 'a,
     {
         match self {
-            ReadonlyValue::ByteArray(value) => Some(value.data),
+            ReadonlyValue::ByteArray(value) => Some(value),
             _ => None,
         }
     }
@@ -287,12 +295,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn as_int_array<'a>(&'a self) -> Option<&'a [byteorder::I32<O>]>
+    pub fn as_int_array<'a>(&'a self) -> Option<&'a ReadonlyArray<'doc, byteorder::I32<O>, D>>
     where
         'doc: 'a,
     {
         match self {
-            ReadonlyValue::IntArray(value) => Some(value.data),
+            ReadonlyValue::IntArray(value) => Some(value),
             _ => None,
         }
     }
@@ -303,12 +311,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn as_long_array<'a>(&'a self) -> Option<&'a [byteorder::I64<O>]>
+    pub fn as_long_array<'a>(&'a self) -> Option<&'a ReadonlyArray<'doc, byteorder::I64<O>, D>>
     where
         'doc: 'a,
     {
         match self {
-            ReadonlyValue::LongArray(value) => Some(value.data),
+            ReadonlyValue::LongArray(value) => Some(value),
             _ => None,
         }
     }
@@ -348,6 +356,15 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
 pub struct ReadonlyArray<'doc, T, D: Document> {
     pub(crate) data: &'doc [T],
     _doc: D,
+}
+
+impl<'doc, T, D: Document> Deref for ReadonlyArray<'doc, T, D> {
+    type Target = [T];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.data
+    }
 }
 
 impl<'doc, T, D: Document> ReadonlyArray<'doc, T, D> {

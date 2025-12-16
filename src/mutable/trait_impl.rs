@@ -1,5 +1,7 @@
 use std::{io::Write, marker::PhantomData};
 
+use zerocopy::byteorder;
+
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, ReadableCompound,
     ReadableConfig, ReadableList, ReadableString, ReadableValue, Result, ScopedReadableCompound,
@@ -28,10 +30,13 @@ impl<O: ByteOrder> ReadableConfig for Config<O> {
     type ByteOrder = O;
     type Value<'doc> = ImmutableValue<'doc, O>;
     type String<'doc> = ImmutableString<'doc>;
+    type ByteArray<'doc> = &'doc [i8];
     type List<'doc> = ImmutableList<'doc, O>;
     type ListIter<'doc> = ImmutableListIter<'doc, O>;
     type Compound<'doc> = ImmutableCompound<'doc, O>;
     type CompoundIter<'doc> = ImmutableCompoundIter<'doc, O>;
+    type IntArray<'doc> = &'doc [byteorder::I32<O>];
+    type LongArray<'doc> = &'doc [byteorder::I64<O>];
 }
 
 impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
@@ -113,11 +118,11 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
     }
 
     #[inline]
-    fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
+    fn as_byte_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteArray<'a>>
     where
         'doc: 'a,
     {
-        self.as_byte_array()
+        self.as_byte_array().cloned()
     }
 
     #[inline]
@@ -165,13 +170,11 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
     }
 
     #[inline]
-    fn as_int_array<'a>(
-        &'a self,
-    ) -> Option<&'a [zerocopy::byteorder::I32<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_int_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntArray<'a>>
     where
         'doc: 'a,
     {
-        self.as_int_array()
+        self.as_int_array().cloned()
     }
 
     #[inline]
@@ -180,13 +183,11 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
     }
 
     #[inline]
-    fn as_long_array<'a>(
-        &'a self,
-    ) -> Option<&'a [zerocopy::byteorder::I64<<Self::Config as ReadableConfig>::ByteOrder>]>
+    fn as_long_array_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongArray<'a>>
     where
         'doc: 'a,
     {
-        self.as_long_array()
+        self.as_long_array().cloned()
     }
 
     #[inline]
@@ -217,12 +218,12 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
             ImmutableValue::Long(value) => match_fn(ValueScoped::Long(*value)),
             ImmutableValue::Float(value) => match_fn(ValueScoped::Float(*value)),
             ImmutableValue::Double(value) => match_fn(ValueScoped::Double(*value)),
-            ImmutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
+            ImmutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(*value)),
             ImmutableValue::String(value) => match_fn(ValueScoped::String(value.clone())),
             ImmutableValue::List(value) => match_fn(ValueScoped::List(value.clone())),
             ImmutableValue::Compound(value) => match_fn(ValueScoped::Compound(value.clone())),
-            ImmutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value)),
-            ImmutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value)),
+            ImmutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(*value)),
+            ImmutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(*value)),
         }
     }
 
@@ -238,6 +239,14 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
 }
 
 impl<'doc, O: ByteOrder> ReadableValue<'doc> for ImmutableValue<'doc, O> {
+    #[inline]
+    fn as_byte_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::ByteArray<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_byte_array()
+    }
+
     #[inline]
     fn as_string<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::String<'doc>>
     where
@@ -260,6 +269,22 @@ impl<'doc, O: ByteOrder> ReadableValue<'doc> for ImmutableValue<'doc, O> {
         'doc: 'a,
     {
         self.as_compound()
+    }
+
+    #[inline]
+    fn as_int_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::IntArray<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_int_array()
+    }
+
+    #[inline]
+    fn as_long_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::LongArray<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_long_array()
     }
 
     #[inline]
