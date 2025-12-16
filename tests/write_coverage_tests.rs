@@ -1,6 +1,6 @@
 //! Tests for write functions with endianness conversion - targeting write.rs coverage
 
-use na_nbt::{read_borrowed, read_owned, write_value_to_vec, write_value_to_writer};
+use na_nbt::{ScopedReadableValue as _, read_borrowed, read_owned};
 use std::io::Cursor;
 use zerocopy::byteorder::BigEndian as BE;
 use zerocopy::byteorder::LittleEndian as LE;
@@ -315,7 +315,7 @@ fn test_write_byte_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_byte(), Some(42));
 }
@@ -326,7 +326,7 @@ fn test_write_short_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_short(), Some(1234));
 }
@@ -337,7 +337,7 @@ fn test_write_int_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_int(), Some(123456));
 }
@@ -348,7 +348,7 @@ fn test_write_long_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert_eq!(owned.as_long(), Some(123456789012345i64));
 }
@@ -359,7 +359,7 @@ fn test_write_float_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert!((owned.as_float().unwrap() - std::f32::consts::PI).abs() < 0.0001);
 }
@@ -370,7 +370,7 @@ fn test_write_double_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     assert!((owned.as_double().unwrap() - std::f64::consts::E).abs() < 0.0001);
 }
@@ -381,7 +381,7 @@ fn test_write_string_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::String(s) = owned {
         assert_eq!(s.decode(), "hello world");
@@ -396,7 +396,7 @@ fn test_write_byte_array_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::ByteArray(arr) = owned {
         assert_eq!(arr.as_slice(), &[1, 2, 3, 4, 5]);
@@ -411,7 +411,7 @@ fn test_write_int_array_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::IntArray(arr) = owned {
         let vals: Vec<i32> = arr.iter().map(|x| x.get()).collect();
@@ -427,7 +427,7 @@ fn test_write_long_array_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::LongArray(arr) = owned {
         let vals: Vec<i64> = arr.iter().map(|x| x.get()).collect();
@@ -445,7 +445,7 @@ fn test_write_byte_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.len(), 3);
@@ -461,7 +461,7 @@ fn test_write_short_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.len(), 3);
@@ -479,7 +479,7 @@ fn test_write_long_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.get(0).unwrap().as_long(), Some(1000));
@@ -494,7 +494,7 @@ fn test_write_float_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert!((list.get(0).unwrap().as_float().unwrap() - 1.5).abs() < 0.001);
@@ -509,7 +509,7 @@ fn test_write_double_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert!((list.get(0).unwrap().as_double().unwrap() - 1.5).abs() < 0.001);
@@ -524,7 +524,7 @@ fn test_write_string_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.len(), 3);
@@ -541,7 +541,7 @@ fn test_write_byte_array_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.len(), 2);
@@ -558,7 +558,7 @@ fn test_write_int_array_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.len(), 2);
@@ -575,7 +575,7 @@ fn test_write_long_array_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.len(), 2);
@@ -592,7 +592,7 @@ fn test_write_nested_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(outer) = owned {
         assert_eq!(outer.len(), 2);
@@ -613,7 +613,7 @@ fn test_write_nested_compound_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::List(list) = owned {
         assert_eq!(list.len(), 2);
@@ -634,7 +634,7 @@ fn test_write_compound_all_types_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
 
-    let output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let output = root.write_to_vec::<LE>().unwrap();
     let owned = read_owned::<LE, LE>(&output).unwrap();
     if let na_nbt::OwnedValue::Compound(comp) = owned {
         assert_eq!(comp.get("b").unwrap().as_byte(), Some(42));
@@ -655,7 +655,7 @@ fn test_write_to_writer_int_be_to_le() {
     let root = doc.root();
 
     let mut buffer = Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
+    root.write_to_writer::<LE>(&mut buffer).unwrap();
 
     let output = buffer.into_inner();
     let owned = read_owned::<LE, LE>(&output).unwrap();
@@ -669,7 +669,7 @@ fn test_write_to_writer_list_be_to_le() {
     let root = doc.root();
 
     let mut buffer = Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
+    root.write_to_writer::<LE>(&mut buffer).unwrap();
 
     let output = buffer.into_inner();
     let owned = read_owned::<LE, LE>(&output).unwrap();
@@ -687,7 +687,7 @@ fn test_write_to_writer_compound_be_to_le() {
     let root = doc.root();
 
     let mut buffer = Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
+    root.write_to_writer::<LE>(&mut buffer).unwrap();
 
     let output = buffer.into_inner();
     let owned = read_owned::<LE, LE>(&output).unwrap();

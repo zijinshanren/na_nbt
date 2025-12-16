@@ -1,10 +1,10 @@
-use std::marker::PhantomData;
+use std::{io::Write, marker::PhantomData};
 
 use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, IntoOwnedValue, MutableCompound,
-    MutableList, MutableValue, OwnedValue, ReadableConfig, ScopedReadableCompound,
+    MutableList, MutableValue, OwnedValue, ReadableConfig, Result, ScopedReadableCompound,
     ScopedReadableList, ScopedReadableValue, ScopedWritableCompound, ScopedWritableList,
     ScopedWritableValue, Tag, ValueMut, ValueMutScoped, ValueScoped, WritableCompound,
     WritableConfig, WritableList, WritableValue,
@@ -222,6 +222,16 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
             MutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value)),
             MutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value)),
         }
+    }
+
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>> {
+        self.write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.write_to_writer::<TARGET>(writer)
     }
 }
 

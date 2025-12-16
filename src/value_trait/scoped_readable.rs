@@ -1,7 +1,9 @@
+use std::io::Write;
+
 use zerocopy::byteorder;
 
 use crate::{
-    Tag,
+    ByteOrder, Result, Tag,
     index::Index,
     value_trait::{ReadableConfig, ValueScoped},
 };
@@ -79,6 +81,10 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     ) -> R
     where
         'doc: 'a;
+
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>>;
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()>;
 }
 
 pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {

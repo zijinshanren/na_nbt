@@ -1,16 +1,14 @@
-use na_nbt::{
-    ScopedReadableValue, ValueScoped, read_borrowed, write_value_to_vec, write_value_to_writer,
-};
+use na_nbt::{ScopedReadableValue, ValueScoped, read_borrowed};
 use zerocopy::BE;
 
 fn read_write(data: &[u8]) {
     let doc = read_borrowed::<BE>(data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, BE>(&root).unwrap();
+    let written = root.write_to_vec::<BE>().unwrap();
     assert_eq!(written, data);
 
     let mut vec = Vec::new();
-    write_value_to_writer::<_, BE, BE, _>(&mut vec, &root).unwrap();
+    root.write_to_writer::<BE>(&mut vec).unwrap();
     assert_eq!(vec, data);
 }
 

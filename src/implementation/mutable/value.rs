@@ -1,9 +1,9 @@
-use std::{borrow::Cow, marker::PhantomData, ptr, slice};
+use std::{borrow::Cow, io::Write, marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Tag,
+    ByteOrder, Result, ScopedReadableValue as _, Tag,
     implementation::mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter},
         util::{
@@ -12,6 +12,7 @@ use crate::{
         },
     },
     index::Index,
+    write_owned_to_vec,
 };
 
 #[derive(Clone)]
@@ -310,6 +311,16 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
                 _ => None,
             },
         )
+    }
+
+    #[inline]
+    pub fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>> {
+        self.visit_scoped(|value| write_owned_to_vec::<O, TARGET>(value))
+    }
+
+    #[inline]
+    pub fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        todo!()
     }
 }
 

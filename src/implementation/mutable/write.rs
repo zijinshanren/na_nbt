@@ -1,187 +1,146 @@
 use std::{hint::unreachable_unchecked, ptr, slice};
 
-use zerocopy::{IntoBytes, byteorder};
+use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Error, cold_path,
+    ByteOrder, Result, Tag, cold_path,
     implementation::mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
 };
 
-#[inline]
-pub unsafe fn write_string<O: ByteOrder>(data: &[u8], out: &mut Vec<u8>) -> Result<(), Error> {
-    out.extend_from_slice(&byteorder::U16::<O>::from(data.len() as u16).to_bytes());
-    out.extend_from_slice(data);
-    Ok(())
+#[inline(always)]
+pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -> Result<()> {
+    unsafe {
+        let mut start = data;
+
+        loop {
+            let tag_id = Tag::from_u8_unchecked(*data);
+            data = data.add(1);
+
+            if tag_id == Tag::End {
+                cold_path();
+                let raw_len = data.byte_offset_from_unsigned(start);
+                if raw_len == 1 {
+                    out.push(0);
+                } else {
+                    let old_len = out.len();
+                    out.reserve(raw_len);
+                    ptr::copy_nonoverlapping(start, out.as_mut_ptr().add(old_len), raw_len);
+                    out.set_len(old_len + raw_len);
+                }
+                return Ok(());
+            }
+
+            let name_len = byteorder::U16::<O>::from_bytes(*data.cast()).get();
+            data = data.add(2 + name_len as usize);
+
+            if tag_id.is_primitive() {
+                data = data.add(tag_size(tag_id));
+            } else {
+                let raw_len = data.byte_offset_from_unsigned(start);
+                let old_len = out.len();
+                out.reserve(raw_len);
+                ptr::copy(start, out.as_mut_ptr().add(old_len), raw_len);
+                out.set_len(old_len + raw_len);
+                write_unsafe_impl::<O>(tag_id, data, out)?;
+                data = data.add(SIZE_DYN);
+                start = data;
+            }
+        }
+    }
 }
 
-#[inline]
-pub unsafe fn write_byte_array<O: ByteOrder>(data: &[i8], out: &mut Vec<u8>) -> Result<(), Error> {
-    out.extend_from_slice(&byteorder::U32::<O>::from(data.len() as u32).to_bytes());
-    out.extend_from_slice(data.as_bytes());
-    Ok(())
-}
-
-#[inline]
-pub unsafe fn write_int_array<O: ByteOrder>(
-    data: &[byteorder::I32<O>],
-    out: &mut Vec<u8>,
-) -> Result<(), Error> {
-    out.extend_from_slice(&byteorder::U32::<O>::from(data.len() as u32).to_bytes());
-    out.extend_from_slice(data.as_bytes());
-    Ok(())
-}
-
-#[inline]
-pub unsafe fn write_long_array<O: ByteOrder>(
-    data: &[byteorder::I64<O>],
-    out: &mut Vec<u8>,
-) -> Result<(), Error> {
-    out.extend_from_slice(&byteorder::U32::<O>::from(data.len() as u32).to_bytes());
-    out.extend_from_slice(data.as_bytes());
-    Ok(())
-}
-
-#[inline]
-pub unsafe fn write_list<O: ByteOrder>(data: *const u8, out: &mut Vec<u8>) -> Result<(), Error> {
+#[inline(always)]
+pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -> Result<()> {
     unsafe {
         let tag_id = list_tag_id(data);
         let len = list_len::<O>(data);
-        match tag_id as u8 {
-            0..=6 => {
-                out.extend_from_slice(slice::from_raw_parts(data, 1 + 4 + len * tag_size(tag_id)));
+        if tag_id.is_primitive() {
+            out.extend_from_slice(slice::from_raw_parts(data, tag_size(tag_id) * len));
+        } else {
+            out.extend_from_slice(slice::from_raw_parts(data, 1 + 4));
+            data = data.add(1 + 4);
+            for _ in 0..len {
+                write_unsafe_impl::<O>(tag_id, data, out)?;
+                data = data.add(SIZE_DYN);
             }
-            7..=12 => {
-                out.extend_from_slice(slice::from_raw_parts(data, 1 + 4));
-                for index in 0..len {
-                    write_payload::<O>(tag_id, data.add(1 + 4 + index * SIZE_DYN), out)?;
-                }
-            }
-            _ => unreachable_unchecked(),
         }
+        Ok(())
     }
-    Ok(())
 }
 
-#[inline]
-pub unsafe fn write_compound<O: ByteOrder>(
+pub unsafe fn write_unsafe_impl<O: ByteOrder>(
+    tag_id: Tag,
     data: *const u8,
     out: &mut Vec<u8>,
-) -> Result<(), Error> {
-    unsafe {
-        let mut start = data;
-        let mut end = data;
-
-        loop {
-            let tag_id = *end;
-            end = end.add(1);
-
-            if tag_id == 0 {
-                cold_path();
-                out.extend_from_slice(slice::from_raw_parts(
-                    start,
-                    end.byte_offset_from_unsigned(start),
-                ));
-                break;
-            }
-
-            let name_len = byteorder::U16::<O>::from_bytes(*end.cast()).get();
-            end = end.add(2);
-            end = end.add(name_len as usize);
-
-            match tag_id {
-                0..=6 => end = end.add(tag_size(tag_id)),
-                7..=12 => {
-                    out.extend_from_slice(slice::from_raw_parts(
-                        start,
-                        end.byte_offset_from_unsigned(start),
-                    ));
-                    write_payload::<O>(tag_id, end, out)?;
-                    end = end.add(tag_size(tag_id));
-                    start = end;
-                }
-                _ => unreachable_unchecked(),
-            }
-        }
-    }
-    Ok(())
-}
-
-pub unsafe fn write_payload<O: ByteOrder>(
-    tag_id: u8,
-    payload: *const u8,
-    out: &mut Vec<u8>,
-) -> Result<(), Error> {
+) -> Result<()> {
     unsafe {
         match tag_id {
-            0..=6 => {
-                out.extend_from_slice(slice::from_raw_parts(payload, tag_size(tag_id)));
+            Tag::ByteArray => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 4 + len;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U32::<O>::from(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len);
+                out.set_len(old_len + len_bytes);
             }
-            7 => {
-                write_byte_array::<O>(
-                    slice::from_raw_parts(
-                        ptr::with_exposed_provenance(usize::from_ne_bytes(*payload.cast())),
-                        usize::from_ne_bytes(*payload.add(SIZE_USIZE).cast()),
-                    ),
-                    out,
-                )?;
+            Tag::String => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 2 + len;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U16::<O>::from(len as u16).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(2), len);
+                out.set_len(old_len + len_bytes);
             }
-            8 => {
-                write_string::<O>(
-                    slice::from_raw_parts(
-                        ptr::with_exposed_provenance(usize::from_ne_bytes(*payload.cast())),
-                        usize::from_ne_bytes(*payload.add(SIZE_USIZE).cast()),
-                    ),
-                    out,
-                )?;
+            Tag::List => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                write_list::<O>(ptr, out)?;
             }
-            9 => {
-                write_list::<O>(
-                    ptr::with_exposed_provenance(usize::from_ne_bytes(*payload.cast())),
-                    out,
-                )?;
+            Tag::Compound => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                write_compound::<O>(ptr, out)?;
             }
-            10 => {
-                write_compound::<O>(
-                    ptr::with_exposed_provenance(usize::from_ne_bytes(*payload.cast())),
-                    out,
-                )?;
+            Tag::IntArray => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 4 + len * 4;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U32::<O>::from(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len * 4);
+                out.set_len(old_len + len_bytes)
             }
-            11 => {
-                write_int_array::<O>(
-                    slice::from_raw_parts(
-                        ptr::with_exposed_provenance(usize::from_ne_bytes(*payload.cast())),
-                        usize::from_ne_bytes(*payload.add(SIZE_USIZE).cast()) / 4,
-                    ),
-                    out,
-                )?;
-            }
-            12 => {
-                write_long_array::<O>(
-                    slice::from_raw_parts(
-                        ptr::with_exposed_provenance(usize::from_ne_bytes(*payload.cast())),
-                        usize::from_ne_bytes(*payload.add(SIZE_USIZE).cast()) / 8,
-                    ),
-                    out,
-                )?;
+            Tag::LongArray => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 4 + len * 8;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U32::<O>::from(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len * 8);
+                out.set_len(old_len + len_bytes);
             }
             _ => unreachable_unchecked(),
         }
+        Ok(())
     }
-    Ok(())
-}
-
-#[inline]
-pub unsafe fn write_head<O: ByteOrder>(
-    tag_id: u8,
-    name: &str,
-    out: &mut Vec<u8>,
-) -> Result<(), Error> {
-    debug_assert!(out.is_empty());
-    // TAG ID
-    out.push(tag_id);
-
-    // NAME LENGTH
-    out.extend_from_slice(&byteorder::U16::<O>::from(name.len() as u16).to_bytes());
-    out.extend_from_slice(name.as_bytes());
-    Ok(())
 }

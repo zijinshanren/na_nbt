@@ -1,6 +1,7 @@
 //! Extended edge case tests - empty containers, boundary conditions, type mismatches
 
-use na_nbt::{read_borrowed, read_owned, write_value_to_vec, OwnedValue};
+use na_nbt::ScopedReadableValue as _;
+use na_nbt::{OwnedValue, read_borrowed, read_owned};
 use zerocopy::byteorder::BigEndian as BE;
 use zerocopy::byteorder::LittleEndian as LE;
 
@@ -355,7 +356,7 @@ fn test_write_empty_list() {
     let data = create_empty_list_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let output = write_value_to_vec::<_, BE, BE>(&root).unwrap();
+    let output = root.write_to_vec::<BE>().unwrap();
     // Roundtrip should produce identical data
     let owned2 = read_owned::<BE, BE>(&output).unwrap();
     if let OwnedValue::List(list) = owned2 {
@@ -370,7 +371,7 @@ fn test_write_empty_compound() {
     let data = create_empty_compound_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let output = write_value_to_vec::<_, BE, BE>(&root).unwrap();
+    let output = root.write_to_vec::<BE>().unwrap();
     let owned2 = read_owned::<BE, BE>(&output).unwrap();
     if let OwnedValue::Compound(comp) = owned2 {
         assert!(comp.get("any").is_none());
@@ -389,7 +390,7 @@ fn test_write_be_to_le_boundary_values() {
     let root = doc.root();
 
     // Write as LE
-    let le_output = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let le_output = root.write_to_vec::<LE>().unwrap();
 
     // Read back as LE
     let owned_le = read_owned::<LE, LE>(&le_output).unwrap();
@@ -491,7 +492,7 @@ fn test_deeply_nested_compound_write_roundtrip() {
     let data = create_deeply_nested_compound_be();
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let output = write_value_to_vec::<_, BE, BE>(&root).unwrap();
+    let output = root.write_to_vec::<BE>().unwrap();
     let owned2 = read_owned::<BE, BE>(&output).unwrap();
 
     if let OwnedValue::Compound(root2) = owned2 {

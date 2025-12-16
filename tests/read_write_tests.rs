@@ -1,6 +1,6 @@
 //! Tests for reading and writing NBT data
 
-use na_nbt::{read_borrowed, write_value_to_vec};
+use na_nbt::{ScopedReadableValue as _, read_borrowed};
 use zerocopy::byteorder::{BigEndian, LittleEndian};
 
 /// Helper to create a simple byte NBT document
@@ -244,7 +244,7 @@ fn test_write_byte_to_vec() {
     let data = create_byte_nbt(42);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BigEndian, BigEndian>(&root).unwrap();
+    let written = root.write_to_vec::<BigEndian>().unwrap();
 
     // The written output should be: [Tag::Byte, 0, 0, 42]
     assert_eq!(written, vec![0x01, 0x00, 0x00, 42]);
@@ -255,7 +255,7 @@ fn test_write_short_to_vec() {
     let data = create_short_nbt_be(1234);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BigEndian, BigEndian>(&root).unwrap();
+    let written = root.write_to_vec::<BigEndian>().unwrap();
 
     let expected_bytes = 1234i16.to_be_bytes();
     assert_eq!(
@@ -269,7 +269,7 @@ fn test_write_int_to_vec() {
     let data = create_int_nbt_be(123456);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BigEndian, BigEndian>(&root).unwrap();
+    let written = root.write_to_vec::<BigEndian>().unwrap();
 
     let expected_bytes = 123456i32.to_be_bytes();
     assert_eq!(
@@ -292,7 +292,7 @@ fn test_write_endianness_conversion() {
     let data = create_int_nbt_be(0x12345678);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BigEndian, LittleEndian>(&root).unwrap();
+    let written = root.write_to_vec::<LittleEndian>().unwrap();
 
     let expected_bytes = 0x12345678i32.to_le_bytes();
     assert_eq!(
@@ -314,7 +314,7 @@ fn test_roundtrip_byte() {
     let original = create_byte_nbt(127);
     let doc = read_borrowed::<BigEndian>(&original).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BigEndian, BigEndian>(&root).unwrap();
+    let written = root.write_to_vec::<BigEndian>().unwrap();
 
     let doc2 = read_borrowed::<BigEndian>(&written).unwrap();
     let root2 = doc2.root();
@@ -327,7 +327,7 @@ fn test_roundtrip_string() {
     let original = create_string_nbt_be("Test string");
     let doc = read_borrowed::<BigEndian>(&original).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BigEndian, BigEndian>(&root).unwrap();
+    let written = root.write_to_vec::<BigEndian>().unwrap();
 
     let doc2 = read_borrowed::<BigEndian>(&written).unwrap();
     let root2 = doc2.root();

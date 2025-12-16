@@ -1,15 +1,16 @@
 //! Tests for immutable write fallbacks
 
-use na_nbt::{read_borrowed, write_value_to_vec, write_value_to_writer};
-use zerocopy::byteorder::{BigEndian, LittleEndian};
+use na_nbt::{ScopedReadableValue as _, read_borrowed};
 use std::io::Cursor;
+use zerocopy::byteorder::{BigEndian, LittleEndian};
 
 fn create_int_list_nbt_be(values: &[i32]) -> Vec<u8> {
     let len = values.len() as u32;
     let len_bytes = len.to_be_bytes();
     let mut result = vec![
         0x09, // Tag::List
-        0x00, 0x00, // empty name
+        0x00,
+        0x00, // empty name
         0x03, // element type = Int
         len_bytes[0],
         len_bytes[1],
@@ -42,11 +43,12 @@ fn test_write_list_endianness_conversion_to_vec() {
     let root = doc.root();
 
     // Write with target little-endian to force fallback conversion
-    let written = write_value_to_vec::<_, BigEndian, LittleEndian>(&root).unwrap();
+    let written = root.write_to_vec::<LittleEndian>().unwrap();
 
     // The length and ints should be little-endian now
     let expected = vec![
-        0x09, 0x00, 0x00, 0x03, 0x02, 0x00, 0x00, 0x00, // header + element type + len (little-endian)
+        0x09, 0x00, 0x00, 0x03, 0x02, 0x00, 0x00,
+        0x00, // header + element type + len (little-endian)
         0x44, 0x33, 0x22, 0x11, // 0x11223344 little-endian
         0x88, 0x77, 0x66, 0x55, // 0x55667788 little-endian
     ];
@@ -59,7 +61,7 @@ fn test_write_compound_endianness_conversion_to_vec() {
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
 
-    let written = write_value_to_vec::<_, BigEndian, LittleEndian>(&root).unwrap();
+    let written = root.write_to_vec::<LittleEndian>().unwrap();
 
     // Expect int bytes to be little-endian
     // Name length (u16) will be converted to little-endian, so 0x0001 -> 0x01 0x00
@@ -77,10 +79,12 @@ fn test_write_list_endianness_conversion_to_writer() {
     let root = doc.root();
 
     let mut cursor = Cursor::new(Vec::new());
-    write_value_to_writer::<_, BigEndian, LittleEndian, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<LittleEndian>(&mut cursor).unwrap();
     let written = cursor.into_inner();
 
     // Int should be little endian
-    let expected = vec![0x09, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10];
+    let expected = vec![
+        0x09, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10,
+    ];
     assert_eq!(written, expected);
 }

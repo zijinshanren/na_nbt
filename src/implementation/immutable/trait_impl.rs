@@ -1,8 +1,9 @@
-use std::marker::PhantomData;
+use std::{io::Write, marker::PhantomData};
 
 use crate::{
     ByteOrder, ReadableCompound, ReadableConfig, ReadableList, ReadableString, ReadableValue,
-    ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, Value, ValueScoped,
+    Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, Value,
+    ValueScoped,
     implementation::immutable::value::{
         Document, ImmutableCompound, ImmutableCompoundIter, ImmutableList, ImmutableListIter,
         ImmutableString, ImmutableValue,
@@ -226,6 +227,16 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ImmutableVal
             ImmutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.as_slice())),
             ImmutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.as_slice())),
         }
+    }
+
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>> {
+        self.write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.write_to_writer::<TARGET>(writer)
     }
 }
 

@@ -1,10 +1,10 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData, mem::ManuallyDrop, ptr};
+use std::{hint::unreachable_unchecked, io::Write, marker::PhantomData, mem::ManuallyDrop, ptr};
 
 use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
-    MutableCompound, MutableList, MutableValue, Tag, cold_path,
+    MutableCompound, MutableList, MutableValue, Result, ScopedReadableValue as _, Tag, cold_path,
     implementation::mutable::{
         iter::{
             ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
@@ -18,6 +18,7 @@ use crate::{
     },
     index::Index,
     view::{StringViewMut, StringViewOwn, VecViewMut, VecViewOwn},
+    write_owned_to_vec,
 };
 
 impl<T> VecViewOwn<T> {
@@ -40,21 +41,20 @@ impl StringViewOwn {
     }
 }
 
-#[repr(u8)]
 pub enum OwnedValue<O: ByteOrder> {
-    End = 0,
-    Byte(i8) = 1,
-    Short(byteorder::I16<O>) = 2,
-    Int(byteorder::I32<O>) = 3,
-    Long(byteorder::I64<O>) = 4,
-    Float(byteorder::F32<O>) = 5,
-    Double(byteorder::F64<O>) = 6,
-    ByteArray(VecViewOwn<i8>) = 7,
-    String(StringViewOwn) = 8,
-    List(OwnedList<O>) = 9,
-    Compound(OwnedCompound<O>) = 10,
-    IntArray(VecViewOwn<byteorder::I32<O>>) = 11,
-    LongArray(VecViewOwn<byteorder::I64<O>>) = 12,
+    End,
+    Byte(i8),
+    Short(byteorder::I16<O>),
+    Int(byteorder::I32<O>),
+    Long(byteorder::I64<O>),
+    Float(byteorder::F32<O>),
+    Double(byteorder::F64<O>),
+    ByteArray(VecViewOwn<i8>),
+    String(StringViewOwn),
+    List(OwnedList<O>),
+    Compound(OwnedCompound<O>),
+    IntArray(VecViewOwn<byteorder::I32<O>>),
+    LongArray(VecViewOwn<byteorder::I64<O>>),
 }
 
 impl<O: ByteOrder> From<()> for OwnedValue<O> {
@@ -469,6 +469,16 @@ impl<O: ByteOrder> OwnedValue<O> {
                 _ => None,
             },
         )
+    }
+
+    #[inline]
+    pub fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>> {
+        self.visit_scoped(|value| write_owned_to_vec::<O, TARGET>(value))
+    }
+
+    #[inline]
+    pub fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        todo!()
     }
 }
 

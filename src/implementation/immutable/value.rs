@@ -1,11 +1,12 @@
-use std::{borrow::Cow, marker::PhantomData, slice};
+use std::{borrow::Cow, io::Write, marker::PhantomData, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Tag, cold_path,
+    ByteOrder, Result, Tag, cold_path,
     implementation::immutable::{mark::Mark, util::tag_size},
     index::Index,
+    write_value_to_vec, write_value_to_writer,
 };
 
 pub trait Document: Send + Sync + Clone + 'static {}
@@ -307,6 +308,16 @@ impl<'doc, O: ByteOrder, D: Document> ImmutableValue<'doc, O, D> {
                 _ => None,
             },
         )
+    }
+
+    #[inline]
+    pub fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>> {
+        write_value_to_vec::<D, O, TARGET>(self)
+    }
+
+    #[inline]
+    pub fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        write_value_to_writer::<D, O, TARGET>(self, writer)
     }
 }
 

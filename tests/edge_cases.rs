@@ -1,6 +1,6 @@
 //! Edge case tests for errors and boundaries
 
-use na_nbt::{Error, read_borrowed, read_owned, write_value_to_writer};
+use na_nbt::{Error, ScopedReadableValue as _, read_borrowed, read_owned};
 use std::io::{self, Write};
 use zerocopy::byteorder::BigEndian as BE;
 
@@ -92,7 +92,7 @@ fn test_write_writer_io_error() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut w = BadWriter;
-    let res = write_value_to_writer::<_, BE, BE, _>(&mut w, &root);
+    let res = root.write_to_writer::<BE>(&mut w);
     assert!(matches!(res.unwrap_err(), Error::IO(_)));
 }
 

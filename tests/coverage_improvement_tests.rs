@@ -5,7 +5,7 @@ use na_nbt::{
     OwnedCompound, OwnedList, OwnedValue, ReadableCompound, ReadableList, ReadableValue,
     ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, ScopedWritableCompound,
     ScopedWritableList, ScopedWritableValue, Tag, Value, ValueScoped, WritableValue, read_borrowed,
-    read_owned, read_shared, write_value_to_vec, write_value_to_writer,
+    read_owned, read_shared,
 };
 use zerocopy::byteorder::{BigEndian as BE, I32, I64, LittleEndian as LE};
 
@@ -459,7 +459,7 @@ fn test_write_le_to_be() {
     data.extend_from_slice(&0x12345678i32.to_le_bytes());
     let doc = read_borrowed::<LE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, LE, BE>(&root).unwrap();
+    let written = root.write_to_vec::<BE>().unwrap();
     let doc_be = read_borrowed::<BE>(&written).unwrap();
     assert_eq!(doc_be.root().as_int(), Some(0x12345678));
 }
@@ -472,7 +472,7 @@ fn test_write_be_to_le_int_array() {
     data.extend_from_slice(&0x55667788i32.to_be_bytes());
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     let root_le = doc_le.root();
     let arr = root_le.as_int_array().unwrap();
@@ -487,7 +487,7 @@ fn test_write_be_to_le_long_array() {
     data.extend_from_slice(&0x1122334455667788i64.to_be_bytes());
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     let root_le = doc_le.root();
     let arr = root_le.as_long_array().unwrap();
@@ -557,7 +557,7 @@ fn test_write_to_writer_end() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, BE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<BE>(&mut cursor).unwrap();
     assert_eq!(cursor.into_inner(), vec![0x00]);
 }
 
@@ -567,7 +567,7 @@ fn test_write_to_writer_byte() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, BE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<BE>(&mut cursor).unwrap();
     let written = cursor.into_inner();
     assert_eq!(written[3], 42);
 }
@@ -579,7 +579,7 @@ fn test_write_to_writer_short_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<LE>(&mut cursor).unwrap();
     let written = cursor.into_inner();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     assert_eq!(doc_le.root().as_short(), Some(1234));
@@ -595,7 +595,7 @@ fn test_write_to_writer_list_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<LE>(&mut cursor).unwrap();
     let written = cursor.into_inner();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     let root_le = doc_le.root();
@@ -616,7 +616,7 @@ fn test_write_to_writer_compound_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<LE>(&mut cursor).unwrap();
     let written = cursor.into_inner();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     assert_eq!(
@@ -640,7 +640,7 @@ fn test_write_to_writer_int_array_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<LE>(&mut cursor).unwrap();
     let written = cursor.into_inner();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     let root_le = doc_le.root();
@@ -657,7 +657,7 @@ fn test_write_to_writer_long_array_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<LE>(&mut cursor).unwrap();
     let written = cursor.into_inner();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     assert_eq!(doc_le.root().as_long_array().unwrap()[0].get(), 999);
@@ -685,7 +685,7 @@ fn test_write_empty_list() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut cursor = std::io::Cursor::new(Vec::new());
-    write_value_to_writer::<_, BE, LE, _>(&mut cursor, &root).unwrap();
+    root.write_to_writer::<LE>(&mut cursor).unwrap();
     let written = cursor.into_inner();
     let doc_le = read_borrowed::<LE>(&written).unwrap();
     assert!(doc_le.root().as_list().unwrap().is_empty());
@@ -1509,7 +1509,7 @@ fn test_write_be_to_le_conversion_with_all_types() {
     // Read as BE, write as LE
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     // Read back as LE and verify values
     let doc2 = read_borrowed::<LE>(&written).unwrap();
@@ -1589,7 +1589,7 @@ fn test_write_be_to_le_with_nested_list() {
 
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     let doc2 = read_borrowed::<LE>(&written).unwrap();
     let root2 = doc2.root();
@@ -1628,7 +1628,7 @@ fn test_write_be_to_le_with_list_of_byte_arrays() {
 
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     let doc2 = read_borrowed::<LE>(&written).unwrap();
     let root2 = doc2.root();
@@ -1658,7 +1658,7 @@ fn test_write_be_to_le_with_list_of_strings() {
 
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     let doc2 = read_borrowed::<LE>(&written).unwrap();
     let root2 = doc2.root();
@@ -1690,7 +1690,7 @@ fn test_write_be_to_le_with_list_of_lists() {
 
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     let doc2 = read_borrowed::<LE>(&written).unwrap();
     let root2 = doc2.root();
@@ -1726,7 +1726,7 @@ fn test_write_be_to_le_with_list_of_compounds() {
 
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     let doc2 = read_borrowed::<LE>(&written).unwrap();
     let root2 = doc2.root();
@@ -1757,7 +1757,7 @@ fn test_write_be_to_le_with_list_of_int_arrays() {
 
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     let doc2 = read_borrowed::<LE>(&written).unwrap();
     let root2 = doc2.root();
@@ -1788,7 +1788,7 @@ fn test_write_be_to_le_with_list_of_long_arrays() {
 
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let written = write_value_to_vec::<_, BE, LE>(&root).unwrap();
+    let written = root.write_to_vec::<LE>().unwrap();
 
     let doc2 = read_borrowed::<LE>(&written).unwrap();
     let root2 = doc2.root();
@@ -1825,7 +1825,7 @@ fn test_write_to_writer_be_to_le() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut buffer = Vec::new();
-    write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
+    root.write_to_writer::<LE>(&mut buffer).unwrap();
 
     let doc2 = read_borrowed::<LE>(&buffer).unwrap();
     let root2 = doc2.root();
@@ -1854,7 +1854,7 @@ fn test_write_to_writer_with_nested_compounds() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut buffer = Vec::new();
-    write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
+    root.write_to_writer::<LE>(&mut buffer).unwrap();
 
     let doc2 = read_borrowed::<LE>(&buffer).unwrap();
     let root2 = doc2.root();
@@ -1882,7 +1882,7 @@ fn test_write_to_writer_with_list_conversions() {
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
     let mut buffer = Vec::new();
-    write_value_to_writer::<_, BE, LE, _>(&mut buffer, &root).unwrap();
+    root.write_to_writer::<LE>(&mut buffer).unwrap();
 
     let doc2 = read_borrowed::<LE>(&buffer).unwrap();
     let root2 = doc2.root();

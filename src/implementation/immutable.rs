@@ -96,7 +96,7 @@ impl SharedDocument {
     }
 }
 
-pub fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>(
+pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>(
     value: &value::ImmutableValue<'s, SOURCE, D>,
 ) -> Result<Vec<u8>> {
     unsafe {
@@ -284,15 +284,14 @@ pub fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARGET: Byt
     }
 }
 
-pub fn write_value_to_writer<
+pub(crate) fn write_value_to_writer<
     's,
     D: value::Document,
     SOURCE: ByteOrder,
     TARGET: ByteOrder,
-    W: Write,
 >(
-    mut writer: W,
     value: &value::ImmutableValue<'s, SOURCE, D>,
+    mut writer: impl Write,
 ) -> Result<()> {
     unsafe {
         match value {
@@ -375,9 +374,9 @@ pub fn write_value_to_writer<
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     writer.write_all(value.data.as_bytes()).map_err(Error::IO)
                 } else {
-                    let size_written = write::write_list_to_writer_fallback::<SOURCE, TARGET, W>(
-                        value.data.as_ptr(),
+                    let size_written = write::write_list_to_writer_fallback::<SOURCE, TARGET>(
                         &mut writer,
+                        value.data.as_ptr(),
                     )?;
                     debug_assert!(size_written == value.data.len());
                     Ok(())
@@ -390,9 +389,9 @@ pub fn write_value_to_writer<
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     writer.write_all(value.data.as_bytes()).map_err(Error::IO)
                 } else {
-                    let size_written = write::write_compound_to_writer_fallback::<SOURCE, TARGET, W>(
-                        value.data.as_ptr(),
+                    let size_written = write::write_compound_to_writer_fallback::<SOURCE, TARGET>(
                         &mut writer,
+                        value.data.as_ptr(),
                     )?;
                     debug_assert!(size_written == value.data.len());
                     Ok(())
@@ -445,4 +444,3 @@ pub fn write_value_to_writer<
         }
     }
 }
-// todo: Read & Write trait

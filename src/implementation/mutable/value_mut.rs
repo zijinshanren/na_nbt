@@ -1,10 +1,10 @@
-use std::marker::PhantomData;
+use std::{io::Write, marker::PhantomData};
 
 use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
-    OwnedValue, Tag,
+    OwnedValue, Result, ScopedReadableValue as _, Tag,
     implementation::mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
         util::{
@@ -15,6 +15,7 @@ use crate::{
     },
     index::Index,
     view::{StringViewMut, VecViewMut},
+    write_owned_to_vec,
 };
 
 pub enum MutableValue<'s, O: ByteOrder> {
@@ -312,6 +313,16 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
                 _ => None,
             },
         )
+    }
+
+    #[inline]
+    pub fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>> {
+        self.visit_scoped(|value| write_owned_to_vec::<O, TARGET>(value))
+    }
+
+    #[inline]
+    pub fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        todo!()
     }
 }
 
