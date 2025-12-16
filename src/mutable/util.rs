@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue, Tag, cold_path,
-    implementation::mutable::iter::{
+    mutable::iter::{
         ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
     },
     view::{StringViewOwn, VecViewMut, VecViewOwn},

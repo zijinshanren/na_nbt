@@ -1,6 +1,6 @@
 use zerocopy::byteorder;
 
-use crate::{Tag, implementation::immutable::mark::Mark, util::ByteOrder};
+use crate::{Tag, immutable::mark::Mark, util::ByteOrder};
 
 pub unsafe fn tag_size<O: ByteOrder>(
     tag_id: Tag,

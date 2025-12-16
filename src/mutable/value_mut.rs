@@ -5,7 +5,8 @@ use zerocopy::byteorder;
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
     OwnedValue, Result, ScopedReadableValue as _, Tag,
-    implementation::mutable::{
+    index::Index,
+    mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
         util::{
             SIZE_USIZE, compound_get, compound_get_mut, compound_iter, compound_iter_mut,
@@ -13,7 +14,6 @@ use crate::{
             list_len, list_pop, list_remove, list_tag_id,
         },
     },
-    index::Index,
     view::{StringViewMut, VecViewMut},
     write_owned_to_vec, write_owned_to_writer,
 };

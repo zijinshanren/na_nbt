@@ -4,14 +4,14 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, Result, ScopedReadableValue as _, Tag,
-    implementation::mutable::{
+    index::Index,
+    mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter},
         util::{
             SIZE_USIZE, compound_get, compound_iter, list_get, list_is_empty, list_iter, list_len,
             list_tag_id,
         },
     },
-    index::Index,
     write_owned_to_vec, write_owned_to_writer,
 };
 

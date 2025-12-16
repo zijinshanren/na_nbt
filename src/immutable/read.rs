@@ -4,7 +4,7 @@ use zerocopy::{ByteOrder, byteorder};
 
 use crate::{
     Error, Result, cold_path,
-    implementation::immutable::mark::{Cache, Mark},
+    immutable::mark::{Cache, Mark},
 };
 
 pub unsafe fn read_unsafe<O: ByteOrder, R>(

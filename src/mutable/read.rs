@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, Error, OwnedCompound, OwnedList, OwnedValue, Result, Tag, cold_path,
-    implementation::mutable::util::{SIZE_DYN, tag_size},
+    mutable::util::{SIZE_DYN, tag_size},
     view::{StringViewOwn, VecViewOwn},
 };
 

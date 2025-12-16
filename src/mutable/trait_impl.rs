@@ -1,17 +1,14 @@
 use std::{io::Write, marker::PhantomData};
 
 use crate::{
-    ByteOrder, ReadableCompound, ReadableConfig, ReadableList, ReadableString, ReadableValue,
-    Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, Value,
-    ValueScoped,
-    implementation::immutable::value::{
-        Document, ImmutableCompound, ImmutableCompoundIter, ImmutableList, ImmutableListIter,
-        ImmutableString, ImmutableValue,
-    },
+    ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, ReadableCompound,
+    ReadableConfig, ReadableList, ReadableString, ReadableValue, Result, ScopedReadableCompound,
+    ScopedReadableList, ScopedReadableValue, Tag, Value, ValueScoped,
     index::Index,
+    mutable::iter::{ImmutableCompoundIter, ImmutableListIter},
 };
 
-impl<'doc, D: Document> ReadableString<'doc> for ImmutableString<'doc, D> {
+impl<'doc> ReadableString<'doc> for ImmutableString<'doc> {
     #[inline]
     fn raw_bytes(&self) -> &[u8] {
         self.raw_bytes()
@@ -23,22 +20,22 @@ impl<'doc, D: Document> ReadableString<'doc> for ImmutableString<'doc, D> {
     }
 }
 
-pub struct Config<O: ByteOrder, D: Document> {
-    _marker: PhantomData<(O, D)>,
+pub struct Config<O: ByteOrder> {
+    _marker: PhantomData<O>,
 }
 
-impl<O: ByteOrder, D: Document> ReadableConfig for Config<O, D> {
+impl<O: ByteOrder> ReadableConfig for Config<O> {
     type ByteOrder = O;
-    type Value<'doc> = ImmutableValue<'doc, O, D>;
-    type String<'doc> = ImmutableString<'doc, D>;
-    type List<'doc> = ImmutableList<'doc, O, D>;
-    type ListIter<'doc> = ImmutableListIter<'doc, O, D>;
-    type Compound<'doc> = ImmutableCompound<'doc, O, D>;
-    type CompoundIter<'doc> = ImmutableCompoundIter<'doc, O, D>;
+    type Value<'doc> = ImmutableValue<'doc, O>;
+    type String<'doc> = ImmutableString<'doc>;
+    type List<'doc> = ImmutableList<'doc, O>;
+    type ListIter<'doc> = ImmutableListIter<'doc, O>;
+    type Compound<'doc> = ImmutableCompound<'doc, O>;
+    type CompoundIter<'doc> = ImmutableCompoundIter<'doc, O>;
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ImmutableValue<'doc, O, D> {
-    type Config = Config<O, D>;
+impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
+    type Config = Config<O>;
 
     #[inline]
     fn tag_id(&self) -> Tag {
@@ -220,12 +217,12 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ImmutableVal
             ImmutableValue::Long(value) => match_fn(ValueScoped::Long(*value)),
             ImmutableValue::Float(value) => match_fn(ValueScoped::Float(*value)),
             ImmutableValue::Double(value) => match_fn(ValueScoped::Double(*value)),
-            ImmutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value.as_slice())),
+            ImmutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
             ImmutableValue::String(value) => match_fn(ValueScoped::String(value.clone())),
             ImmutableValue::List(value) => match_fn(ValueScoped::List(value.clone())),
             ImmutableValue::Compound(value) => match_fn(ValueScoped::Compound(value.clone())),
-            ImmutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value.as_slice())),
-            ImmutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value.as_slice())),
+            ImmutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value)),
+            ImmutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value)),
         }
     }
 
@@ -240,7 +237,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ImmutableVal
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ImmutableValue<'doc, O, D> {
+impl<'doc, O: ByteOrder> ReadableValue<'doc> for ImmutableValue<'doc, O> {
     #[inline]
     fn as_string<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::String<'doc>>
     where
@@ -285,18 +282,18 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ImmutableValue<'do
             ImmutableValue::Long(value) => match_fn(Value::Long(*value)),
             ImmutableValue::Float(value) => match_fn(Value::Float(*value)),
             ImmutableValue::Double(value) => match_fn(Value::Double(*value)),
-            ImmutableValue::ByteArray(value) => match_fn(Value::ByteArray(value.as_slice())),
+            ImmutableValue::ByteArray(value) => match_fn(Value::ByteArray(value)),
             ImmutableValue::String(value) => match_fn(Value::String(value)),
             ImmutableValue::List(value) => match_fn(Value::List(value)),
             ImmutableValue::Compound(value) => match_fn(Value::Compound(value)),
-            ImmutableValue::IntArray(value) => match_fn(Value::IntArray(value.as_slice())),
-            ImmutableValue::LongArray(value) => match_fn(Value::LongArray(value.as_slice())),
+            ImmutableValue::IntArray(value) => match_fn(Value::IntArray(value)),
+            ImmutableValue::LongArray(value) => match_fn(Value::LongArray(value)),
         }
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ImmutableList<'doc, O, D> {
-    type Config = Config<O, D>;
+impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for ImmutableList<'doc, O> {
+    type Config = Config<O>;
 
     #[inline]
     fn tag_id(&self) -> Tag {
@@ -330,7 +327,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ImmutableList
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ImmutableList<'doc, O, D> {
+impl<'doc, O: ByteOrder> ReadableList<'doc> for ImmutableList<'doc, O> {
     #[inline]
     fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'doc>> {
         self.get(index)
@@ -342,10 +339,8 @@ impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ImmutableList<'doc,
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
-    for ImmutableCompound<'doc, O, D>
-{
-    type Config = Config<O, D>;
+impl<'doc, O: ByteOrder> ScopedReadableCompound<'doc> for ImmutableCompound<'doc, O> {
+    type Config = Config<O>;
 
     #[inline]
     fn get_scoped<'a>(&'a self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
@@ -364,7 +359,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableCompound<'doc> for ImmutableCompound<'doc, O, D> {
+impl<'doc, O: ByteOrder> ReadableCompound<'doc> for ImmutableCompound<'doc, O> {
     #[inline]
     fn get(&self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'doc>> {
         self.get(key)

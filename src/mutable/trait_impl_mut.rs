@@ -4,15 +4,27 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, IntoOwnedValue, MutableCompound,
-    MutableList, OwnedCompound, OwnedList, OwnedValue, ReadableConfig, Result,
-    ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, ScopedWritableCompound,
-    ScopedWritableList, ScopedWritableValue, Tag, ValueMutScoped, ValueScoped, WritableConfig,
-    implementation::mutable::trait_impl::Config,
+    MutableList, MutableValue, OwnedValue, ReadableConfig, Result, ScopedReadableCompound,
+    ScopedReadableList, ScopedReadableValue, ScopedWritableCompound, ScopedWritableList,
+    ScopedWritableValue, Tag, ValueMut, ValueMutScoped, ValueScoped, WritableCompound,
+    WritableConfig, WritableList, WritableValue,
     index::Index,
+    mutable::{
+        iter::{MutableCompoundIter, MutableListIter},
+        trait_impl::Config,
+    },
     view::{StringViewMut, VecViewMut},
 };
 
-impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
+impl<O: ByteOrder> WritableConfig for Config<O> {
+    type ValueMut<'s> = MutableValue<'s, O>;
+    type ListMut<'s> = MutableList<'s, O>;
+    type ListIterMut<'s> = MutableListIter<'s, O>;
+    type CompoundMut<'s> = MutableCompound<'s, O>;
+    type CompoundIterMut<'s> = MutableCompoundIter<'s, O>;
+}
+
+impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
@@ -93,7 +105,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     #[inline]
     fn as_byte_array<'a>(&'a self) -> Option<&'a [i8]>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.as_byte_array()
     }
@@ -106,7 +118,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     #[inline]
     fn as_string_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::String<'a>>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.as_string()
     }
@@ -119,7 +131,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     #[inline]
     fn as_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::List<'a>>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.as_list()
     }
@@ -132,7 +144,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     #[inline]
     fn as_compound_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::Compound<'a>>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.as_compound()
     }
@@ -147,7 +159,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
         &'a self,
     ) -> Option<&'a [byteorder::I32<<Self::Config as ReadableConfig>::ByteOrder>]>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.as_int_array()
     }
@@ -162,7 +174,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
         &'a self,
     ) -> Option<&'a [byteorder::I64<<Self::Config as ReadableConfig>::ByteOrder>]>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.as_long_array()
     }
@@ -178,37 +190,37 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
         index: I,
     ) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.get(index)
     }
 
     fn visit_scoped<'a, R>(&'a self, match_fn: impl FnOnce(ValueScoped<'a, Self::Config>) -> R) -> R
     where
-        'static: 'a,
+        'doc: 'a,
     {
         match self {
-            OwnedValue::End => match_fn(ValueScoped::End),
-            OwnedValue::Byte(value) => match_fn(ValueScoped::Byte(*value)),
-            OwnedValue::Short(value) => match_fn(ValueScoped::Short(value.get())),
-            OwnedValue::Int(value) => match_fn(ValueScoped::Int(value.get())),
-            OwnedValue::Long(value) => match_fn(ValueScoped::Long(value.get())),
-            OwnedValue::Float(value) => match_fn(ValueScoped::Float(value.get())),
-            OwnedValue::Double(value) => match_fn(ValueScoped::Double(value.get())),
-            OwnedValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
-            OwnedValue::String(value) => match_fn(ValueScoped::String(ImmutableString {
+            MutableValue::End => match_fn(ValueScoped::End),
+            MutableValue::Byte(value) => match_fn(ValueScoped::Byte(**value)),
+            MutableValue::Short(value) => match_fn(ValueScoped::Short(value.get())),
+            MutableValue::Int(value) => match_fn(ValueScoped::Int(value.get())),
+            MutableValue::Long(value) => match_fn(ValueScoped::Long(value.get())),
+            MutableValue::Float(value) => match_fn(ValueScoped::Float(value.get())),
+            MutableValue::Double(value) => match_fn(ValueScoped::Double(value.get())),
+            MutableValue::ByteArray(value) => match_fn(ValueScoped::ByteArray(value)),
+            MutableValue::String(value) => match_fn(ValueScoped::String(ImmutableString {
                 data: value.as_mutf8_bytes(),
             })),
-            OwnedValue::List(value) => match_fn(ValueScoped::List(ImmutableList {
+            MutableValue::List(value) => match_fn(ValueScoped::List(ImmutableList {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             })),
-            OwnedValue::Compound(value) => match_fn(ValueScoped::Compound(ImmutableCompound {
+            MutableValue::Compound(value) => match_fn(ValueScoped::Compound(ImmutableCompound {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             })),
-            OwnedValue::IntArray(value) => match_fn(ValueScoped::IntArray(value)),
-            OwnedValue::LongArray(value) => match_fn(ValueScoped::LongArray(value)),
+            MutableValue::IntArray(value) => match_fn(ValueScoped::IntArray(value)),
+            MutableValue::LongArray(value) => match_fn(ValueScoped::LongArray(value)),
         }
     }
 
@@ -223,13 +235,13 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     }
 }
 
-impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
+impl<'s, O: ByteOrder> ScopedWritableValue<'s> for MutableValue<'s, O> {
     type ConfigMut = Config<O>;
 
     #[inline]
     fn as_byte_mut<'a>(&'a mut self) -> Option<&'a mut i8>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_byte_mut()
     }
@@ -249,7 +261,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<&'a mut byteorder::I16<<Self::ConfigMut as ReadableConfig>::ByteOrder>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_short_mut()
     }
@@ -269,7 +281,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<&'a mut byteorder::I32<<Self::ConfigMut as ReadableConfig>::ByteOrder>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_int_mut()
     }
@@ -289,7 +301,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<&'a mut byteorder::I64<<Self::ConfigMut as ReadableConfig>::ByteOrder>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_long_mut()
     }
@@ -309,7 +321,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<&'a mut byteorder::F32<<Self::ConfigMut as ReadableConfig>::ByteOrder>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_float_mut()
     }
@@ -329,7 +341,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<&'a mut byteorder::F64<<Self::ConfigMut as ReadableConfig>::ByteOrder>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_double_mut()
     }
@@ -347,7 +359,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
     #[inline]
     fn as_byte_array_mut_scoped<'a>(&'a mut self) -> Option<VecViewMut<'a, i8>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_byte_array_mut()
             .map(|value| unsafe { VecViewMut::new(value.ptr, value.len, value.cap) })
@@ -356,7 +368,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
     #[inline]
     fn as_string_mut_scoped<'a>(&'a mut self) -> Option<StringViewMut<'a>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_string_mut()
             .map(|value| unsafe { StringViewMut::new(value.ptr, value.len, value.cap) })
@@ -367,7 +379,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<<Self::ConfigMut as WritableConfig>::ListMut<'a>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_list_mut().map(|value| unsafe {
             MutableList {
@@ -382,7 +394,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<<Self::ConfigMut as WritableConfig>::CompoundMut<'a>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_compound_mut().map(|value| unsafe {
             MutableCompound {
@@ -397,7 +409,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<VecViewMut<'a, byteorder::I32<<Self::ConfigMut as ReadableConfig>::ByteOrder>>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_int_array_mut()
             .map(|value| unsafe { VecViewMut::new(value.ptr, value.len, value.cap) })
@@ -408,7 +420,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         &'a mut self,
     ) -> Option<VecViewMut<'a, byteorder::I64<<Self::ConfigMut as ReadableConfig>::ByteOrder>>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.as_long_array_mut()
             .map(|value| unsafe { VecViewMut::new(value.ptr, value.len, value.cap) })
@@ -420,7 +432,7 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         index: I,
     ) -> Option<<Self::ConfigMut as WritableConfig>::ValueMut<'a>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.get_mut(index)
     }
@@ -430,53 +442,131 @@ impl<O: ByteOrder> ScopedWritableValue<'static> for OwnedValue<O> {
         match_fn: impl FnOnce(ValueMutScoped<'a, Self::ConfigMut>) -> R,
     ) -> R
     where
-        'static: 'a,
+        's: 'a,
     {
         match self {
-            OwnedValue::End => match_fn(ValueMutScoped::End),
-            OwnedValue::Byte(value) => match_fn(ValueMutScoped::Byte(value)),
-            OwnedValue::Short(value) => match_fn(ValueMutScoped::Short(value)),
-            OwnedValue::Int(value) => match_fn(ValueMutScoped::Int(value)),
-            OwnedValue::Long(value) => match_fn(ValueMutScoped::Long(value)),
-            OwnedValue::Float(value) => match_fn(ValueMutScoped::Float(value)),
-            OwnedValue::Double(value) => match_fn(ValueMutScoped::Double(value)),
-            OwnedValue::ByteArray(value) => match_fn(ValueMutScoped::ByteArray(unsafe {
-                VecViewMut::new(&mut value.ptr, &mut value.len, &mut value.cap)
+            MutableValue::End => match_fn(ValueMutScoped::End),
+            MutableValue::Byte(value) => match_fn(ValueMutScoped::Byte(value)),
+            MutableValue::Short(value) => match_fn(ValueMutScoped::Short(value)),
+            MutableValue::Int(value) => match_fn(ValueMutScoped::Int(value)),
+            MutableValue::Long(value) => match_fn(ValueMutScoped::Long(value)),
+            MutableValue::Float(value) => match_fn(ValueMutScoped::Float(value)),
+            MutableValue::Double(value) => match_fn(ValueMutScoped::Double(value)),
+            MutableValue::ByteArray(value) => match_fn(ValueMutScoped::ByteArray(unsafe {
+                VecViewMut::new(value.ptr, value.len, value.cap)
             })),
-            OwnedValue::String(value) => match_fn(ValueMutScoped::String(unsafe {
-                StringViewMut::new(&mut value.ptr, &mut value.len, &mut value.cap)
+            MutableValue::String(value) => match_fn(ValueMutScoped::String(unsafe {
+                StringViewMut::new(value.ptr, value.len, value.cap)
             })),
-            OwnedValue::List(value) => match_fn(ValueMutScoped::List(unsafe {
+            MutableValue::List(value) => match_fn(ValueMutScoped::List(unsafe {
                 MutableList {
-                    data: VecViewMut::new(
-                        &mut value.data.ptr,
-                        &mut value.data.len,
-                        &mut value.data.cap,
-                    ),
+                    data: VecViewMut::new(value.data.ptr, value.data.len, value.data.cap),
                     _marker: PhantomData,
                 }
             })),
-            OwnedValue::Compound(value) => match_fn(ValueMutScoped::Compound(unsafe {
+            MutableValue::Compound(value) => match_fn(ValueMutScoped::Compound(unsafe {
                 MutableCompound {
-                    data: VecViewMut::new(
-                        &mut value.data.ptr,
-                        &mut value.data.len,
-                        &mut value.data.cap,
-                    ),
+                    data: VecViewMut::new(value.data.ptr, value.data.len, value.data.cap),
                     _marker: PhantomData,
                 }
             })),
-            OwnedValue::IntArray(value) => match_fn(ValueMutScoped::IntArray(unsafe {
-                VecViewMut::new(&mut value.ptr, &mut value.len, &mut value.cap)
+            MutableValue::IntArray(value) => match_fn(ValueMutScoped::IntArray(unsafe {
+                VecViewMut::new(value.ptr, value.len, value.cap)
             })),
-            OwnedValue::LongArray(value) => match_fn(ValueMutScoped::LongArray(unsafe {
-                VecViewMut::new(&mut value.ptr, &mut value.len, &mut value.cap)
+            MutableValue::LongArray(value) => match_fn(ValueMutScoped::LongArray(unsafe {
+                VecViewMut::new(value.ptr, value.len, value.cap)
             })),
         }
     }
 }
 
-impl<O: ByteOrder> ScopedReadableList<'static> for OwnedList<O> {
+impl<'s, O: ByteOrder> WritableValue<'s> for MutableValue<'s, O> {
+    #[inline]
+    fn as_byte_array_mut<'a>(&'a mut self) -> Option<&'a mut VecViewMut<'s, i8>>
+    where
+        's: 'a,
+    {
+        self.as_byte_array_mut()
+    }
+
+    #[inline]
+    fn as_string_mut<'a>(&'a mut self) -> Option<&'a mut StringViewMut<'s>>
+    where
+        's: 'a,
+    {
+        self.as_string_mut()
+    }
+
+    #[inline]
+    fn as_list_mut<'a>(
+        &'a mut self,
+    ) -> Option<&'a mut <Self::ConfigMut as WritableConfig>::ListMut<'s>>
+    where
+        's: 'a,
+    {
+        self.as_list_mut()
+    }
+
+    #[inline]
+    fn as_compound_mut<'a>(
+        &'a mut self,
+    ) -> Option<&'a mut <Self::ConfigMut as WritableConfig>::CompoundMut<'s>>
+    where
+        's: 'a,
+    {
+        self.as_compound_mut()
+    }
+
+    #[inline]
+    fn as_int_array_mut<'a>(
+        &'a mut self,
+    ) -> Option<
+        &'a mut VecViewMut<'s, byteorder::I32<<Self::ConfigMut as ReadableConfig>::ByteOrder>>,
+    >
+    where
+        's: 'a,
+    {
+        self.as_int_array_mut()
+    }
+
+    #[inline]
+    fn as_long_array_mut<'a>(
+        &'a mut self,
+    ) -> Option<
+        &'a mut VecViewMut<'s, byteorder::I64<<Self::ConfigMut as ReadableConfig>::ByteOrder>>,
+    >
+    where
+        's: 'a,
+    {
+        self.as_long_array_mut()
+    }
+
+    fn visit_mut<'a, R>(
+        &'a mut self,
+        match_fn: impl FnOnce(crate::ValueMut<'a, 's, Self::ConfigMut>) -> R,
+    ) -> R
+    where
+        's: 'a,
+    {
+        match self {
+            MutableValue::End => match_fn(ValueMut::End),
+            MutableValue::Byte(value) => match_fn(ValueMut::Byte(value)),
+            MutableValue::Short(value) => match_fn(ValueMut::Short(value)),
+            MutableValue::Int(value) => match_fn(ValueMut::Int(value)),
+            MutableValue::Long(value) => match_fn(ValueMut::Long(value)),
+            MutableValue::Float(value) => match_fn(ValueMut::Float(value)),
+            MutableValue::Double(value) => match_fn(ValueMut::Double(value)),
+            MutableValue::ByteArray(value) => match_fn(ValueMut::ByteArray(value)),
+            MutableValue::String(value) => match_fn(ValueMut::String(value)),
+            MutableValue::List(value) => match_fn(ValueMut::List(value)),
+            MutableValue::Compound(value) => match_fn(ValueMut::Compound(value)),
+            MutableValue::IntArray(value) => match_fn(ValueMut::IntArray(value)),
+            MutableValue::LongArray(value) => match_fn(ValueMut::LongArray(value)),
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for MutableList<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
@@ -497,7 +587,7 @@ impl<O: ByteOrder> ScopedReadableList<'static> for OwnedList<O> {
     #[inline]
     fn get_scoped<'a>(&'a self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.get(index)
     }
@@ -505,13 +595,13 @@ impl<O: ByteOrder> ScopedReadableList<'static> for OwnedList<O> {
     #[inline]
     fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::ListIter<'a>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.iter()
     }
 }
 
-impl<O: ByteOrder> ScopedWritableList<'static> for OwnedList<O> {
+impl<'s, O: ByteOrder> ScopedWritableList<'s> for MutableList<'s, O> {
     type ConfigMut = Config<O>;
 
     #[inline]
@@ -520,7 +610,7 @@ impl<O: ByteOrder> ScopedWritableList<'static> for OwnedList<O> {
         index: usize,
     ) -> Option<<Self::ConfigMut as WritableConfig>::ValueMut<'a>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.get_mut(index)
     }
@@ -528,7 +618,7 @@ impl<O: ByteOrder> ScopedWritableList<'static> for OwnedList<O> {
     #[inline]
     fn iter_mut<'a>(&'a mut self) -> <Self::ConfigMut as WritableConfig>::ListIterMut<'a>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.iter_mut()
     }
@@ -583,13 +673,15 @@ impl<O: ByteOrder> ScopedWritableList<'static> for OwnedList<O> {
     }
 }
 
-impl<O: ByteOrder> ScopedReadableCompound<'static> for OwnedCompound<O> {
+impl<'s, O: ByteOrder> WritableList<'s> for MutableList<'s, O> {}
+
+impl<'doc, O: ByteOrder> ScopedReadableCompound<'doc> for MutableCompound<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
     fn get_scoped<'a>(&'a self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.get(key)
     }
@@ -597,13 +689,13 @@ impl<O: ByteOrder> ScopedReadableCompound<'static> for OwnedCompound<O> {
     #[inline]
     fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::CompoundIter<'a>
     where
-        'static: 'a,
+        'doc: 'a,
     {
         self.iter()
     }
 }
 
-impl<O: ByteOrder> ScopedWritableCompound<'static> for OwnedCompound<O> {
+impl<'s, O: ByteOrder> ScopedWritableCompound<'s> for MutableCompound<'s, O> {
     type ConfigMut = Config<O>;
 
     #[inline]
@@ -612,7 +704,7 @@ impl<O: ByteOrder> ScopedWritableCompound<'static> for OwnedCompound<O> {
         key: &str,
     ) -> Option<<Self::ConfigMut as WritableConfig>::ValueMut<'a>>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.get_mut(key)
     }
@@ -620,7 +712,7 @@ impl<O: ByteOrder> ScopedWritableCompound<'static> for OwnedCompound<O> {
     #[inline]
     fn iter_mut<'a>(&'a mut self) -> <Self::ConfigMut as WritableConfig>::CompoundIterMut<'a>
     where
-        'static: 'a,
+        's: 'a,
     {
         self.iter_mut()
     }
@@ -642,3 +734,5 @@ impl<O: ByteOrder> ScopedWritableCompound<'static> for OwnedCompound<O> {
         self.remove(key)
     }
 }
+
+impl<'s, O: ByteOrder> WritableCompound<'s> for MutableCompound<'s, O> {}

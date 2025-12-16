@@ -2,7 +2,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, OwnedCompound, OwnedList, OwnedValue,
-    implementation::mutable::util::{
+    mutable::util::{
         compound_insert_byte, compound_insert_byte_array, compound_insert_compound,
         compound_insert_double, compound_insert_end, compound_insert_float, compound_insert_int,
         compound_insert_int_array, compound_insert_list, compound_insert_long,
@@ -31,7 +31,7 @@ use crate::{
 
 mod private {
 
-    use crate::{ByteOrder, implementation::mutable::OwnedValue};
+    use crate::{ByteOrder, mutable::OwnedValue};
 
     pub trait Sealed<O: ByteOrder> {}
     impl<T: Into<OwnedValue<O>>, O: ByteOrder> Sealed<O> for T {}

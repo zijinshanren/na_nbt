@@ -21,7 +21,7 @@ use zerocopy::{IntoBytes, byteorder};
 
 use crate::{
     ByteOrder, Error, Result, Tag, ValueScoped, cold_path,
-    implementation::mutable::{
+    mutable::{
         read::{read_unsafe, read_unsafe_fallback},
         trait_impl::Config,
         write::{

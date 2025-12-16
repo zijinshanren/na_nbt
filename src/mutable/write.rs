@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, Error, Result, Tag, cold_path,
-    implementation::mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
+    mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
 };
 
 macro_rules! change_endian {

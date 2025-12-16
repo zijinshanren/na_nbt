@@ -5,7 +5,7 @@ use zerocopy::byteorder;
 use crate::{
     ByteOrder, ImmutableString, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue,
     Tag, cold_path,
-    implementation::mutable::util::tag_size,
+    mutable::util::tag_size,
     view::{StringViewOwn, VecViewOwn},
 };
 

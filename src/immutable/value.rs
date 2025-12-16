@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, Result, Tag, cold_path,
-    implementation::immutable::{mark::Mark, util::tag_size},
+    immutable::{mark::Mark, util::tag_size},
     index::Index,
     write_value_to_vec, write_value_to_writer,
 };
