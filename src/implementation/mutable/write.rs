@@ -7,6 +7,12 @@ use crate::{
     implementation::mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
 };
 
+macro_rules! change_endian {
+    ($value:expr, $type:ident, $from:ident, $to:ident) => {
+        byteorder::$type::<$to>::new(byteorder::$type::<$from>::from_bytes($value).get())
+    };
+}
+
 #[inline(always)]
 pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -> Result<()> {
     unsafe {
@@ -39,7 +45,7 @@ pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8
                 let raw_len = data.byte_offset_from_unsigned(start);
                 let old_len = out.len();
                 out.reserve(raw_len);
-                ptr::copy(start, out.as_mut_ptr().add(old_len), raw_len);
+                ptr::copy_nonoverlapping(start, out.as_mut_ptr().add(old_len), raw_len);
                 out.set_len(old_len + raw_len);
                 write_unsafe_impl::<O>(tag_id, data, out)?;
                 data = data.add(SIZE_DYN);
@@ -55,7 +61,7 @@ pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -
         let tag_id = list_tag_id(data);
         let len = list_len::<O>(data);
         if tag_id.is_primitive() {
-            out.extend_from_slice(slice::from_raw_parts(data, tag_size(tag_id) * len));
+            out.extend_from_slice(slice::from_raw_parts(data, 1 + 4 + tag_size(tag_id) * len));
         } else {
             out.extend_from_slice(slice::from_raw_parts(data, 1 + 4));
             data = data.add(1 + 4);
@@ -84,7 +90,7 @@ pub unsafe fn write_unsafe_impl<O: ByteOrder>(
                 let write_ptr = out.as_mut_ptr().add(old_len);
                 ptr::write(
                     write_ptr.cast(),
-                    byteorder::U32::<O>::from(len as u32).to_bytes(),
+                    byteorder::U32::<O>::new(len as u32).to_bytes(),
                 );
                 ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len);
                 out.set_len(old_len + len_bytes);
@@ -98,7 +104,7 @@ pub unsafe fn write_unsafe_impl<O: ByteOrder>(
                 let write_ptr = out.as_mut_ptr().add(old_len);
                 ptr::write(
                     write_ptr.cast(),
-                    byteorder::U16::<O>::from(len as u16).to_bytes(),
+                    byteorder::U16::<O>::new(len as u16).to_bytes(),
                 );
                 ptr::copy_nonoverlapping(ptr, write_ptr.add(2), len);
                 out.set_len(old_len + len_bytes);
@@ -120,7 +126,7 @@ pub unsafe fn write_unsafe_impl<O: ByteOrder>(
                 let write_ptr = out.as_mut_ptr().add(old_len);
                 ptr::write(
                     write_ptr.cast(),
-                    byteorder::U32::<O>::from(len as u32).to_bytes(),
+                    byteorder::U32::<O>::new(len as u32).to_bytes(),
                 );
                 ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len * 4);
                 out.set_len(old_len + len_bytes)
@@ -134,9 +140,304 @@ pub unsafe fn write_unsafe_impl<O: ByteOrder>(
                 let write_ptr = out.as_mut_ptr().add(old_len);
                 ptr::write(
                     write_ptr.cast(),
-                    byteorder::U32::<O>::from(len as u32).to_bytes(),
+                    byteorder::U32::<O>::new(len as u32).to_bytes(),
                 );
                 ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len * 8);
+                out.set_len(old_len + len_bytes);
+            }
+            _ => unreachable_unchecked(),
+        }
+        Ok(())
+    }
+}
+
+#[inline(always)]
+pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
+    mut data: *const u8,
+    out: &mut Vec<u8>,
+) -> Result<()> {
+    unsafe {
+        loop {
+            let start = data;
+            let tag_id = Tag::from_u8_unchecked(*data);
+            data = data.add(1);
+
+            if tag_id == Tag::End {
+                cold_path();
+                out.push(0);
+                return Ok(());
+            }
+
+            let name_len = byteorder::U16::<O>::from_bytes(*data.cast()).get() as usize;
+            data = data.add(2 + name_len);
+
+            match tag_id {
+                Tag::End => unreachable_unchecked(),
+                Tag::Byte => {
+                    let old_len = out.len();
+                    let head_len = 1 + 2 + name_len;
+                    out.reserve(head_len + 1);
+                    let write_ptr = out.as_mut_ptr().add(old_len);
+                    ptr::copy_nonoverlapping(start, write_ptr, head_len + 1);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    out.set_len(old_len + head_len + 1);
+                    data = data.add(1);
+                }
+                Tag::Short => {
+                    let old_len = out.len();
+                    let head_len = 1 + 2 + name_len;
+                    out.reserve(head_len + 2);
+                    let write_ptr = out.as_mut_ptr().add(old_len);
+                    ptr::copy_nonoverlapping(start, write_ptr, head_len);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    ptr::write(
+                        write_ptr.add(head_len).cast(),
+                        change_endian!(*data.cast(), U16, O, R).to_bytes(),
+                    );
+                    out.set_len(old_len + head_len + 2);
+                    data = data.add(2);
+                }
+                Tag::Int | Tag::Float => {
+                    let old_len = out.len();
+                    let head_len = 1 + 2 + name_len;
+                    out.reserve(head_len + 4);
+                    let write_ptr = out.as_mut_ptr().add(old_len);
+                    ptr::copy_nonoverlapping(start, write_ptr, head_len);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    ptr::write(
+                        write_ptr.add(head_len).cast(),
+                        change_endian!(*data.cast(), U32, O, R).to_bytes(),
+                    );
+                    out.set_len(old_len + head_len + 4);
+                    data = data.add(4);
+                }
+                Tag::Long | Tag::Double => {
+                    let old_len = out.len();
+                    let head_len = 1 + 2 + name_len;
+                    out.reserve(head_len + 8);
+                    let write_ptr = out.as_mut_ptr().add(old_len);
+                    ptr::copy_nonoverlapping(start, write_ptr, head_len);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    ptr::write(
+                        write_ptr.add(head_len).cast(),
+                        change_endian!(*data.cast(), U64, O, R).to_bytes(),
+                    );
+                    out.set_len(old_len + head_len + 8);
+                    data = data.add(8);
+                }
+                _ => {
+                    let old_len = out.len();
+                    let head_len = 1 + 2 + name_len;
+                    out.reserve(head_len);
+                    let write_ptr = out.as_mut_ptr().add(old_len);
+                    ptr::copy_nonoverlapping(start, write_ptr, head_len);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    out.set_len(old_len + head_len);
+                    write_unsafe_fallback_impl::<O, R>(tag_id, data, out)?;
+                    data = data.add(SIZE_DYN);
+                }
+            }
+        }
+    }
+}
+
+#[inline(always)]
+pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
+    mut data: *const u8,
+    out: &mut Vec<u8>,
+) -> Result<()> {
+    unsafe {
+        let tag_id = list_tag_id(data);
+        let len = list_len::<O>(data);
+        match tag_id {
+            Tag::End => {
+                let old_len = out.len();
+                out.reserve(1 + 4);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(write_ptr, *data); // tag byte
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                out.set_len(old_len + 1 + 4);
+            }
+            Tag::Byte => {
+                let old_len = out.len();
+                let len_bytes = 1 + 4 + len;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(write_ptr, *data); // tag byte
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(data.add(1 + 4), write_ptr.add(1 + 4), len);
+                out.set_len(old_len + len_bytes);
+            }
+            Tag::Short => {
+                let old_len = out.len();
+                let len_bytes = 1 + 4 + len * 2;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(write_ptr, *data); // tag byte
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(data.add(1 + 4), write_ptr.add(1 + 4), len * 2);
+                let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 2]>(), len);
+                for element in s {
+                    *element = change_endian!(*element, U16, O, R).to_bytes();
+                }
+                out.set_len(old_len + len_bytes);
+            }
+            Tag::Int | Tag::Float => {
+                let old_len = out.len();
+                let len_bytes = 1 + 4 + len * 4;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(write_ptr, *data); // tag byte
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(data.add(1 + 4), write_ptr.add(1 + 4), len * 4);
+                let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 4]>(), len);
+                for element in s {
+                    *element = change_endian!(*element, U32, O, R).to_bytes();
+                }
+                out.set_len(old_len + len_bytes);
+            }
+            Tag::Long | Tag::Double => {
+                let old_len = out.len();
+                let len_bytes = 1 + 4 + len * 8;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(write_ptr, *data); // tag byte
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(data.add(1 + 4), write_ptr.add(1 + 4), len * 8);
+                let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 8]>(), len);
+                for element in s {
+                    *element = change_endian!(*element, U64, O, R).to_bytes();
+                }
+                out.set_len(old_len + len_bytes);
+            }
+            _ => {
+                let old_len = out.len();
+                out.reserve(1 + 4);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(write_ptr, *data); // tag byte
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                out.set_len(old_len + 1 + 4);
+                data = data.add(1 + 4);
+                for _ in 0..len {
+                    write_unsafe_fallback_impl::<O, R>(tag_id, data, out)?;
+                    data = data.add(SIZE_DYN);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+pub unsafe fn write_unsafe_fallback_impl<O: ByteOrder, R: ByteOrder>(
+    tag_id: Tag,
+    data: *const u8,
+    out: &mut Vec<u8>,
+) -> Result<()> {
+    unsafe {
+        match tag_id {
+            Tag::ByteArray => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 4 + len;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len);
+                out.set_len(old_len + len_bytes);
+            }
+            Tag::String => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 2 + len;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U16::<R>::new(len as u16).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(2), len);
+                out.set_len(old_len + len_bytes);
+            }
+            Tag::List => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                write_list_fallback::<O, R>(ptr, out)?;
+            }
+            Tag::Compound => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                write_compound_fallback::<O, R>(ptr, out)?;
+            }
+            Tag::IntArray => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 4 + len * 4;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len * 4);
+                let s = slice::from_raw_parts_mut(write_ptr.add(4).cast::<[u8; 4]>(), len);
+                for element in s {
+                    *element = change_endian!(*element, U32, O, R).to_bytes();
+                }
+                out.set_len(old_len + len_bytes)
+            }
+            Tag::LongArray => {
+                let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
+                let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
+                let old_len = out.len();
+                let len_bytes = 4 + len * 8;
+                out.reserve(len_bytes);
+                let write_ptr = out.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                ptr::copy_nonoverlapping(ptr, write_ptr.add(4), len * 8);
+                let s = slice::from_raw_parts_mut(write_ptr.add(4).cast::<[u8; 8]>(), len);
+                for element in s {
+                    *element = change_endian!(*element, U64, O, R).to_bytes();
+                }
                 out.set_len(old_len + len_bytes);
             }
             _ => unreachable_unchecked(),

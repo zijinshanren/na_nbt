@@ -24,7 +24,7 @@ use crate::{
     implementation::mutable::{
         read::{read_unsafe, read_unsafe_fallback},
         trait_impl::Config,
-        write::{write_compound, write_list},
+        write::{write_compound, write_compound_fallback, write_list, write_list_fallback},
     },
 };
 
@@ -181,7 +181,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     write_list::<TARGET>(payload, &mut buf)?;
                 } else {
-                    todo!()
+                    write_list_fallback::<SOURCE, TARGET>(payload, &mut buf)?;
                 }
                 Ok(buf)
             }
@@ -194,7 +194,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     write_compound::<TARGET>(payload, &mut buf)?;
                 } else {
-                    todo!()
+                    write_compound_fallback::<SOURCE, TARGET>(payload, &mut buf)?;
                 }
                 Ok(buf)
             }
