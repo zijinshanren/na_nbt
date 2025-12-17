@@ -1,6 +1,6 @@
 //! Additional tests for OwnedList and OwnedCompound variants
 
-use na_nbt::{OwnedValue, ScopedReadableValue, Tag, ValueScoped, read_owned};
+use na_nbt::{OwnedValue, Tag, read_owned};
 use zerocopy::byteorder::{self, BigEndian as BE};
 
 fn create_string_list_nbt_be(values: &[&str]) -> Vec<u8> {

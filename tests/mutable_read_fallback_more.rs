@@ -73,7 +73,10 @@ fn test_read_fallback_arrays() {
 
     let owned = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
     if let OwnedValue::Compound(c) = owned {
-        assert_eq!(c.get("b").unwrap().as_byte_array(), Some(bytes.as_slice()));
+        assert_eq!(
+            c.get("b").unwrap().as_byte_array().cloned(),
+            Some(bytes.as_slice())
+        );
     } else {
         panic!("Expected compound");
     }

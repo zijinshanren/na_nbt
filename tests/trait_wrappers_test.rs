@@ -68,7 +68,7 @@ fn test_owned_value_trait_wrappers() {
     // 7. ByteArray
     let val = OwnedValue::<BE>::from(vec![1i8, 2, 3]);
     assert!(ScopedReadableValue::is_byte_array(&val));
-    assert_eq!(ScopedReadableValue::as_byte_array(&val), Some(&[1i8, 2, 3][..]));
+    assert_eq!(ScopedReadableValue::as_byte_array_scoped(&val), Some(&[1i8, 2, 3][..]));
     
     // 8. String
     let val = OwnedValue::<BE>::from("hello");
@@ -89,12 +89,12 @@ fn test_owned_value_trait_wrappers() {
     // 11. IntArray
     let val = OwnedValue::<BE>::from(vec![zerocopy::byteorder::I32::<BE>::new(1)]);
     assert!(ScopedReadableValue::is_int_array(&val));
-    assert!(ScopedReadableValue::as_int_array(&val).is_some());
+    assert!(ScopedReadableValue::as_int_array_scoped(&val).is_some());
 
     // 12. LongArray
     let val = OwnedValue::<BE>::from(vec![zerocopy::byteorder::I64::<BE>::new(1)]);
     assert!(ScopedReadableValue::is_long_array(&val));
-    assert!(ScopedReadableValue::as_long_array(&val).is_some());
+    assert!(ScopedReadableValue::as_long_array_scoped(&val).is_some());
 
     // 13. End
     let val = OwnedValue::<BE>::End;
@@ -337,7 +337,7 @@ fn test_owned_value_array_mut_access() {
     if let Some(mut view) = ScopedWritableValue::as_byte_array_mut_scoped(&mut val) {
         view[0] = 10;
     }
-    assert_eq!(ScopedReadableValue::as_byte_array(&val).unwrap()[0], 10);
+    assert_eq!(ScopedReadableValue::as_byte_array_scoped(&val).unwrap()[0], 10);
 
     // String
     let mut val = OwnedValue::<BE>::from("foo");
@@ -351,13 +351,13 @@ fn test_owned_value_array_mut_access() {
     if let Some(mut view) = ScopedWritableValue::as_int_array_mut_scoped(&mut val) {
         view[0].set(2);
     }
-    assert_eq!(ScopedReadableValue::as_int_array(&val).unwrap()[0].get(), 2);
+    assert_eq!(ScopedReadableValue::as_int_array_scoped(&val).unwrap()[0].get(), 2);
 
     // LongArray
     let mut val = OwnedValue::<BE>::from(vec![zerocopy::byteorder::I64::<BE>::new(1)]);
     if let Some(mut view) = ScopedWritableValue::as_long_array_mut_scoped(&mut val) {
         view[0].set(2);
     }
-    assert_eq!(ScopedReadableValue::as_long_array(&val).unwrap()[0].get(), 2);
+    assert_eq!(ScopedReadableValue::as_long_array_scoped(&val).unwrap()[0].get(), 2);
 }
 

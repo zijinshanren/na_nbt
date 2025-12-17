@@ -1,6 +1,6 @@
 //! Tests for write functions with endianness conversion - targeting write.rs coverage
 
-use na_nbt::{ScopedReadableValue as _, read_borrowed, read_owned};
+use na_nbt::{read_borrowed, read_owned};
 use std::io::Cursor;
 use zerocopy::byteorder::BigEndian as BE;
 use zerocopy::byteorder::LittleEndian as LE;

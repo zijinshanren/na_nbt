@@ -63,7 +63,7 @@ fn test_mutable_value_scoped_writable_traits() {
         if let Some(mut view) = ScopedWritableValue::as_byte_array_mut_scoped(&mut mv) {
             view[0] = 3;
         }
-        assert_eq!(ScopedReadableValue::as_byte_array(&mv).unwrap()[0], 3);
+        assert_eq!(ScopedReadableValue::as_byte_array_scoped(&mv).unwrap()[0], 3);
     } else { panic!("missing ba") }
     
     // 2. String
@@ -79,7 +79,7 @@ fn test_mutable_value_scoped_writable_traits() {
         if let Some(mut view) = ScopedWritableValue::as_int_array_mut_scoped(&mut mv) {
             view[0].set(20);
         }
-        assert_eq!(ScopedReadableValue::as_int_array(&mv).unwrap()[0].get(), 20);
+        assert_eq!(ScopedReadableValue::as_int_array_scoped(&mv).unwrap()[0].get(), 20);
     } else { panic!("missing ia") }
     
     // 4. LongArray
@@ -87,7 +87,7 @@ fn test_mutable_value_scoped_writable_traits() {
         if let Some(mut view) = ScopedWritableValue::as_long_array_mut_scoped(&mut mv) {
             view[0].set(200);
         }
-        assert_eq!(ScopedReadableValue::as_long_array(&mv).unwrap()[0].get(), 200);
+        assert_eq!(ScopedReadableValue::as_long_array_scoped(&mv).unwrap()[0].get(), 200);
     } else { panic!("missing la") }
 }
 

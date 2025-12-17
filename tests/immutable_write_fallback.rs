@@ -1,6 +1,6 @@
 //! Tests for immutable write fallbacks
 
-use na_nbt::{ScopedReadableValue as _, read_borrowed};
+use na_nbt::read_borrowed;
 use std::io::Cursor;
 use zerocopy::byteorder::{BigEndian, LittleEndian};
 

@@ -177,8 +177,8 @@ fn test_immutable_scoped_as_byte_array() {
     let data = create_byte_array_nbt(&[1, 2, 3, 4]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let arr = ScopedReadableValue::as_byte_array(&root).unwrap();
-    assert_eq!(arr, &[1, 2, 3, 4]);
+    let arr = ScopedReadableValue::as_byte_array_scoped(&root).unwrap();
+    assert_eq!(arr.as_slice(), &[1, 2, 3, 4]);
     assert!(ScopedReadableValue::is_byte_array(&root));
 }
 
@@ -218,7 +218,7 @@ fn test_immutable_scoped_as_int_array() {
     let data = create_int_array_nbt(&[10, 20, 30]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let arr = ScopedReadableValue::as_int_array(&root).unwrap();
+    let arr = ScopedReadableValue::as_int_array_scoped(&root).unwrap();
     assert_eq!(arr.len(), 3);
     assert!(ScopedReadableValue::is_int_array(&root));
 }
@@ -228,7 +228,7 @@ fn test_immutable_scoped_as_long_array() {
     let data = create_long_array_nbt(&[100, 200, 300]);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    let arr = ScopedReadableValue::as_long_array(&root).unwrap();
+    let arr = ScopedReadableValue::as_long_array_scoped(&root).unwrap();
     assert_eq!(arr.len(), 3);
     assert!(ScopedReadableValue::is_long_array(&root));
 }
@@ -317,7 +317,7 @@ fn test_owned_scoped_as_double() {
 fn test_owned_scoped_as_byte_array() {
     let data = create_byte_array_nbt(&[1, 2, 3, 4]);
     let owned = read_owned::<BE, BE>(&data).unwrap();
-    let arr = ScopedReadableValue::as_byte_array(&owned).unwrap();
+    let arr = ScopedReadableValue::as_byte_array_scoped(&owned).unwrap();
     assert_eq!(arr, &[1, 2, 3, 4]);
     assert!(ScopedReadableValue::is_byte_array(&owned));
 }
@@ -354,7 +354,7 @@ fn test_owned_scoped_as_compound() {
 fn test_owned_scoped_as_int_array() {
     let data = create_int_array_nbt(&[10, 20, 30]);
     let owned = read_owned::<BE, BE>(&data).unwrap();
-    let arr = ScopedReadableValue::as_int_array(&owned).unwrap();
+    let arr = ScopedReadableValue::as_int_array_scoped(&owned).unwrap();
     assert_eq!(arr.len(), 3);
     assert!(ScopedReadableValue::is_int_array(&owned));
 }
@@ -363,7 +363,7 @@ fn test_owned_scoped_as_int_array() {
 fn test_owned_scoped_as_long_array() {
     let data = create_long_array_nbt(&[100, 200, 300]);
     let owned = read_owned::<BE, BE>(&data).unwrap();
-    let arr = ScopedReadableValue::as_long_array(&owned).unwrap();
+    let arr = ScopedReadableValue::as_long_array_scoped(&owned).unwrap();
     assert_eq!(arr.len(), 3);
     assert!(ScopedReadableValue::is_long_array(&owned));
 }
@@ -415,12 +415,12 @@ fn test_immutable_type_mismatch_returns_none() {
     assert_eq!(ScopedReadableValue::as_long(&root), None);
     assert_eq!(ScopedReadableValue::as_float(&root), None);
     assert_eq!(ScopedReadableValue::as_double(&root), None);
-    assert!(ScopedReadableValue::as_byte_array(&root).is_none());
+    assert!(ScopedReadableValue::as_byte_array_scoped(&root).is_none());
     assert!(ScopedReadableValue::as_string_scoped(&root).is_none());
     assert!(ScopedReadableValue::as_list_scoped(&root).is_none());
     assert!(ScopedReadableValue::as_compound_scoped(&root).is_none());
-    assert!(ScopedReadableValue::as_int_array(&root).is_none());
-    assert!(ScopedReadableValue::as_long_array(&root).is_none());
+    assert!(ScopedReadableValue::as_int_array_scoped(&root).is_none());
+    assert!(ScopedReadableValue::as_long_array_scoped(&root).is_none());
     assert_eq!(ScopedReadableValue::as_end(&root), None);
 
     assert!(!ScopedReadableValue::is_short(&root));
@@ -447,12 +447,12 @@ fn test_owned_type_mismatch_returns_none() {
     assert_eq!(ScopedReadableValue::as_long(&owned), None);
     assert_eq!(ScopedReadableValue::as_float(&owned), None);
     assert_eq!(ScopedReadableValue::as_double(&owned), None);
-    assert!(ScopedReadableValue::as_byte_array(&owned).is_none());
+    assert!(ScopedReadableValue::as_byte_array_scoped(&owned).is_none());
     assert!(ScopedReadableValue::as_string_scoped(&owned).is_none());
     assert!(ScopedReadableValue::as_list_scoped(&owned).is_none());
     assert!(ScopedReadableValue::as_compound_scoped(&owned).is_none());
-    assert!(ScopedReadableValue::as_int_array(&owned).is_none());
-    assert!(ScopedReadableValue::as_long_array(&owned).is_none());
+    assert!(ScopedReadableValue::as_int_array_scoped(&owned).is_none());
+    assert!(ScopedReadableValue::as_long_array_scoped(&owned).is_none());
     assert_eq!(ScopedReadableValue::as_end(&owned), None);
 
     assert!(!ScopedReadableValue::is_short(&owned));

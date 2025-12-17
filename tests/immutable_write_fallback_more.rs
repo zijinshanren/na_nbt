@@ -1,4 +1,4 @@
-use na_nbt::{ScopedReadableValue as _, Tag, read_borrowed};
+use na_nbt::{Tag, read_borrowed};
 use std::io::Cursor;
 use zerocopy::byteorder::{BigEndian, LittleEndian};
 
@@ -328,7 +328,10 @@ fn test_write_compound_fallback_all_types() {
     assert_eq!(comp.get("l").unwrap().as_long(), Some(0x1122334455667788));
     assert_eq!(comp.get("f").unwrap().as_float(), Some(1.5));
     assert_eq!(comp.get("d").unwrap().as_double(), Some(1.5));
-    assert_eq!(comp.get("ba").unwrap().as_byte_array().unwrap(), &[1, 2]);
+    assert_eq!(
+        comp.get("ba").unwrap().as_byte_array().unwrap().as_slice(),
+        &[1, 2]
+    );
     assert_eq!(comp.get("st").unwrap().as_string().unwrap().decode(), "val");
     assert_eq!(comp.get("li").unwrap().as_list().unwrap().len(), 1);
     assert_eq!(

@@ -228,7 +228,7 @@ fn test_immutable_from_owned_as_byte_array() {
     let data = create_byte_array_nbt(&[1, 2, 3, 4, 5]);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    let arr = ScopedReadableValue::as_byte_array(&root).unwrap();
+    let arr = ScopedReadableValue::as_byte_array_scoped(&root).unwrap();
     assert_eq!(arr, &[1, 2, 3, 4, 5]);
     assert!(ScopedReadableValue::is_byte_array(&root));
 }
@@ -248,7 +248,7 @@ fn test_immutable_from_owned_as_int_array() {
     let data = create_int_array_nbt(&[1, 2, 3]);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    let arr = ScopedReadableValue::as_int_array(&root).unwrap();
+    let arr = ScopedReadableValue::as_int_array_scoped(&root).unwrap();
     assert_eq!(arr.len(), 3);
     assert!(ScopedReadableValue::is_int_array(&root));
 }
@@ -258,7 +258,7 @@ fn test_immutable_from_owned_as_long_array() {
     let data = create_long_array_nbt(&[1, 2, 3]);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    let arr = ScopedReadableValue::as_long_array(&root).unwrap();
+    let arr = ScopedReadableValue::as_long_array_scoped(&root).unwrap();
     assert_eq!(arr.len(), 3);
     assert!(ScopedReadableValue::is_long_array(&root));
 }
@@ -299,9 +299,9 @@ fn test_immutable_from_owned_type_mismatch() {
     assert!(ScopedReadableValue::as_string_scoped(&root).is_none());
     assert!(ScopedReadableValue::as_list_scoped(&root).is_none());
     assert!(ScopedReadableValue::as_compound_scoped(&root).is_none());
-    assert!(ScopedReadableValue::as_byte_array(&root).is_none());
-    assert!(ScopedReadableValue::as_int_array(&root).is_none());
-    assert!(ScopedReadableValue::as_long_array(&root).is_none());
+    assert!(ScopedReadableValue::as_byte_array_scoped(&root).is_none());
+    assert!(ScopedReadableValue::as_int_array_scoped(&root).is_none());
+    assert!(ScopedReadableValue::as_long_array_scoped(&root).is_none());
 }
 
 #[test]

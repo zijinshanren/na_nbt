@@ -1,6 +1,6 @@
 //! Tests for reading and writing NBT data
 
-use na_nbt::{ScopedReadableValue as _, read_borrowed};
+use na_nbt::read_borrowed;
 use zerocopy::byteorder::{BigEndian, LittleEndian};
 
 /// Helper to create a simple byte NBT document
@@ -199,7 +199,7 @@ fn test_read_byte_array() {
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
     let arr = root.as_byte_array().unwrap();
-    assert_eq!(arr, &[1, 2, 3, 4, 5]);
+    assert_eq!(arr.as_slice(), &[1, 2, 3, 4, 5]);
 }
 
 #[test]

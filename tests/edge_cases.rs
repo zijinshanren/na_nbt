@@ -1,6 +1,6 @@
 //! Edge case tests for errors and boundaries
 
-use na_nbt::{Error, ScopedReadableValue as _, read_borrowed, read_owned};
+use na_nbt::{Error, read_borrowed, read_owned};
 use std::io::{self, Write};
 use zerocopy::byteorder::BigEndian as BE;
 

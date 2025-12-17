@@ -64,6 +64,11 @@ pub enum ReadonlyValue<'doc, O: ByteOrder, D: Document> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     pub unsafe fn read(tag_id: Tag, data: *const u8, mark: *const Mark, doc: D) -> Self {
         unsafe {
             macro_rules! get {

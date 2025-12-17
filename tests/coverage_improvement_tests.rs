@@ -1092,19 +1092,19 @@ fn test_scoped_readable_value_as_methods_owned() {
 
     let ba_val = OwnedValue::<BE>::from(vec![1i8, 2, 3]);
     assert_eq!(
-        ScopedReadableValue::as_byte_array(&ba_val).map(|a| a.len()),
+        ScopedReadableValue::as_byte_array_scoped(&ba_val).map(|a| a.len()),
         Some(3)
     );
 
     let ia_val = OwnedValue::<BE>::from(vec![I32::<BE>::new(42)]);
     assert_eq!(
-        ScopedReadableValue::as_int_array(&ia_val).map(|a| a[0].get()),
+        ScopedReadableValue::as_int_array_scoped(&ia_val).map(|a| a[0].get()),
         Some(42)
     );
 
     let la_val = OwnedValue::<BE>::from(vec![I64::<BE>::new(99)]);
     assert_eq!(
-        ScopedReadableValue::as_long_array(&la_val).map(|a| a[0].get()),
+        ScopedReadableValue::as_long_array_scoped(&la_val).map(|a| a[0].get()),
         Some(99)
     );
 }
@@ -2073,7 +2073,7 @@ fn test_immutable_value_trait_all_as_methods() {
     assert!((d - std::f64::consts::PI).abs() < 0.000001);
 
     let ba_val = ScopedReadableValue::get_scoped(&root, "ba").unwrap();
-    let ba: &[i8] = ScopedReadableValue::as_byte_array(&ba_val).unwrap();
+    let ba = ScopedReadableValue::as_byte_array_scoped(&ba_val).unwrap();
     assert_eq!(ba.len(), 3);
 
     let st_val = ScopedReadableValue::get_scoped(&root, "st").unwrap();
@@ -2086,11 +2086,11 @@ fn test_immutable_value_trait_all_as_methods() {
     let _c = ScopedReadableValue::as_compound_scoped(&c_val).unwrap();
 
     let ia_val = ScopedReadableValue::get_scoped(&root, "ia").unwrap();
-    let ia = ScopedReadableValue::as_int_array(&ia_val).unwrap();
+    let ia = ScopedReadableValue::as_int_array_scoped(&ia_val).unwrap();
     assert_eq!(ia.len(), 2);
 
     let la_val = ScopedReadableValue::get_scoped(&root, "la").unwrap();
-    let la = ScopedReadableValue::as_long_array(&la_val).unwrap();
+    let la = ScopedReadableValue::as_long_array_scoped(&la_val).unwrap();
     assert_eq!(la.len(), 2);
 }
 
@@ -2422,7 +2422,7 @@ fn test_mutable_immutable_value_trait_as_methods() {
     assert!((d - std::f64::consts::PI).abs() < 0.000001);
 
     let ba_val = doc.get("ba").unwrap();
-    let ba: &[i8] = ScopedReadableValue::as_byte_array(&ba_val).unwrap();
+    let ba = ScopedReadableValue::as_byte_array_scoped(&ba_val).unwrap();
     assert_eq!(ba.len(), 3);
 
     let st_val = doc.get("st").unwrap();
@@ -2435,11 +2435,11 @@ fn test_mutable_immutable_value_trait_as_methods() {
     let _c = ScopedReadableValue::as_compound_scoped(&c_val).unwrap();
 
     let ia_val = doc.get("ia").unwrap();
-    let ia = ScopedReadableValue::as_int_array(&ia_val).unwrap();
+    let ia = ScopedReadableValue::as_int_array_scoped(&ia_val).unwrap();
     assert_eq!(ia.len(), 2);
 
     let la_val = doc.get("la").unwrap();
-    let la = ScopedReadableValue::as_long_array(&la_val).unwrap();
+    let la = ScopedReadableValue::as_long_array_scoped(&la_val).unwrap();
     assert_eq!(la.len(), 2);
 }
 
@@ -2762,7 +2762,7 @@ fn test_mutable_value_trait_all_as_methods() {
     assert!((d - std::f64::consts::PI).abs() < 0.000001);
 
     let ba_mv = doc.get_mut("ba").unwrap();
-    let ba: &[i8] = ScopedReadableValue::as_byte_array(&ba_mv).unwrap();
+    let ba: &[i8] = ScopedReadableValue::as_byte_array_scoped(&ba_mv).unwrap();
     assert_eq!(ba.len(), 3);
 
     let st_mv = doc.get_mut("st").unwrap();
@@ -2775,11 +2775,11 @@ fn test_mutable_value_trait_all_as_methods() {
     let _c = ScopedReadableValue::as_compound_scoped(&c_mv).unwrap();
 
     let ia_mv = doc.get_mut("ia").unwrap();
-    let ia = ScopedReadableValue::as_int_array(&ia_mv).unwrap();
+    let ia = ScopedReadableValue::as_int_array_scoped(&ia_mv).unwrap();
     assert_eq!(ia.len(), 2);
 
     let la_mv = doc.get_mut("la").unwrap();
-    let la = ScopedReadableValue::as_long_array(&la_mv).unwrap();
+    let la = ScopedReadableValue::as_long_array_scoped(&la_mv).unwrap();
     assert_eq!(la.len(), 2);
 }
 

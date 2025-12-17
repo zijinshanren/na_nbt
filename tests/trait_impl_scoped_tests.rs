@@ -1,4 +1,6 @@
-use na_nbt::{read_borrowed, read_owned, OwnedValue, ScopedReadableValue, ScopedWritableValue, ValueScoped};
+use na_nbt::{
+    OwnedValue, ScopedReadableValue, ScopedWritableValue, ValueScoped, read_borrowed, read_owned,
+};
 use zerocopy::byteorder::BigEndian as BE;
 
 fn create_all_primitives_be() -> Vec<u8> {
@@ -108,18 +110,23 @@ fn scoped_readable_arrays_immutable() {
 
     let ba = comp.get("ba").unwrap();
     assert!(ScopedReadableValue::is_byte_array(&ba));
-    assert_eq!(ScopedReadableValue::as_byte_array(&ba).unwrap(), &[1i8, 2i8]);
+    assert_eq!(
+        ScopedReadableValue::as_byte_array_scoped(&ba)
+            .unwrap()
+            .as_slice(),
+        &[1i8, 2i8]
+    );
 
     let ia = comp.get("ia").unwrap();
     assert!(ScopedReadableValue::is_int_array(&ia));
-    let ia_slice = ScopedReadableValue::as_int_array(&ia).unwrap();
+    let ia_slice = ScopedReadableValue::as_int_array_scoped(&ia).unwrap();
     assert_eq!(ia_slice.len(), 2);
     assert_eq!(ia_slice[0].get(), 3);
     assert_eq!(ia_slice[1].get(), 4);
 
     let la = comp.get("la").unwrap();
     assert!(ScopedReadableValue::is_long_array(&la));
-    let la_slice = ScopedReadableValue::as_long_array(&la).unwrap();
+    let la_slice = ScopedReadableValue::as_long_array_scoped(&la).unwrap();
     assert_eq!(la_slice.len(), 2);
     assert_eq!(la_slice[0].get(), 5);
     assert_eq!(la_slice[1].get(), 6);

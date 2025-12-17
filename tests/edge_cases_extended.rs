@@ -1,6 +1,5 @@
 //! Extended edge case tests - empty containers, boundary conditions, type mismatches
 
-use na_nbt::ScopedReadableValue as _;
 use na_nbt::{OwnedValue, read_borrowed, read_owned};
 use zerocopy::byteorder::BigEndian as BE;
 use zerocopy::byteorder::LittleEndian as LE;
