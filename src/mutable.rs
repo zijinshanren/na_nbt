@@ -1,3 +1,53 @@
+//! Owned and mutable NBT value types.
+//!
+//! This module contains the owned value types that can be modified after parsing.
+//! Unlike zero-copy types, these allocate memory and can outlive the source data.
+//!
+//! # Types
+//!
+//! ## Value Types
+//!
+//! - [`OwnedValue`] - Fully owned NBT value that can be modified
+//! - [`MutableValue`] - Mutable borrowed view into an `OwnedValue`
+//! - [`ImmutableValue`] - Immutable borrowed view into an `OwnedValue`
+//!
+//! ## Container Types
+//!
+//! - [`OwnedCompound`] / [`OwnedList`] - Owned compound and list types
+//! - [`MutableCompound`] / [`MutableList`] - Mutable views into compounds and lists
+//! - [`ImmutableCompound`] / [`ImmutableList`] / [`ImmutableString`] - Immutable views
+//!
+//! # When to Use
+//!
+//! Use owned types when you need to:
+//! - Modify NBT data after parsing
+//! - Keep values after the source bytes are dropped
+//! - Build NBT structures from scratch
+//! - Convert between endianness formats
+//!
+//! # Example
+//!
+//! ```
+//! use na_nbt::{read_owned, OwnedValue, OwnedCompound};
+//! use zerocopy::byteorder::BigEndian;
+//!
+//! // Parse existing NBT
+//! let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
+//! let mut root: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data).unwrap();
+//!
+//! // Modify the compound
+//! if let OwnedValue::Compound(ref mut compound) = root {
+//!     compound.insert("name", "Alex");
+//!     compound.insert("health", 20i32);
+//! }
+//!
+//! // Or build from scratch
+//! let mut compound: OwnedCompound<BigEndian> = OwnedCompound::default();
+//! compound.insert("x", 100i32);
+//! compound.insert("y", 64i32);
+//! compound.insert("z", -200i32);
+//! ```
+
 mod into_owned_value;
 mod iter;
 mod read;
@@ -32,29 +82,53 @@ use crate::{
     },
 };
 
-/// Reads an NBT document into an owned, mutable value.
+/// Parses NBT from bytes into an owned, mutable value.
 ///
-/// This function parses the NBT data and returns an [`OwnedValue`] that can be modified.
-/// It supports converting between different byte orders (e.g., reading BigEndian data into a LittleEndian structure).
+/// This function parses NBT data and returns an [`OwnedValue`] that can be
+/// modified. It supports converting between different byte orders during
+/// parsing.
 ///
 /// # Arguments
 ///
-/// * `source` - The byte slice containing the NBT data.
+/// * `source` - The byte slice containing NBT data
 ///
-/// # Generic Parameters
+/// # Type Parameters
 ///
-/// * `SOURCE`: The byte order of the input data.
-/// * `STORE`: The byte order to use for the in-memory representation.
-///
-/// # Performance
-///
-/// *   If `SOURCE == STORE`, there is a fast path for reading.
-/// *   If `STORE` matches the `TARGET` byte order used in `write_to` methods, there is a fast path for writing.
-/// *   Otherwise, a fallback implementation is used.
+/// * `SOURCE` - The byte order of the input data
+/// * `STORE` - The byte order for the in-memory representation
 ///
 /// # Returns
 ///
-/// A `Result` containing the parsed `OwnedValue` or an error.
+/// A `Result` containing the parsed `OwnedValue` or an [`Error`].
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::{read_owned, OwnedValue};
+/// use zerocopy::byteorder::{BigEndian, LittleEndian};
+///
+/// // Read Java Edition NBT (BigEndian) into native representation
+/// let data = [0x0a, 0x00, 0x00, 0x00];
+/// let value: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data)?;
+///
+/// // Convert from BigEndian source to LittleEndian storage
+/// let value: OwnedValue<LittleEndian> = read_owned::<BigEndian, LittleEndian>(&data)?;
+/// # Ok::<(), na_nbt::Error>(())
+/// ```
+///
+/// # Performance
+///
+/// - **Fast path**: When `SOURCE == STORE`, parsing is optimized
+/// - **Fallback**: When converting endianness, each value is converted individually
+///
+/// For best write performance, choose `STORE` to match your target format.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The data is truncated ([`Error::EndOfFile`])
+/// - An invalid tag type is encountered ([`Error::InvalidTagType`])
+/// - Extra data remains after parsing ([`Error::TrailingData`])
 pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<OwnedValue<STORE>> {
     unsafe {
         macro_rules! check_bounds {

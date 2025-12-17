@@ -1,58 +1,96 @@
 //! # na_nbt
 //!
-//! A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsing
-//! and full mutation support.
+//! NBT (Named Binary Tag) is a binary format used by Minecraft to store structured
+//! game data including worlds, player inventories, and entity information.
 //!
-//! ## Quick Start
+//! An NBT file contains a tree of typed, named values. For example, a simple
+//! player data structure might contain:
 //!
-//! ```rust
-//! use na_nbt::read_borrowed;
-//! use zerocopy::byteorder::BigEndian;
+//! | Tag Type | Name | Value |
+//! |----------|------|-------|
+//! | Compound | (root) | |
+//! | ├─ String | "name" | "Steve" |
+//! | ├─ Int | "score" | 100 |
+//! | └─ List | "inventory" | [Compound, ...] |
 //!
-//! let data = [
-//!     0x0a, 0x00, 0x00, // Compound with empty name
-//!     0x01, 0x00, 0x03, b'f', b'o', b'o', 42u8, // Byte "foo" = 42
-//!     0x00, // End
-//! ];
+//! There are three common ways to work with NBT data in Rust:
 //!
-//! let doc = read_borrowed::<BigEndian>(&data).unwrap();
-//! let root = doc.root();
+//! - **As raw bytes.** Binary NBT data you read from a file, receive over the
+//!   network, or prepare to send to a Minecraft client/server.
 //!
-//! if let Some(compound) = root.as_compound() {
-//!     if let Some(value) = compound.get("foo") {
-//!         assert_eq!(value.as_byte(), Some(42));
-//!     }
-//! }
-//! ```
+//! - **As a zero-copy representation.** When you need maximum performance for
+//!   read-only access, parsing directly from the source bytes without allocations.
 //!
-//! ## Two Parsing Modes
+//! - **As an owned mutable structure.** When you need to modify NBT data,
+//!   build structures from scratch, or keep values after the source is dropped.
+//!
+//! This crate provides efficient, flexible, and safe ways to work with each of
+//! these representations.
+//!
+//! # Reading NBT from bytes
+//!
+//! Any valid NBT data can be parsed into a value type. Choose the parsing mode
+//! based on your needs:
 //!
 //! | Mode | Function | Type | Use Case |
 //! |------|----------|------|----------|
-//! | **Zero-copy (borrowed)** | [`read_borrowed`] | [`BorrowedValue`] | Fast reads |
-//! | **Zero-copy (shared)** | [`read_shared`] | [`SharedValue`] | Don't want to be bothered with lifetimes |
-//! | **Owned** | [`read_owned`] | [`OwnedValue`] | Need to modify |
+//! | **Borrowed** | [`read_borrowed`] | [`BorrowedValue`] | Fast read-only access |
+//! | **Shared** | [`read_shared`] | [`SharedValue`] | Multi-threaded access |
+//! | **Owned** | [`read_owned`] | [`OwnedValue`] | Modification required |
 //!
-//! ### Zero-Copy Mode (Borrowed)
+//! ```
+//! use na_nbt::{Result, read_borrowed};
+//! use zerocopy::byteorder::BigEndian;
 //!
-//! Parses NBT without copying data. Values reference the original byte slice directly.
-//! Best for read-only access when performance matters.
+//! fn read_example() -> Result<()> {
+//!     // NBT binary data - maybe from a file or network
+//!     let data = [
+//!         0x0a, 0x00, 0x00,                           // Compound with empty name
+//!         0x01, 0x00, 0x05, b'l', b'e', b'v', b'e', b'l', 42u8, // Byte "level" = 42
+//!         0x00,                                       // End tag
+//!     ];
 //!
-//! ```rust
+//!     // Parse the NBT data
+//!     let doc = read_borrowed::<BigEndian>(&data)?;
+//!     let root = doc.root();
+//!
+//!     // Access data directly using get() on the value
+//!     // Returns None if root is not a compound or key doesn't exist
+//!     if let Some(level) = root.get("level") {
+//!         println!("Level: {}", level.as_byte().unwrap_or(0));
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! The result of methods like `as_compound()` returns an `Option` - `None` if
+//! the value is not the expected type. You can also use `get()` directly on
+//! any value, which will return `None` if the value is not indexable.
+//!
+//! # Zero-copy parsing (borrowed)
+//!
+//! For maximum read performance, use [`read_borrowed`]. The parsed values
+//! reference the original byte slice directly - no data is copied.
+//!
+//! ```
 //! use na_nbt::read_borrowed;
 //! use zerocopy::byteorder::BigEndian;
 //!
 //! let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
 //! let doc = read_borrowed::<BigEndian>(&data).unwrap();
 //! let root = doc.root(); // Zero-copy reference into `data`
+//!
+//! assert!(root.is_compound());
 //! ```
 //!
-//! ### Zero-Copy Mode (Shared)
+//! # Zero-copy parsing (shared)
 //!
-//! Like borrowed mode, but wraps data in `Arc` for shared ownership. Values are
-//! `Clone`, `Send`, `Sync`, and `'static` - perfect for multi-threaded scenarios.
+//! When you need to share NBT data across threads or don't want to deal with
+//! lifetimes, use [`read_shared`]. The data is wrapped in `Arc` for shared
+//! ownership.
 //!
-//! ```rust
+//! ```
 //! use na_nbt::read_shared;
 //! use bytes::Bytes;
 //! use zerocopy::byteorder::BigEndian;
@@ -60,66 +98,130 @@
 //! let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]);
 //! let root = read_shared::<BigEndian>(data).unwrap();
 //!
-//! // Can clone and send to other threads
+//! // Clone and send to another thread
 //! let cloned = root.clone();
 //! std::thread::spawn(move || {
 //!     assert!(cloned.as_compound().is_some());
 //! }).join().unwrap();
 //! ```
 //!
-//! ### Owned Mode
+//! # Owned parsing for mutation
 //!
-//! Parses NBT into an owned structure that can be modified and outlives the source.
-//! Supports endianness conversion during parsing.
+//! When you need to modify NBT data, use [`read_owned`]. This creates an
+//! owned structure that can be modified in place.
 //!
-//! ```rust
+//! ```
+//! use na_nbt::{read_owned, OwnedValue};
+//! use zerocopy::byteorder::BigEndian;
+//!
+//! let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
+//! let mut root: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data).unwrap();
+//!
+//! // Modify the value
+//! if let OwnedValue::Compound(ref mut compound) = root {
+//!     compound.insert("score", 100i32);
+//!     compound.insert("name", "Steve");
+//! }
+//! ```
+//!
+//! # Building NBT from scratch
+//!
+//! You can construct NBT values programmatically using the owned types:
+//!
+//! ```
+//! use na_nbt::{OwnedValue, OwnedCompound};
+//! use zerocopy::byteorder::BigEndian;
+//!
+//! // Create a compound from scratch
+//! let mut compound: OwnedCompound<BigEndian> = OwnedCompound::default();
+//! compound.insert("name", "Alex");
+//! compound.insert("health", 20i32);
+//! compound.insert("score", 100i64);
+//!
+//! let root = OwnedValue::Compound(compound);
+//! ```
+//!
+//! # Writing NBT to bytes
+//!
+//! All value types can be serialized back to NBT binary format:
+//!
+//! ```
 //! use na_nbt::{read_owned, OwnedValue};
 //! use zerocopy::byteorder::{BigEndian, LittleEndian};
 //!
 //! let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound (BigEndian)
+//! let root: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data).unwrap();
 //!
-//! // Convert from BigEndian source to LittleEndian storage
-//! let mut root: OwnedValue<LittleEndian> = read_owned::<BigEndian, LittleEndian>(&data).unwrap();
+//! // Write back as BigEndian
+//! let bytes = root.write_to_vec::<BigEndian>().unwrap();
 //!
-//! if let OwnedValue::Compound(ref mut compound) = root {
-//!     compound.insert("score", 100i32);
-//! }
+//! // Or write to any io::Write
+//! let mut buffer = Vec::new();
+//! root.write_to_writer::<BigEndian>(&mut buffer).unwrap();
 //! ```
 //!
-//! ## Writing Generic Code
+//! # Endianness
 //!
-//! ### Trait Hierarchy
+//! NBT data can be stored in either big-endian (Java Edition) or little-endian
+//! (Bedrock Edition) format. This crate supports both through the generic
+//! byte order parameter.
+//!
+//! ```
+//! use na_nbt::{read_owned, OwnedValue};
+//! use zerocopy::byteorder::{BigEndian, LittleEndian};
+//!
+//! // Read Java Edition NBT (BigEndian)
+//! # let java_data = [0x0a, 0x00, 0x00, 0x00];
+//! let java_value: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&java_data).unwrap();
+//!
+//! // Read Bedrock Edition NBT (LittleEndian)
+//! # let bedrock_data = [0x0a, 0x00, 0x00, 0x00];
+//! let bedrock_value: OwnedValue<LittleEndian> = read_owned::<LittleEndian, LittleEndian>(&bedrock_data).unwrap();
+//!
+//! // Convert between formats by reading as one endianness and writing as another
+//! # let java_data = [0x0a, 0x00, 0x00, 0x00];
+//! let value: OwnedValue<LittleEndian> = read_owned::<BigEndian, LittleEndian>(&java_data).unwrap();
+//! let bedrock_bytes = value.write_to_vec::<LittleEndian>().unwrap();
+//! ```
+//!
+//! # Trait hierarchy for generic code
+//!
+//! This crate provides a trait hierarchy for writing generic code that works
+//! with any value type:
 //!
 //! ```text
-//! ReadableValue ───────► ScopedReadableValue
-//!                              ▲
-//!                              │
-//! WritableValue ───► ScopedWritableValue
+//! ScopedReadableValue (all types)
+//!         ▲
+//!         │
+//! ┌───────┴───────┐
+//! │               │
+//! ReadableValue   ScopedWritableValue
+//! (borrowed,      (owned, mutable)
+//!  shared,                ▲
+//!  immutable)             │
+//!                   WritableValue
+//!                   (mutable)
 //! ```
 //!
-//! - `Readable` extends `ScopedReadable` with methods returning document-lifetime references
-//! - `Writable` extends `ScopedWritable` with mutable access to complex types
-//! - `ScopedWritable` extends `ScopedReadable` (writable values are also readable)
+//! - [`ScopedReadableValue`] - Core reading trait, implemented by all value types.
+//!   Scoped methods like `get_scoped()` construct views on demand with borrow lifetime.
 //!
-//! **Scoped vs Unscoped**: When you call `get_scoped()` or `as_*_scoped()` methods, the returned
-//! value has a lifetime tied to the borrow. The non-scoped versions (`get()`, `as_*()`) return
-//! values with the document lifetime, allowing you to store them.
+//! - [`ReadableValue`] - Adds unscoped methods like `get()` that return references to
+//!   stored data with document lifetime `'doc`.
 //!
-//! | Trait | Capability | Implemented By |
-//! |-------|------------|----------------|
-//! | [`ScopedReadableValue`] | Read primitives, iterate | All value types |
-//! | [`ReadableValue`] | + Store references to nested values | [`BorrowedValue`], [`SharedValue`], [`ImmutableValue`] |
-//! | [`ScopedWritableValue`] | + Modify primitives | [`OwnedValue`], [`MutableValue`] |
-//! | [`WritableValue`] | + Mutable access to arrays/lists/compounds | [`MutableValue`] |
+//! - [`ScopedWritableValue`] - Adds mutation via scoped methods like `as_byte_array_mut_scoped()`
+//!   that construct mutable views on demand.
 //!
-//! ### Example: Generic Dump Function
+//! - [`WritableValue`] - Adds unscoped mutable access like `as_byte_array_mut()` returning
+//!   references to stored mutable views.
 //!
-//! ```rust
+//! Use these traits to write generic functions:
+//!
+//! ```
 //! use na_nbt::{
-//!     ScopedReadableValue, ScopedReadableList, ScopedReadableCompound,
-//!     ReadableString, ValueScoped, read_borrowed, read_owned,
+//!     ScopedReadableValue, ScopedReadableCompound, ScopedReadableList,
+//!     ReadableString, ValueScoped,
 //! };
-//! use zerocopy::byteorder::BigEndian;
 //!
 //! fn dump<'doc>(value: &impl ScopedReadableValue<'doc>) -> String {
 //!     dump_inner(value, 0)
@@ -159,50 +261,57 @@
 //!         }
 //!     })
 //! }
-//!
-//! // Works with borrowed values
-//! let data = [0x0a, 0x00, 0x00, 0x01, 0x00, 0x01, b'x', 5, 0x00];
-//! let doc = read_borrowed::<BigEndian>(&data).unwrap();
-//! let s = dump(&doc.root());
-//! assert!(s.contains("Compound"));
-//!
-//! // Works with owned values
-//! let owned = read_owned::<BigEndian, BigEndian>(&data).unwrap();
-//! let s = dump(&owned);
-//! assert!(s.contains("Compound"));
 //! ```
 //!
-//! ## Type Overview
+//! # Types overview
 //!
-//! ### Zero-Copy Types
+//! ## Value types
 //!
-//! - [`ReadonlyValue`] - The underlying zero-copy value type
-//! - [`BorrowedValue`] - Type alias for borrowed data (`ReadonlyValue<'s, O, ()>`)
-//! - [`SharedValue`] - Type alias for `Arc`-wrapped data
+//! | Type | Description |
+//! |------|-------------|
+//! | [`BorrowedValue`] | Zero-copy value borrowing from a slice |
+//! | [`SharedValue`] | Zero-copy value with `Arc` shared ownership |
+//! | [`OwnedValue`] | Fully owned, mutable value |
+//! | [`MutableValue`] | Mutable view into an [`OwnedValue`] |
+//! | [`ImmutableValue`] | Immutable view into an [`OwnedValue`] |
 //!
-//! ### Owned Types
+//! ## Container types
 //!
-//! - [`OwnedValue`] - Fully owned, mutable NBT value
-//! - [`MutableValue`] - Mutable view into an `OwnedValue`
-//! - [`ImmutableValue`] - Immutable view into an `OwnedValue`
+//! Each value type has associated container types for compounds, lists, and strings:
 //!
-//! ## Feature Comparison
+//! - `ReadonlyCompound`, `ReadonlyList`, `ReadonlyString` - For borrowed/shared values
+//! - `OwnedCompound`, `OwnedList` - For owned values  
+//! - `MutableCompound`, `MutableList` - For mutable views
+//! - `ImmutableCompound`, `ImmutableList`, `ImmutableString` - For immutable views
 //!
-//! | Feature | `BorrowedValue` | `OwnedValue` |
-//! |---------|-----------------|--------------|
-//! | Zero-copy parsing | ✅ | ❌ |
-//! | Modify values | ❌ | ✅ |
-//! | Outlives source | ❌ | ✅ |
-//! | Endianness conversion | On write | On read or write |
-//! | Memory usage | Minimal | Proportional to data |
+//! ## Other types
+//!
+//! | Type | Description |
+//! |------|-------------|
+//! | [`Tag`] | NBT tag type enumeration (End, Byte, Short, Int, etc.) |
+//! | [`Error`] | Error type for parsing and writing |
+//! | [`Result`] | Result type alias using [`Error`] |
+//!
+//! # Feature comparison
+//!
+//! | Feature | `BorrowedValue` | `SharedValue` | `OwnedValue` |
+//! |---------|-----------------|---------------|--------------|
+//! | Zero-copy parsing | ✅ | ✅ | ❌ |
+//! | Modify values | ❌ | ❌ | ✅ |
+//! | Outlives source | ❌ | ✅ | ✅ |
+//! | Thread-safe sharing | ✅* | ✅ | ✅ |
+//! | Clone | ✅ | ✅ | ❌† |
+//!
+//! \* With appropriate lifetime management  
+//! † Use [`MutableValue`] or [`ImmutableValue`] for borrowed access
 
-mod error;
-mod immutable;
+pub mod error;
+pub mod immutable;
 mod index;
-mod mutable;
-mod tag;
-mod util;
-mod value_trait;
+pub mod mutable;
+pub mod tag;
+pub mod util;
+pub mod value_trait;
 mod view;
 
 pub use error::*;

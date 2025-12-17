@@ -1,3 +1,47 @@
+//! Zero-copy NBT value types with immutable access.
+//!
+//! This module contains the zero-copy value types that reference NBT data directly
+//! from the source bytes without copying. These types provide the fastest read-only
+//! access to NBT data.
+//!
+//! # Types
+//!
+//! - [`BorrowedValue`] - Value that borrows from a byte slice (via [`read_borrowed`])
+//! - [`SharedValue`] - Value with `Arc` ownership for thread-safe sharing (via [`read_shared`])
+//! - [`ReadonlyValue`] - The underlying generic type for both
+//!
+//! # Container Types
+//!
+//! - [`ReadonlyArray`] - Zero-copy view of byte/int/long arrays
+//! - [`ReadonlyString`] - Zero-copy view of NBT strings (Modified UTF-8)
+//! - [`ReadonlyList`] - Zero-copy view of NBT lists
+//! - [`ReadonlyCompound`] - Zero-copy view of NBT compounds
+//!
+//! # When to Use
+//!
+//! Use zero-copy types when:
+//! - You only need to read NBT data, not modify it
+//! - Performance is critical
+//! - You want to minimize memory allocations
+//!
+//! # Example
+//!
+//! ```
+//! use na_nbt::read_borrowed;
+//! use zerocopy::byteorder::BigEndian;
+//!
+//! let data = [
+//!     0x0a, 0x00, 0x00,  // Compound with empty name
+//!     0x03, 0x00, 0x01, b'x', 0x00, 0x00, 0x00, 0x2a,  // Int "x" = 42
+//!     0x00,  // End
+//! ];
+//!
+//! let doc = read_borrowed::<BigEndian>(&data).unwrap();
+//! let root = doc.root();
+//!
+//! assert_eq!(root.get("x").and_then(|v| v.as_int()), Some(42));
+//! ```
+
 use std::{any::TypeId, io::Write, ptr, sync::Arc};
 
 use bytes::Bytes;
@@ -24,28 +68,59 @@ pub use value::{
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use na_nbt::read_borrowed;
 /// use zerocopy::byteorder::BigEndian;
 ///
 /// let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
 /// let doc = read_borrowed::<BigEndian>(&data).unwrap();
 /// let root = doc.root(); // BorrowedValue<BigEndian>
+///
+/// assert!(root.is_compound());
 /// ```
+///
+/// # Generic Parameter
+///
+/// - `O` - The byte order of the NBT data ([`BigEndian`](zerocopy::byteorder::BigEndian)
+///   for Java Edition, [`LittleEndian`](zerocopy::byteorder::LittleEndian) for Bedrock)
 pub type BorrowedValue<'s, O> = value::ReadonlyValue<'s, O, ()>;
 
-/// Reads an NBT document from a byte slice.
+/// Parses NBT from a byte slice with zero-copy borrowing.
 ///
-/// This function performs a zero-copy parse of the NBT data. The returned [`BorrowedDocument`]
-/// borrows from the input slice.
+/// This function performs a zero-copy parse of the NBT data. The returned
+/// [`BorrowedDocument`] borrows from the input slice, so the slice must
+/// outlive the document.
 ///
 /// # Arguments
 ///
-/// * `source` - The byte slice containing the NBT data.
+/// * `source` - The byte slice containing NBT data
+///
+/// # Type Parameters
+///
+/// * `O` - The byte order of the input data
 ///
 /// # Returns
 ///
-/// A `Result` containing the parsed `BorrowedDocument` or an error.
+/// A `Result` containing the parsed document or an [`Error`].
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::read_borrowed;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
+/// let doc = read_borrowed::<BigEndian>(&data)?;
+/// let root = doc.root();
+/// # Ok::<(), na_nbt::Error>(())
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The data is truncated ([`Error::EndOfFile`])
+/// - An invalid tag type is encountered ([`Error::InvalidTagType`])
+/// - Extra data remains after parsing ([`Error::TrailingData`])
 pub fn read_borrowed<'s, O: ByteOrder>(source: &'s [u8]) -> Result<BorrowedDocument<'s, O>> {
     unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| BorrowedDocument {
@@ -56,7 +131,15 @@ pub fn read_borrowed<'s, O: ByteOrder>(source: &'s [u8]) -> Result<BorrowedDocum
     }
 }
 
-/// A document that borrows its data from a slice.
+/// A parsed NBT document that borrows from a byte slice.
+///
+/// This type is returned by [`read_borrowed`] and provides access to the
+/// root NBT value through the [`root`](BorrowedDocument::root) method.
+///
+/// # Lifetime
+///
+/// The `'s` lifetime parameter ties this document to the source byte slice.
+/// The document (and any values derived from it) cannot outlive the source data.
 pub struct BorrowedDocument<'s, O: ByteOrder> {
     mark: Vec<mark::Mark>,
     source: *const u8,
@@ -64,7 +147,24 @@ pub struct BorrowedDocument<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
-    /// Returns the root value of the document.
+    /// Returns the root value of the NBT document.
+    ///
+    /// The returned value has a lifetime tied to this document, not the
+    /// original source slice. This allows the document to manage its
+    /// internal parsing state.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use na_nbt::read_borrowed;
+    /// use zerocopy::byteorder::BigEndian;
+    ///
+    /// let data = [0x0a, 0x00, 0x00, 0x00];
+    /// let doc = read_borrowed::<BigEndian>(&data).unwrap();
+    /// let root = doc.root();
+    ///
+    /// assert!(root.is_compound());
+    /// ```
     #[inline]
     pub fn root<'doc>(&'doc self) -> BorrowedValue<'doc, O> {
         let root_tag = unsafe { *self.source.cast() };
@@ -90,44 +190,78 @@ impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
 unsafe impl<'s, O: ByteOrder> Send for BorrowedDocument<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for BorrowedDocument<'s, O> {}
 
-/// A shared, immutable NBT value with `Arc`-based ownership.
+/// A zero-copy NBT value with shared ownership via `Arc`.
 ///
-/// This type is returned by [`read_shared`]. Unlike [`BorrowedValue`], it owns its data
-/// via `Arc`, so it can be cloned and passed across threads without lifetime concerns.
+/// This type is returned by [`read_shared`]. Unlike [`BorrowedValue`], it owns
+/// its data through `Arc`, making it `Clone`, `Send`, `Sync`, and `'static`.
 ///
-/// The `'static` lifetime indicates the value doesn't borrow from external data.
-pub type SharedValue<O> = value::ReadonlyValue<'static, O, Arc<SharedDocument>>;
-
-/// Reads an NBT document from a `Bytes` buffer with shared ownership.
-///
-/// The returned [`SharedValue`] owns the data via `Arc`, making it `Clone`, `Send`, `Sync`,
-/// and `'static`. Use this when you need to pass NBT values across threads or store them
-/// without worrying about lifetimes.
+/// Use this when you need to:
+/// - Pass NBT values across thread boundaries
+/// - Store values without lifetime concerns
+/// - Clone values efficiently (only clones the `Arc`, not the data)
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use na_nbt::read_shared;
 /// use bytes::Bytes;
 /// use zerocopy::byteorder::BigEndian;
 ///
-/// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]); // Empty compound
+/// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]);
 /// let root = read_shared::<BigEndian>(data).unwrap();
 ///
-/// // Can be cloned and sent to another thread
-/// let handle = std::thread::spawn(move || {
-///     assert!(root.as_compound().is_some());
-/// });
-/// handle.join().unwrap();
+/// // Clone is cheap - just increments Arc refcount
+/// let cloned = root.clone();
+///
+/// // Can send to another thread
+/// std::thread::spawn(move || {
+///     assert!(cloned.is_compound());
+/// }).join().unwrap();
 /// ```
+pub type SharedValue<O> = value::ReadonlyValue<'static, O, Arc<SharedDocument>>;
+
+/// Parses NBT from a `Bytes` buffer with shared ownership.
+///
+/// The returned [`SharedValue`] owns the data via `Arc`, making it `Clone`,
+/// `Send`, `Sync`, and `'static`. This is ideal for multi-threaded scenarios
+/// or when you want to avoid lifetime management.
 ///
 /// # Arguments
 ///
-/// * `source` - A [`Bytes`](bytes::Bytes) buffer containing NBT data
+/// * `source` - A [`Bytes`] buffer containing NBT data
+///
+/// # Type Parameters
+///
+/// * `O` - The byte order of the input data
 ///
 /// # Returns
 ///
 /// The root NBT value, or an error if parsing fails.
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::read_shared;
+/// use bytes::Bytes;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]);
+/// let root = read_shared::<BigEndian>(data)?;
+///
+/// // Store in a struct with 'static lifetime
+/// struct MyStruct {
+///     nbt: na_nbt::SharedValue<BigEndian>,
+/// }
+///
+/// let s = MyStruct { nbt: root };
+/// # Ok::<(), na_nbt::Error>(())
+/// ```
+///
+/// # Performance Note
+///
+/// While parsing is still zero-copy, accessing the shared value has slightly
+/// more overhead than borrowed values due to `Arc` reference counting.
+/// Use [`read_borrowed`] when the borrowed lifetime is acceptable.
 pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
     Ok(unsafe {
         read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {
@@ -137,7 +271,10 @@ pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
     })
 }
 
-/// A document that shares ownership of its data.
+/// A parsed NBT document with shared ownership.
+///
+/// This type holds the source data and parsing metadata for [`SharedValue`]s.
+/// It is managed through `Arc` and should not typically be used directly.
 pub struct SharedDocument {
     mark: Vec<mark::Mark>,
     source: Bytes,

@@ -45,54 +45,122 @@ impl StringViewOwn {
 ///
 /// Unlike [`BorrowedValue`](crate::BorrowedValue), this type owns its data and can be
 /// modified. Use this when you need to:
-/// - Modify NBT data
-/// - Keep the value after the source slice is dropped
+/// - Modify NBT data after parsing
+/// - Keep values after the source bytes are dropped
 /// - Build NBT structures from scratch
+/// - Convert between endianness formats
 ///
-/// # Example
+/// # Variants
 ///
-/// ```rust
+/// Each variant corresponds to an NBT tag type:
+///
+/// | Variant | Tag ID | Description |
+/// |---------|--------|-------------|
+/// | `End` | 0 | Marks the end of a compound |
+/// | `Byte` | 1 | Signed 8-bit integer |
+/// | `Short` | 2 | Signed 16-bit integer |
+/// | `Int` | 3 | Signed 32-bit integer |
+/// | `Long` | 4 | Signed 64-bit integer |
+/// | `Float` | 5 | 32-bit floating point |
+/// | `Double` | 6 | 64-bit floating point |
+/// | `ByteArray` | 7 | Array of bytes |
+/// | `String` | 8 | UTF-8 string |
+/// | `List` | 9 | Homogeneous list |
+/// | `Compound` | 10 | Key-value map |
+/// | `IntArray` | 11 | Array of ints |
+/// | `LongArray` | 12 | Array of longs |
+///
+/// # Creating Values
+///
+/// `OwnedValue` implements `From` for many Rust types, making construction easy:
+///
+/// ```
+/// use na_nbt::OwnedValue;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let byte: OwnedValue<BigEndian> = 42i8.into();
+/// let int: OwnedValue<BigEndian> = 12345i32.into();
+/// let string: OwnedValue<BigEndian> = "Hello".into();
+/// let array: OwnedValue<BigEndian> = vec![1i8, 2, 3].into();
+/// ```
+///
+/// # Parsing NBT
+///
+/// ```
 /// use na_nbt::{read_owned, OwnedValue};
 /// use zerocopy::byteorder::BigEndian;
 ///
 /// let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
+/// let root: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data).unwrap();
+/// ```
+///
+/// # Modifying Values
+///
+/// ```
+/// use na_nbt::{read_owned, OwnedValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = [0x0a, 0x00, 0x00, 0x00];
 /// let mut root: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data).unwrap();
 ///
 /// if let OwnedValue::Compound(ref mut c) = root {
-///     c.insert("key", 42i32);
+///     c.insert("name", "Steve");
+///     c.insert("health", 20i32);
 /// }
+/// ```
+///
+/// # Writing to Bytes
+///
+/// ```
+/// use na_nbt::{read_owned, OwnedValue, ScopedReadableValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = [0x0a, 0x00, 0x00, 0x00];
+/// let root: OwnedValue<BigEndian> = read_owned::<BigEndian, BigEndian>(&data).unwrap();
+///
+/// // Serialize to bytes
+/// let bytes = root.write_to_vec::<BigEndian>().unwrap();
 /// ```
 ///
 /// # Generic Parameter
 ///
-/// `O` specifies the byte order for multi-byte values in memory. Choose based on your
-/// write target to avoid conversion overhead.
+/// `O` specifies the byte order for multi-byte values stored in memory.
+/// Choose based on your target format to minimize conversion overhead:
+///
+/// - Use [`BigEndian`](zerocopy::byteorder::BigEndian) for Java Edition
+/// - Use [`LittleEndian`](zerocopy::byteorder::LittleEndian) for Bedrock Edition
+///
+/// # See Also
+///
+/// - [`MutableValue`] - Mutable borrowed view into an `OwnedValue`
+/// - [`ImmutableValue`] - Immutable borrowed view into an `OwnedValue`
+/// - [`BorrowedValue`](crate::BorrowedValue) - Zero-copy alternative for read-only access
 pub enum OwnedValue<O: ByteOrder> {
-    /// End tag (0).
+    /// End tag (0) - marks the end of a compound.
     End,
-    /// Byte tag (1).
+    /// Byte tag (1) - a signed 8-bit integer.
     Byte(i8),
-    /// Short tag (2).
+    /// Short tag (2) - a signed 16-bit integer.
     Short(byteorder::I16<O>),
-    /// Int tag (3).
+    /// Int tag (3) - a signed 32-bit integer.
     Int(byteorder::I32<O>),
-    /// Long tag (4).
+    /// Long tag (4) - a signed 64-bit integer.
     Long(byteorder::I64<O>),
-    /// Float tag (5).
+    /// Float tag (5) - a 32-bit IEEE 754 floating point number.
     Float(byteorder::F32<O>),
-    /// Double tag (6).
+    /// Double tag (6) - a 64-bit IEEE 754 floating point number.
     Double(byteorder::F64<O>),
-    /// Byte array tag (7).
+    /// Byte array tag (7) - an array of signed bytes.
     ByteArray(VecViewOwn<i8>),
-    /// String tag (8).
+    /// String tag (8) - a UTF-8 encoded string.
     String(StringViewOwn),
-    /// List tag (9).
+    /// List tag (9) - a list of values, all of the same type.
     List(OwnedList<O>),
-    /// Compound tag (10).
+    /// Compound tag (10) - a map of string keys to NBT values.
     Compound(OwnedCompound<O>),
-    /// Int array tag (11).
+    /// Int array tag (11) - an array of signed 32-bit integers.
     IntArray(VecViewOwn<byteorder::I32<O>>),
-    /// Long array tag (12).
+    /// Long array tag (12) - an array of signed 64-bit integers.
     LongArray(VecViewOwn<byteorder::I64<O>>),
 }
 
@@ -792,6 +860,52 @@ impl<O: ByteOrder> OwnedValue<O> {
     }
 }
 
+/// An owned NBT list.
+///
+/// This type represents a mutable NBT list that owns its data. All elements
+/// in an NBT list must have the same tag type.
+///
+/// # Creating a List
+///
+/// The easiest way to create a list is using `From` conversions:
+///
+/// ```
+/// use na_nbt::{OwnedValue, OwnedList};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// // Create from a Vec of bytes
+/// let byte_list: OwnedValue<BigEndian> = vec![1i8, 2, 3].into();
+///
+/// // Create an empty list
+/// let empty_list: OwnedList<BigEndian> = OwnedList::default();
+/// ```
+///
+/// # Accessing Elements
+///
+/// ```
+/// use na_nbt::{OwnedValue, OwnedList};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let value: OwnedValue<BigEndian> = vec![10i8, 20, 30].into();
+/// if let OwnedValue::List(list) = &value {
+///     if let Some(elem) = list.get(1) {
+///         assert_eq!(elem.as_byte(), Some(20));
+///     }
+/// }
+/// ```
+///
+/// # Modifying Elements
+///
+/// ```
+/// use na_nbt::{OwnedValue, OwnedList};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let mut value: OwnedValue<BigEndian> = vec![1i8, 2, 3].into();
+/// if let OwnedValue::List(ref mut list) = value {
+///     list.push(4i8);
+///     // list.remove(0);
+/// }
+/// ```
 #[repr(transparent)]
 pub struct OwnedList<O: ByteOrder> {
     pub(crate) data: VecViewOwn<u8>,
@@ -978,6 +1092,11 @@ impl<O: ByteOrder> OwnedList<O> {
         list_pop(&mut data)
     }
 
+    /// Removes and returns the element at the given index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
     pub fn remove(&mut self, index: usize) -> OwnedValue<O> {
         let mut data =
             unsafe { VecViewMut::new(&mut self.data.ptr, &mut self.data.len, &mut self.data.cap) };
@@ -985,6 +1104,51 @@ impl<O: ByteOrder> OwnedList<O> {
     }
 }
 
+/// An owned NBT compound (key-value map).
+///
+/// This type represents a mutable NBT compound that owns its data. Use it to
+/// build compound structures or modify parsed compounds.
+///
+/// # Creating a Compound
+///
+/// ```
+/// use na_nbt::OwnedCompound;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let mut compound: OwnedCompound<BigEndian> = OwnedCompound::default();
+/// compound.insert("name", "Steve");
+/// compound.insert("health", 20i32);
+/// compound.insert("score", 1000i64);
+/// ```
+///
+/// # Accessing Values
+///
+/// ```
+/// use na_nbt::{OwnedCompound, OwnedValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let mut compound: OwnedCompound<BigEndian> = OwnedCompound::default();
+/// compound.insert("level", 42i32);
+///
+/// if let Some(value) = compound.get("level") {
+///     println!("Level: {:?}", value.as_int());
+/// }
+/// ```
+///
+/// # Iterating
+///
+/// ```
+/// use na_nbt::{OwnedCompound, ReadableString, ScopedReadableValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let mut compound: OwnedCompound<BigEndian> = OwnedCompound::default();
+/// compound.insert("a", 1i32);
+/// compound.insert("b", 2i32);
+///
+/// for (key, value) in compound.iter() {
+///     println!("{}: {:?}", key.decode(), value.as_int());
+/// }
+/// ```
 #[repr(transparent)]
 pub struct OwnedCompound<O: ByteOrder> {
     pub(crate) data: VecViewOwn<u8>,

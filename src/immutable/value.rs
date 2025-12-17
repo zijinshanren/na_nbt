@@ -9,6 +9,14 @@ use crate::{
     write_value_to_vec, write_value_to_writer,
 };
 
+/// Marker trait for document ownership types.
+///
+/// This trait is automatically implemented for any type that is `Send + Sync + Clone + 'static`.
+/// It is used to abstract over the ownership model of the underlying NBT data.
+///
+/// The two main implementations are:
+/// - `()` - For borrowed values that reference external data
+/// - `Arc<SharedDocument>` - For shared values with `Arc` ownership
 pub trait Document: Send + Sync + Clone + 'static {}
 
 impl<T: Send + Sync + Clone + 'static> Document for T {}
@@ -30,45 +38,88 @@ impl<T: Send + Sync + Clone + 'static> Document for T {}
 /// - `O`: Byte order ([`BigEndian`](zerocopy::byteorder::BigEndian) or [`LittleEndian`](zerocopy::byteorder::LittleEndian))
 /// - `D`: Document type managing data ownership (`()` for borrowed, `Arc<...>` for shared)
 ///
+/// # Variants
+///
+/// Each variant corresponds to an NBT tag type:
+///
+/// | Variant | Tag ID | Description |
+/// |---------|--------|-------------|
+/// | `End` | 0 | Marks the end of a compound |
+/// | `Byte` | 1 | Signed 8-bit integer |
+/// | `Short` | 2 | Signed 16-bit integer |
+/// | `Int` | 3 | Signed 32-bit integer |
+/// | `Long` | 4 | Signed 64-bit integer |
+/// | `Float` | 5 | 32-bit floating point |
+/// | `Double` | 6 | 64-bit floating point |
+/// | `ByteArray` | 7 | Array of bytes |
+/// | `String` | 8 | Modified UTF-8 string |
+/// | `List` | 9 | Homogeneous list |
+/// | `Compound` | 10 | Key-value map |
+/// | `IntArray` | 11 | Array of ints |
+/// | `LongArray` | 12 | Array of longs |
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::{read_borrowed, BorrowedValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let data = [0x0a, 0x00, 0x00, 0x00]; // Empty compound
+/// let doc = read_borrowed::<BigEndian>(&data).unwrap();
+/// let root = doc.root();
+///
+/// match &root {
+///     BorrowedValue::Compound(compound) => {
+///         assert_eq!(compound.iter().count(), 0);
+///     }
+///     _ => panic!("Root is not a compound"),
+/// }
+/// ```
+///
 /// # See Also
 ///
-/// - [`ImmutableValue`](crate::ImmutableValue) - A different type for immutable views of owned data
+/// - [`ImmutableValue`](crate::ImmutableValue) - Immutable view into owned data
+/// - [`OwnedValue`](crate::OwnedValue) - Fully owned, mutable NBT value
 #[derive(Clone)]
 pub enum ReadonlyValue<'doc, O: ByteOrder, D: Document> {
-    /// End tag (0).
+    /// End tag (0) - marks the end of a compound.
     End,
-    /// Byte tag (1).
+    /// Byte tag (1) - a signed 8-bit integer.
     Byte(i8),
-    /// Short tag (2).
+    /// Short tag (2) - a signed 16-bit integer.
     Short(i16),
-    /// Int tag (3).
+    /// Int tag (3) - a signed 32-bit integer.
     Int(i32),
-    /// Long tag (4).
+    /// Long tag (4) - a signed 64-bit integer.
     Long(i64),
-    /// Float tag (5).
+    /// Float tag (5) - a 32-bit IEEE 754 floating point number.
     Float(f32),
-    /// Double tag (6).
+    /// Double tag (6) - a 64-bit IEEE 754 floating point number.
     Double(f64),
-    /// Byte array tag (7).
+    /// Byte array tag (7) - an array of signed bytes.
     ByteArray(ReadonlyArray<'doc, i8, D>),
-    /// String tag (8).
+    /// String tag (8) - a Modified UTF-8 encoded string.
     String(ReadonlyString<'doc, D>),
-    /// List tag (9).
+    /// List tag (9) - a list of values, all of the same type.
     List(ReadonlyList<'doc, O, D>),
-    /// Compound tag (10).
+    /// Compound tag (10) - a map of string keys to NBT values.
     Compound(ReadonlyCompound<'doc, O, D>),
-    /// Int array tag (11).
+    /// Int array tag (11) - an array of signed 32-bit integers.
     IntArray(ReadonlyArray<'doc, byteorder::I32<O>, D>),
-    /// Long array tag (12).
+    /// Long array tag (12) - an array of signed 64-bit integers.
     LongArray(ReadonlyArray<'doc, byteorder::I64<O>, D>),
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
-    /// .
+    /// Reads a value from raw NBT data.
     ///
     /// # Safety
     ///
-    /// .
+    /// The caller must ensure that:
+    /// - `tag_id` is a valid NBT tag type
+    /// - `data` points to valid NBT data for the given tag type
+    /// - `mark` points to valid parsing metadata
+    /// - The data remains valid for the `'doc` lifetime
     pub unsafe fn read(tag_id: Tag, data: *const u8, mark: *const Mark, doc: D) -> Self {
         unsafe {
             macro_rules! get {
@@ -346,17 +397,100 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
         )
     }
 
+    /// Serializes this value to a byte vector.
+    ///
+    /// The output includes the tag type and empty root name, making it a complete
+    /// NBT document that can be written to a file or sent over the network.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `TARGET` - The byte order for the output
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use na_nbt::read_borrowed;
+    /// use zerocopy::byteorder::{BigEndian, LittleEndian};
+    ///
+    /// let data = [0x0a, 0x00, 0x00, 0x00];
+    /// let doc = read_borrowed::<BigEndian>(&data).unwrap();
+    /// let root = doc.root();
+    ///
+    /// // Write as BigEndian (Java Edition)
+    /// let bytes = root.write_to_vec::<BigEndian>().unwrap();
+    ///
+    /// // Or convert to LittleEndian (Bedrock Edition)
+    /// let bytes = root.write_to_vec::<LittleEndian>().unwrap();
+    /// ```
     #[inline]
     pub fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>> {
         write_value_to_vec::<D, O, TARGET>(self)
     }
 
+    /// Serializes this value to a writer.
+    ///
+    /// Writes a complete NBT document (with tag type and empty root name) to
+    /// any type implementing [`std::io::Write`].
+    ///
+    /// # Type Parameters
+    ///
+    /// * `TARGET` - The byte order for the output
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use na_nbt::read_borrowed;
+    /// use zerocopy::byteorder::BigEndian;
+    /// use std::io::Cursor;
+    ///
+    /// let data = [0x0a, 0x00, 0x00, 0x00];
+    /// let doc = read_borrowed::<BigEndian>(&data).unwrap();
+    /// let root = doc.root();
+    ///
+    /// let mut buffer = Cursor::new(Vec::new());
+    /// root.write_to_writer::<BigEndian>(&mut buffer).unwrap();
+    /// ```
     #[inline]
     pub fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
         write_value_to_writer::<D, O, TARGET>(self, writer)
     }
 }
 
+/// A zero-copy view of an NBT array (byte array, int array, or long array).
+///
+/// This type provides direct access to array data without copying. It implements
+/// [`Deref`] to `[T]`, so you can use it like a slice.
+///
+/// # Type Parameters
+///
+/// - `'doc` - Lifetime of the underlying data
+/// - `T` - Element type (`i8` for byte arrays, `I32<O>` for int arrays, `I64<O>` for long arrays)
+/// - `D` - Document ownership type
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::{read_borrowed, BorrowedValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// # fn example() -> Option<()> {
+/// let data = [
+///     0x0a, 0x00, 0x00,  // Compound
+///     0x07, 0x00, 0x01, b'a', 0x00, 0x00, 0x00, 0x03, 1, 2, 3,  // ByteArray "a" = [1,2,3]
+///     0x00,  // End
+/// ];
+/// let doc = read_borrowed::<BigEndian>(&data).ok()?;
+/// let root = doc.root();
+/// let compound = root.as_compound()?;
+/// let value = compound.get("a")?;
+/// let array = value.as_byte_array()?;
+///
+/// // Use like a slice
+/// assert_eq!(array.len(), 3);
+/// assert_eq!(array[0], 1);
+/// # Some(())
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct ReadonlyArray<'doc, T, D: Document> {
     pub(crate) data: &'doc [T],
@@ -373,6 +507,7 @@ impl<'doc, T, D: Document> Deref for ReadonlyArray<'doc, T, D> {
 }
 
 impl<'doc, T, D: Document> ReadonlyArray<'doc, T, D> {
+    /// Returns the array data as a slice.
     #[inline]
     pub fn as_slice<'a>(&'a self) -> &'a [T]
     where
@@ -382,20 +517,93 @@ impl<'doc, T, D: Document> ReadonlyArray<'doc, T, D> {
     }
 }
 
+/// A zero-copy view of an NBT string.
+///
+/// NBT strings use Modified UTF-8 encoding (MUTF-8), which is similar to CESU-8.
+/// Use [`decode`](ReadonlyString::decode) to convert to a Rust string.
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::{read_borrowed, BorrowedValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// # fn example() -> Option<()> {
+/// let data = [
+///     0x0a, 0x00, 0x00,  // Compound
+///     0x08, 0x00, 0x01, b'n', 0x00, 0x05, b'H', b'e', b'l', b'l', b'o',  // String "n" = "Hello"
+///     0x00,  // End
+/// ];
+/// let doc = read_borrowed::<BigEndian>(&data).ok()?;
+/// let root = doc.root();
+/// let compound = root.as_compound()?;
+/// let name_value = compound.get("n")?;
+/// let name_str = name_value.as_string()?;
+///
+/// assert_eq!(name_str.decode(), "Hello");
+/// # Some(())
+/// # }
+/// ```
 pub type ReadonlyString<'doc, D> = ReadonlyArray<'doc, u8, D>;
 
 impl<'doc, D: Document> ReadonlyString<'doc, D> {
+    /// Returns the raw MUTF-8 bytes of the string.
+    ///
+    /// For most ASCII strings, this is identical to UTF-8. Use [`decode`](Self::decode)
+    /// for proper string conversion.
     #[inline]
     pub fn raw_bytes(&self) -> &[u8] {
         self.data
     }
 
+    /// Decodes the MUTF-8 string to a Rust string.
+    ///
+    /// Returns a [`Cow<str>`](std::borrow::Cow) - borrowed if the string is valid UTF-8,
+    /// owned if conversion was needed.
+    ///
+    /// Invalid sequences are replaced with the Unicode replacement character (U+FFFD).
     #[inline]
     pub fn decode<'a>(&'a self) -> Cow<'a, str> {
         simd_cesu8::mutf8::decode_lossy(self.data)
     }
 }
 
+/// A zero-copy view of an NBT list.
+///
+/// NBT lists are homogeneous - all elements have the same tag type. Use
+/// [`tag_id`](ReadonlyList::tag_id) to get the element type.
+///
+/// This type implements [`IntoIterator`], so you can use it directly in a for loop.
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::{read_borrowed, BorrowedValue, Tag};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// # fn example() -> Option<()> {
+/// let data = [
+///     0x0a, 0x00, 0x00,  // Compound
+///     0x09, 0x00, 0x01, b's', 0x03, 0x00, 0x00, 0x00, 0x02,  // List "s" of Int, length 2
+///     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,  // [1, 2]
+///     0x00,  // End
+/// ];
+/// let doc = read_borrowed::<BigEndian>(&data).ok()?;
+/// let root = doc.root();
+/// let compound = root.as_compound()?;
+/// let value = compound.get("s")?;
+/// let list = value.as_list()?.clone();
+///
+/// assert_eq!(list.tag_id(), Tag::Int);
+/// assert_eq!(list.len(), 2);
+///
+/// for item in list {
+///     // Each item is an Int
+///     let _ = item.as_int();
+/// }
+/// # Some(())
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct ReadonlyList<'doc, O: ByteOrder, D: Document> {
     pub(crate) data: &'doc [u8],
@@ -425,21 +633,27 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyList<'doc, O, D> 
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
+    /// Returns the tag type of elements in this list.
+    ///
+    /// All elements in an NBT list have the same type.
     #[inline]
     pub fn tag_id(&self) -> Tag {
         unsafe { *self.data.as_ptr().cast() }
     }
 
+    /// Returns the number of elements in this list.
     #[inline]
     pub fn len(&self) -> usize {
         unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
     }
 
+    /// Returns `true` if this list contains no elements.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the element at the given index, or `None` if out of bounds.
     pub fn get(&self, index: usize) -> Option<ReadonlyValue<'doc, O, D>> {
         if index >= self.len() {
             cold_path();
@@ -522,6 +736,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         }
     }
 
+    /// Returns an iterator over the elements of this list.
     #[inline]
     pub fn iter(&self) -> ReadonlyListIter<'doc, O, D> {
         ReadonlyListIter {
@@ -535,6 +750,9 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 }
 
+/// An iterator over the elements of a [`ReadonlyList`].
+///
+/// This iterator yields [`ReadonlyValue`]s and implements [`ExactSizeIterator`].
 #[derive(Clone)]
 pub struct ReadonlyListIter<'doc, O: ByteOrder, D: Document> {
     tag_id: Tag,
@@ -579,6 +797,42 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyListIter<'doc, O, D> 
 
 impl<'doc, O: ByteOrder, D: Document> ExactSizeIterator for ReadonlyListIter<'doc, O, D> {}
 
+/// A zero-copy view of an NBT compound.
+///
+/// NBT compounds are key-value maps where keys are strings and values can be
+/// any NBT type. Use [`get`](ReadonlyCompound::get) to look up values by key,
+/// or iterate to visit all entries.
+///
+/// This type implements [`IntoIterator`], yielding `(ReadonlyString, ReadonlyValue)` pairs.
+///
+/// # Example
+///
+/// ```
+/// use na_nbt::{read_borrowed, BorrowedValue};
+/// use zerocopy::byteorder::BigEndian;
+///
+/// # fn example() -> Option<()> {
+/// let data = [
+///     0x0a, 0x00, 0x00,  // Compound (root)
+///     0x03, 0x00, 0x01, b'x', 0x00, 0x00, 0x00, 0x0a,  // Int "x" = 10
+///     0x03, 0x00, 0x01, b'y', 0x00, 0x00, 0x00, 0x14,  // Int "y" = 20
+///     0x00,  // End
+/// ];
+/// let doc = read_borrowed::<BigEndian>(&data).ok()?;
+/// let root = doc.root();
+/// let compound = root.as_compound()?.clone();
+///
+/// // Look up by key
+/// let x = compound.get("x")?.as_int()?;
+/// assert_eq!(x, 10);
+///
+/// // Iterate over all entries
+/// for (key, value) in compound {
+///     let _ = (key.decode(), value.tag_id());
+/// }
+/// # Some(())
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct ReadonlyCompound<'doc, O: ByteOrder, D: Document> {
     pub(crate) data: &'doc [u8],
@@ -606,6 +860,9 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyCompound<'doc, O,
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
+    /// Returns the value associated with the given key, or `None` if not found.
+    ///
+    /// Key lookup uses MUTF-8 encoding internally to match NBT string format.
     pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
         let name = simd_cesu8::mutf8::encode(key);
         unsafe {
@@ -637,6 +894,9 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
+    /// Returns an iterator over the entries of this compound.
+    ///
+    /// Each entry is a `(ReadonlyString, ReadonlyValue)` pair.
     #[inline]
     pub fn iter(&self) -> ReadonlyCompoundIter<'doc, O, D> {
         ReadonlyCompoundIter {
@@ -648,6 +908,10 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     }
 }
 
+/// An iterator over the entries of a [`ReadonlyCompound`].
+///
+/// Each iteration yields a `(ReadonlyString, ReadonlyValue)` pair representing
+/// a key-value entry in the compound.
 #[derive(Clone)]
 pub struct ReadonlyCompoundIter<'doc, O: ByteOrder, D: Document> {
     data: *const u8,
