@@ -86,6 +86,8 @@ pub enum Error {
     KeyMustBeString,
 
     TagMismatch(u8, u8),
+
+    InvalidCharacter(u32),
 }
 
 impl ser::Error for Error {
@@ -118,6 +120,9 @@ impl Display for Error {
             Error::TagMismatch(expected, actual) => formatter.write_str(&format!(
                 "tag in list mismatch: expected {expected:#04x}, got {actual:#04x}"
             )),
+            Error::InvalidCharacter(character) => {
+                formatter.write_str(&format!("invalid character: {character:#04x}"))
+            }
         }
     }
 }

@@ -316,10 +316,14 @@ pub mod util;
 pub mod value_trait;
 mod view;
 
+pub use de::{
+    Deserializer, from_reader, from_reader_be, from_reader_le, from_slice, from_slice_be,
+    from_slice_le,
+};
 pub use error::*;
 pub use immutable::*;
 pub use mutable::*;
-pub use ser::{Serializer, to_vec, to_writer};
+pub use ser::{Serializer, to_vec, to_vec_be, to_vec_le, to_writer, to_writer_be, to_writer_le};
 pub use tag::*;
 pub use util::*;
 pub use value_trait::*;

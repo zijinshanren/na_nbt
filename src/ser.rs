@@ -90,6 +90,18 @@ pub fn to_vec<O: ByteOrder>(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>
     Ok(serializer.vec)
 }
 
+/// Convenience function for serializing with big-endian byte order.
+#[inline]
+pub fn to_vec_be(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>> {
+    to_vec::<zerocopy::byteorder::BigEndian>(value)
+}
+
+/// Convenience function for serializing with little-endian byte order.
+#[inline]
+pub fn to_vec_le(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>> {
+    to_vec::<zerocopy::byteorder::LittleEndian>(value)
+}
+
 #[inline]
 pub fn to_writer<O: ByteOrder>(
     writer: &mut impl Write,
@@ -97,6 +109,18 @@ pub fn to_writer<O: ByteOrder>(
 ) -> Result<()> {
     let vec = to_vec::<O>(value)?;
     writer.write_all(&vec).map_err(Error::IO)
+}
+
+/// Convenience function for writing with big-endian byte order.
+#[inline]
+pub fn to_writer_be(writer: &mut impl Write, value: &(impl ?Sized + Serialize)) -> Result<()> {
+    to_writer::<zerocopy::byteorder::BigEndian>(writer, value)
+}
+
+/// Convenience function for writing with little-endian byte order.
+#[inline]
+pub fn to_writer_le(writer: &mut impl Write, value: &(impl ?Sized + Serialize)) -> Result<()> {
+    to_writer::<zerocopy::byteorder::LittleEndian>(writer, value)
 }
 
 impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
@@ -229,7 +253,17 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     where
         T: ?Sized + Serialize,
     {
-        value.serialize(self)
+        unsafe {
+            let old_len = self.vec.len();
+            self.vec.reserve(1 + 2);
+            let write_ptr = self.vec.as_mut_ptr().add(old_len);
+            ptr::write(write_ptr.add(1).cast(), [0u8; 2]);
+            self.vec.set_len(old_len + 1 + 2);
+            let tag_id = value.serialize(&mut *self)?;
+            *self.vec.get_unchecked_mut(old_len) = tag_id as u8;
+            self.vec.push(Tag::End as u8);
+        }
+        Ok(Tag::Compound)
     }
 
     #[inline]
@@ -308,7 +342,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
                 Ok(ListSerializer {
                     start_pos: old_len,
                     len: None,
-                    tag_id: None,
+                    tag_id: Tag::End,
                     serializer: &mut *self,
                 })
             }
@@ -319,7 +353,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             Ok(ListSerializer {
                 start_pos: old_len,
                 len: Some(0),
-                tag_id: None,
+                tag_id: Tag::End,
                 serializer: &mut *self,
             })
         }
@@ -339,6 +373,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         unsafe { self.write_list_of_compound_begin(len) }
     }
 
+    // Tag::Compound { variant: Tag::List[Tag::Compound] }
     fn serialize_tuple_variant(
         self,
         _name: &'static str,
@@ -422,7 +457,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
 pub struct ListSerializer<'a, O: ByteOrder> {
     start_pos: usize,
     len: Option<u32>,
-    tag_id: Option<Tag>,
+    tag_id: Tag,
     serializer: &'a mut Serializer<O>,
 }
 
@@ -439,23 +474,18 @@ impl<'a, O: ByteOrder> ser::SerializeSeq for ListSerializer<'a, O> {
             assert!(len < u32::MAX, "list length too long");
             self.len = Some(len + 1);
         }
-        match self.tag_id {
-            Some(tag) => {
-                if tag != tag_id {
-                    return Err(Error::TagMismatch(tag as u8, tag_id as u8));
-                }
-            }
-            None => {
-                self.tag_id = Some(tag_id);
-            }
+        if self.tag_id == Tag::End {
+            cold_path();
+            self.tag_id = tag_id;
+        } else if self.tag_id != tag_id {
+            return Err(Error::TagMismatch(self.tag_id as u8, tag_id as u8));
         }
         Ok(())
     }
 
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
         unsafe {
-            *self.serializer.vec.get_unchecked_mut(self.start_pos) =
-                self.tag_id.unwrap_or(Tag::End) as u8;
+            *self.serializer.vec.get_unchecked_mut(self.start_pos) = self.tag_id as u8;
             if let Some(len) = self.len {
                 ptr::write(
                     self.serializer
@@ -540,7 +570,7 @@ impl<O: ByteOrder> ser::SerializeTupleVariant for &mut Serializer<O> {
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec.push(Tag::End as u8);
-        Ok(Tag::List)
+        Ok(Tag::Compound)
     }
 }
 

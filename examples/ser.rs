@@ -1,13 +1,13 @@
-use std::{collections::HashMap, fs::File};
+use std::collections::HashMap;
 
 use na_nbt::{
-    ReadableString, ScopedReadableList, ScopedReadableValue, ValueScoped, read_borrowed, to_vec,
-    to_writer,
+    ReadableString, ScopedReadableList, ScopedReadableValue, ValueScoped, from_slice_be,
+    read_borrowed, to_vec_be,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use zerocopy::BigEndian;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Player {
     name: String,
     health: f32,
@@ -15,7 +15,7 @@ struct Player {
     map: HashMap<String, i32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Item {
     name: String,
     count: u8,
@@ -85,13 +85,11 @@ fn main() {
         ],
         map: HashMap::from([("apple".to_string(), 1), ("banana".to_string(), 2)]),
     };
-    let serialized = to_vec::<BigEndian>(&player).unwrap();
+    let serialized = to_vec_be(&player).unwrap();
     let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
     let root = doc.root();
 
+    let deserialized: Player = from_slice_be(&serialized).unwrap();
     println!("{}", dump(&root));
-
-    // write to file
-    let mut file = File::create("player.nbt").unwrap();
-    to_writer::<BigEndian>(&mut file, &player).unwrap();
+    println!("{:#?}", deserialized);
 }

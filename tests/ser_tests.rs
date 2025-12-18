@@ -211,9 +211,15 @@ fn test_serialize_none_as_unit() {
 fn test_serialize_some() {
     let opt: Option<i32> = Some(42);
     let result = to_vec::<BigEndian>(&opt).unwrap();
-    assert_eq!(root_tag(&result), Tag::Int as u8);
-    // Should serialize the inner value directly
-    assert_eq!(payload(&result), &[0x00, 0x00, 0x00, 42]);
+    // Some is serialized as a compound with single unnamed field
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    let p = payload(&result);
+    // Structure: [field_tag, name_len(2 bytes, 0), value, End]
+    assert_eq!(p[0], Tag::Int as u8); // field tag
+    assert_eq!(p[1], 0); // name len hi
+    assert_eq!(p[2], 0); // name len lo
+    assert_eq!(read_be_i32(&p[3..7]), 42); // value
+    assert_eq!(p[7], Tag::End as u8); // end of compound
 }
 
 #[test]
@@ -280,7 +286,7 @@ fn test_serialize_vec_as_list() {
 
     let p = payload(&result);
     // List structure: element_type (1 byte) + length (4 bytes) + elements
-    assert_eq!(p[0], Tag::Compound as u8); // Wraps each element in Compound
+    assert_eq!(p[0], Tag::Int as u8); // Element type matches the vec content type
     assert_eq!(read_be_u32(&p[1..5]), 3); // 3 elements
 }
 
@@ -395,8 +401,8 @@ fn test_serialize_enum_tuple_variant() {
     }
 
     let result = to_vec::<BigEndian>(&Coord::Point2D(1, 2)).unwrap();
-    // Tuple variants serialize as List (containing compound-wrapped elements)
-    assert_eq!(root_tag(&result), Tag::List as u8);
+    // Tuple variants serialize as Compound { variant: List[Compound] }
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
     // Should contain variant name and end with End tag
     assert_eq!(*result.last().unwrap(), Tag::End as u8);
     assert!(result.windows(7).any(|w| w == b"Point2D"));
@@ -478,8 +484,8 @@ fn test_serialize_empty_vec() {
     assert_eq!(root_tag(&result), Tag::List as u8);
 
     let p = payload(&result);
-    // Empty list should still have list header with length 0
-    assert_eq!(p[0], Tag::Compound as u8);
+    // Empty list has element type End (no elements serialized to determine type)
+    assert_eq!(p[0], Tag::End as u8);
     assert_eq!(read_be_u32(&p[1..5]), 0);
 }
 
