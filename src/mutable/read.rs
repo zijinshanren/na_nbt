@@ -1,6 +1,6 @@
-use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
+use std::{any::TypeId, hint::assert_unchecked, io::BufRead, marker::PhantomData, ptr, slice};
 
-use zerocopy::byteorder;
+use zerocopy::{IntoBytes, byteorder};
 
 use crate::{
     ByteOrder, Error, OwnedCompound, OwnedList, OwnedValue, Result, Tag, cold_path,
@@ -374,6 +374,25 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
             let header_len = 1 + 2 + name_len;
             let old_len = compound_data.len();
 
+            macro_rules! case {
+                ($size:expr, $type:ident) => {{
+                    compound_data.reserve(header_len + $size);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::copy_nonoverlapping(start, write_ptr, header_len);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    check_bounds!($size);
+                    ptr::write(
+                        write_ptr.add(header_len).cast(),
+                        change_endian!(*(*current_pos).cast(), $type, O, R).to_bytes(),
+                    );
+                    *current_pos = current_pos.add($size);
+                    compound_data.set_len(old_len + header_len + $size);
+                }};
+            }
+
             match tag_id {
                 1 => {
                     compound_data.reserve(header_len + 1);
@@ -389,52 +408,13 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     compound_data.set_len(old_len + header_len + 1);
                 }
                 2 => {
-                    compound_data.reserve(header_len + 2);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
-                    ptr::copy_nonoverlapping(start, write_ptr, header_len);
-                    ptr::write(
-                        write_ptr.add(1).cast(),
-                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
-                    );
-                    check_bounds!(2);
-                    ptr::write(
-                        write_ptr.add(header_len).cast(),
-                        change_endian!(*(*current_pos).cast(), U16, O, R).to_bytes(),
-                    );
-                    *current_pos = current_pos.add(2);
-                    compound_data.set_len(old_len + header_len + 2);
+                    case!(2, U16)
                 }
                 3 | 5 => {
-                    compound_data.reserve(header_len + 4);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
-                    ptr::copy_nonoverlapping(start, write_ptr, header_len);
-                    ptr::write(
-                        write_ptr.add(1).cast(),
-                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
-                    );
-                    check_bounds!(4);
-                    ptr::write(
-                        write_ptr.add(header_len).cast(),
-                        change_endian!(*(*current_pos).cast(), U32, O, R).to_bytes(),
-                    );
-                    *current_pos = current_pos.add(4);
-                    compound_data.set_len(old_len + header_len + 4);
+                    case!(4, U32)
                 }
                 4 | 6 => {
-                    compound_data.reserve(header_len + 8);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
-                    ptr::copy_nonoverlapping(start, write_ptr, header_len);
-                    ptr::write(
-                        write_ptr.add(1).cast(),
-                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
-                    );
-                    check_bounds!(8);
-                    ptr::write(
-                        write_ptr.add(header_len).cast(),
-                        change_endian!(*(*current_pos).cast(), U64, O, R).to_bytes(),
-                    );
-                    *current_pos = current_pos.add(8);
-                    compound_data.set_len(old_len + header_len + 8);
+                    case!(8, U64)
                 }
                 7 => {
                     compound_data.reserve(header_len + SIZE_DYN);
@@ -569,6 +549,26 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
         *current_pos = current_pos.add(4);
 
         macro_rules! case {
+            ($size:expr, $type:ident) => {{
+                check_bounds!(len * $size);
+                let mut list_data = Vec::with_capacity(1 + 4 + len * $size);
+                let write_ptr = list_data.as_mut_ptr();
+                ptr::copy_nonoverlapping((*current_pos).sub(1 + 4), write_ptr, 1 + 4 + len * $size);
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; $size]>(), len);
+                for element in s {
+                    *element = change_endian!(*element, $type, O, R).to_bytes();
+                }
+                *current_pos = current_pos.add(len * $size);
+                list_data.set_len(1 + 4 + len * $size);
+                Ok(OwnedValue::List(OwnedList {
+                    data: list_data.into(),
+                    _marker: PhantomData,
+                }))
+            }};
             ($parse:block) => {{
                 let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
                 let write_ptr = list_data.as_mut_ptr();
@@ -622,64 +622,13 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }))
             }
             2 => {
-                check_bounds!(len * 2);
-                let mut list_data = Vec::with_capacity(1 + 4 + len * 2);
-                let write_ptr = list_data.as_mut_ptr();
-                ptr::copy_nonoverlapping((*current_pos).sub(1 + 4), write_ptr, 1 + 4 + len * 2);
-                ptr::write(
-                    write_ptr.add(1).cast(),
-                    byteorder::U32::<R>::new(len as u32).to_bytes(),
-                );
-                let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 2]>(), len);
-                for element in s {
-                    *element = change_endian!(*element, U16, O, R).to_bytes();
-                }
-                *current_pos = current_pos.add(len * 2);
-                list_data.set_len(1 + 4 + len * 2);
-                Ok(OwnedValue::List(OwnedList {
-                    data: list_data.into(),
-                    _marker: PhantomData,
-                }))
+                case!(2, U16)
             }
             3 | 5 => {
-                check_bounds!(len * 4);
-                let mut list_data = Vec::with_capacity(1 + 4 + len * 4);
-                let write_ptr = list_data.as_mut_ptr();
-                ptr::copy_nonoverlapping((*current_pos).sub(1 + 4), write_ptr, 1 + 4 + len * 4);
-                ptr::write(
-                    write_ptr.add(1).cast(),
-                    byteorder::U32::<R>::new(len as u32).to_bytes(),
-                );
-                let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 4]>(), len);
-                for element in s {
-                    *element = change_endian!(*element, U32, O, R).to_bytes();
-                }
-                *current_pos = current_pos.add(len * 4);
-                list_data.set_len(1 + 4 + len * 4);
-                Ok(OwnedValue::List(OwnedList {
-                    data: list_data.into(),
-                    _marker: PhantomData,
-                }))
+                case!(4, U32)
             }
             4 | 6 => {
-                check_bounds!(len * 8);
-                let mut list_data = Vec::with_capacity(1 + 4 + len * 8);
-                let write_ptr = list_data.as_mut_ptr();
-                ptr::copy_nonoverlapping((*current_pos).sub(1 + 4), write_ptr, 1 + 4 + len * 8);
-                ptr::write(
-                    write_ptr.add(1).cast(),
-                    byteorder::U32::<R>::new(len as u32).to_bytes(),
-                );
-                let s = slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; 8]>(), len);
-                for element in s {
-                    *element = change_endian!(*element, U64, O, R).to_bytes();
-                }
-                *current_pos = current_pos.add(len * 8);
-                list_data.set_len(1 + 4 + len * 8);
-                Ok(OwnedValue::List(OwnedList {
-                    data: list_data.into(),
-                    _marker: PhantomData,
-                }))
+                case!(8, U64)
             }
             7 => {
                 case!({
@@ -856,6 +805,515 @@ pub unsafe fn read_unsafe_fallback<O: ByteOrder, R: ByteOrder>(
                 Ok(OwnedValue::LongArray(
                     std::mem::transmute::<Vec<[u8; 8]>, Vec<byteorder::I64<R>>>(value).into(),
                 ))
+            }
+            _ => Err(Error::InvalidTagType(tag_id)),
+        }
+    }
+}
+
+unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
+    reader: &mut impl BufRead,
+) -> Result<OwnedValue<R>> {
+    unsafe {
+        let mut compound_data = Vec::with_capacity(128);
+
+        loop {
+            let mut tag_id = [0u8];
+            reader.read_exact(&mut tag_id).map_err(Error::IO)?;
+            let tag_id = tag_id[0];
+
+            if tag_id == 0 {
+                cold_path();
+                compound_data.push(0);
+                return Ok(OwnedValue::Compound(OwnedCompound {
+                    data: compound_data.into(),
+                    _marker: PhantomData,
+                }));
+            }
+
+            let mut name_len = [0u8; 2];
+            reader.read_exact(&mut name_len).map_err(Error::IO)?;
+            let name_len = byteorder::U16::<O>::from_bytes(name_len).get() as usize;
+
+            let header_len = 1 + 2 + name_len;
+            let old_len = compound_data.len();
+
+            macro_rules! case {
+                ($size:expr, $type:ident) => {{
+                    compound_data.reserve(header_len + $size);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(
+                            write_ptr.add(1 + 2),
+                            name_len + $size,
+                        ))
+                        .map_err(Error::IO)?;
+                    ptr::write(
+                        write_ptr.add(header_len).cast(),
+                        change_endian!(*write_ptr.add(header_len).cast(), $type, O, R).to_bytes(),
+                    );
+                    compound_data.set_len(old_len + header_len + $size);
+                }};
+            }
+
+            match tag_id {
+                1 => {
+                    compound_data.reserve(header_len + 1);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(
+                            write_ptr.add(1 + 2),
+                            name_len + 1,
+                        ))
+                        .map_err(Error::IO)?;
+                    compound_data.set_len(old_len + header_len + 1);
+                }
+                2 => {
+                    case!(2, U16)
+                }
+                3 | 5 => {
+                    case!(4, U32)
+                }
+                4 | 6 => {
+                    case!(8, U64)
+                }
+                7 => {
+                    compound_data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
+                        .map_err(Error::IO)?;
+                    let write_ptr = write_ptr.add(header_len);
+
+                    let mut len = [0u8; 4];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+
+                    let mut value = Vec::<u8>::with_capacity(len);
+                    value.set_len(len);
+                    reader
+                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .map_err(Error::IO)?;
+
+                    VecViewOwn::from(value).write(write_ptr);
+                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                }
+                8 => {
+                    compound_data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
+                        .map_err(Error::IO)?;
+                    let write_ptr = write_ptr.add(header_len);
+
+                    let mut len = [0u8; 2];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U16::<O>::from_bytes(len).get() as usize;
+
+                    let mut value = Vec::<u8>::with_capacity(len);
+                    value.set_len(len);
+                    reader
+                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .map_err(Error::IO)?;
+
+                    StringViewOwn::from(value).write(write_ptr);
+                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                }
+                9 => {
+                    compound_data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
+                        .map_err(Error::IO)?;
+                    let write_ptr = write_ptr.add(header_len);
+                    read_list_from_reader::<O, R>(reader)?.write(write_ptr);
+
+                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                }
+                10 => {
+                    compound_data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
+                        .map_err(Error::IO)?;
+                    let write_ptr = write_ptr.add(header_len);
+                    read_compound_from_reader::<O, R>(reader)?.write(write_ptr);
+
+                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                }
+                11 => {
+                    compound_data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
+                        .map_err(Error::IO)?;
+                    let write_ptr = write_ptr.add(header_len);
+
+                    let mut len = [0u8; 4];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                    let mut value = Vec::<byteorder::I32<R>>::with_capacity(len);
+                    value.set_len(len);
+                    reader
+                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .map_err(Error::IO)?;
+                    if TypeId::of::<R>() != TypeId::of::<O>() {
+                        let s =
+                            slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 4]>(), len);
+                        for element in s {
+                            *element = change_endian!(*element, U32, O, R).to_bytes();
+                        }
+                    }
+                    VecViewOwn::from(value).write(write_ptr);
+                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                }
+                12 => {
+                    compound_data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    ptr::write(write_ptr, tag_id);
+                    ptr::write(
+                        write_ptr.add(1).cast(),
+                        byteorder::U16::<R>::new(name_len as u16).to_bytes(),
+                    );
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
+                        .map_err(Error::IO)?;
+                    let write_ptr = write_ptr.add(header_len);
+
+                    let mut len = [0u8; 4];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                    let mut value = Vec::<byteorder::I64<R>>::with_capacity(len);
+                    value.set_len(len);
+                    reader
+                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .map_err(Error::IO)?;
+                    if TypeId::of::<R>() != TypeId::of::<O>() {
+                        let s =
+                            slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 8]>(), len);
+                        for element in s {
+                            *element = change_endian!(*element, U64, O, R).to_bytes();
+                        }
+                    }
+                    VecViewOwn::from(value).write(write_ptr);
+                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                }
+                _ => return Err(Error::InvalidTagType(tag_id)),
+            }
+        }
+    }
+}
+
+unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
+    reader: &mut impl BufRead,
+) -> Result<OwnedValue<R>> {
+    unsafe {
+        let mut tag_id = [0u8];
+        reader.read_exact(&mut tag_id).map_err(Error::IO)?;
+        let tag_id = tag_id[0];
+
+        let mut len = [0u8; 4];
+        reader.read_exact(&mut len).map_err(Error::IO)?;
+        let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+
+        macro_rules! case {
+            ($size:expr, $type:ident) => {{
+                let mut list_data = Vec::with_capacity(1 + 4 + len * $size);
+                let write_ptr = list_data.as_mut_ptr();
+                ptr::write(write_ptr, tag_id);
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                reader
+                    .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 4), len * $size))
+                    .map_err(Error::IO)?;
+                if TypeId::of::<R>() != TypeId::of::<O>() {
+                    let s =
+                        slice::from_raw_parts_mut(write_ptr.add(1 + 4).cast::<[u8; $size]>(), len);
+                    for element in s {
+                        *element = change_endian!(*element, $type, O, R).to_bytes();
+                    }
+                }
+                list_data.set_len(1 + 4 + len * $size);
+                Ok(OwnedValue::List(OwnedList {
+                    data: list_data.into(),
+                    _marker: PhantomData,
+                }))
+            }};
+            ($parse:block) => {{
+                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let write_ptr = list_data.as_mut_ptr();
+                ptr::write(write_ptr, tag_id);
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                let mut write_ptr = list_data.as_mut_ptr().add(1 + 4);
+                for _ in 0..len {
+                    $parse.write(write_ptr);
+                    write_ptr = write_ptr.add(SIZE_DYN);
+                }
+                list_data.set_len(1 + 4 + len * SIZE_DYN);
+                Ok(OwnedValue::List(OwnedList {
+                    data: list_data.into(),
+                    _marker: PhantomData,
+                }))
+            }};
+        }
+        match tag_id {
+            0 => {
+                let mut list_data = Vec::with_capacity(1 + 4);
+                let write_ptr = list_data.as_mut_ptr();
+                ptr::write(write_ptr, tag_id);
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                list_data.set_len(1 + 4);
+                Ok(OwnedValue::List(OwnedList {
+                    data: list_data.into(),
+                    _marker: PhantomData,
+                }))
+            }
+            1 => {
+                let mut list_data = Vec::with_capacity(1 + 4 + len);
+                let write_ptr = list_data.as_mut_ptr();
+                ptr::write(write_ptr, tag_id);
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<R>::new(len as u32).to_bytes(),
+                );
+                reader
+                    .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 4), len))
+                    .map_err(Error::IO)?;
+                list_data.set_len(1 + 4 + len);
+                Ok(OwnedValue::List(OwnedList {
+                    data: list_data.into(),
+                    _marker: PhantomData,
+                }))
+            }
+            2 => {
+                case!(2, U16)
+            }
+            3 | 5 => {
+                case!(4, U32)
+            }
+            4 | 6 => {
+                case!(8, U64)
+            }
+            7 => {
+                case!({
+                    let mut len = [0u8; 4];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                    let mut value = Vec::<i8>::with_capacity(len);
+                    value.set_len(len);
+                    reader
+                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .map_err(Error::IO)?;
+                    VecViewOwn::from(value)
+                })
+            }
+            8 => {
+                case!({
+                    let mut len = [0u8; 2];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U16::<O>::from_bytes(len).get() as usize;
+                    let mut value = Vec::<u8>::with_capacity(len);
+                    value.set_len(len);
+                    reader.read_exact(value.as_mut_slice()).map_err(Error::IO)?;
+                    StringViewOwn::from(value)
+                })
+            }
+            9 => {
+                case!({ read_list_from_reader::<O, R>(reader)? })
+            }
+            10 => {
+                case!({ read_compound_from_reader::<O, R>(reader)? })
+            }
+            11 => {
+                case!({
+                    let mut len = [0u8; 4];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                    let mut value = Vec::<byteorder::I32<R>>::with_capacity(len);
+                    value.set_len(len);
+                    reader
+                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .map_err(Error::IO)?;
+                    if TypeId::of::<R>() != TypeId::of::<O>() {
+                        let s =
+                            slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 4]>(), len);
+                        for element in s {
+                            *element = change_endian!(*element, U32, O, R).to_bytes();
+                        }
+                    }
+                    VecViewOwn::from(value)
+                })
+            }
+            12 => {
+                case!({
+                    let mut len = [0u8; 4];
+                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                    let mut value = Vec::<byteorder::I64<R>>::with_capacity(len);
+                    value.set_len(len);
+                    reader
+                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .map_err(Error::IO)?;
+                    if TypeId::of::<R>() != TypeId::of::<O>() {
+                        let s =
+                            slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 8]>(), len);
+                        for element in s {
+                            *element = change_endian!(*element, U64, O, R).to_bytes();
+                        }
+                    }
+                    VecViewOwn::from(value)
+                })
+            }
+            _ => Err(Error::InvalidTagType(tag_id)),
+        }
+    }
+}
+
+pub unsafe fn read_unsafe_from_reader<O: ByteOrder, R: ByteOrder>(
+    tag_id: u8,
+    reader: &mut impl BufRead,
+) -> Result<OwnedValue<R>> {
+    unsafe {
+        assert_unchecked(tag_id != 0);
+        match tag_id {
+            1 => {
+                let mut value = [0u8];
+                reader.read_exact(&mut value).map_err(Error::IO)?;
+                Ok(OwnedValue::Byte(value[0] as i8))
+            }
+            2 => {
+                let mut value = [0u8; 2];
+                reader.read_exact(&mut value).map_err(Error::IO)?;
+                Ok(OwnedValue::Short(
+                    byteorder::I16::<O>::from_bytes(value).get().into(),
+                ))
+            }
+            3 => {
+                let mut value = [0u8; 4];
+                reader.read_exact(&mut value).map_err(Error::IO)?;
+                Ok(OwnedValue::Int(
+                    byteorder::I32::<O>::from_bytes(value).get().into(),
+                ))
+            }
+            4 => {
+                let mut value = [0u8; 8];
+                reader.read_exact(&mut value).map_err(Error::IO)?;
+                Ok(OwnedValue::Long(
+                    byteorder::I64::<O>::from_bytes(value).get().into(),
+                ))
+            }
+            5 => {
+                let mut value = [0u8; 4];
+                reader.read_exact(&mut value).map_err(Error::IO)?;
+                Ok(OwnedValue::Float(
+                    byteorder::F32::<O>::from_bytes(value).get().into(),
+                ))
+            }
+            6 => {
+                let mut value = [0u8; 8];
+                reader.read_exact(&mut value).map_err(Error::IO)?;
+                Ok(OwnedValue::Double(
+                    byteorder::F64::<O>::from_bytes(value).get().into(),
+                ))
+            }
+            7 => {
+                let mut len = [0u8; 4];
+                reader.read_exact(&mut len).map_err(Error::IO)?;
+                let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                let mut value = Vec::<i8>::with_capacity(len);
+                value.set_len(len);
+                reader
+                    .read_exact(value.as_mut_slice().as_mut_bytes())
+                    .map_err(Error::IO)?;
+                Ok(OwnedValue::ByteArray(VecViewOwn::from(value)))
+            }
+            8 => {
+                let mut len = [0u8; 2];
+                reader.read_exact(&mut len).map_err(Error::IO)?;
+                let len = byteorder::U16::<O>::from_bytes(len).get() as usize;
+                let mut value = Vec::with_capacity(len);
+                value.set_len(len);
+                reader.read_exact(value.as_mut_slice()).map_err(Error::IO)?;
+                Ok(OwnedValue::String(StringViewOwn::from(value)))
+            }
+            9 => read_list_from_reader::<O, R>(reader),
+            10 => read_compound_from_reader::<O, R>(reader),
+            11 => {
+                let mut len = [0u8; 4];
+                reader.read_exact(&mut len).map_err(Error::IO)?;
+                let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                let mut value = Vec::<byteorder::I32<R>>::with_capacity(len);
+                value.set_len(len);
+                reader
+                    .read_exact(value.as_mut_slice().as_mut_bytes())
+                    .map_err(Error::IO)?;
+                if TypeId::of::<R>() != TypeId::of::<O>() {
+                    let s = slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 4]>(), len);
+                    for element in s {
+                        *element = change_endian!(*element, U32, O, R).to_bytes();
+                    }
+                }
+                Ok(OwnedValue::IntArray(VecViewOwn::from(value)))
+            }
+            12 => {
+                let mut len = [0u8; 4];
+                reader.read_exact(&mut len).map_err(Error::IO)?;
+                let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
+                let mut value = Vec::<byteorder::I64<R>>::with_capacity(len);
+                value.set_len(len);
+                reader
+                    .read_exact(value.as_mut_slice().as_mut_bytes())
+                    .map_err(Error::IO)?;
+                if TypeId::of::<R>() != TypeId::of::<O>() {
+                    let s = slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 8]>(), len);
+                    for element in s {
+                        *element = change_endian!(*element, U64, O, R).to_bytes();
+                    }
+                }
+                Ok(OwnedValue::LongArray(VecViewOwn::from(value)))
             }
             _ => Err(Error::InvalidTagType(tag_id)),
         }

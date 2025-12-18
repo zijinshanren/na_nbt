@@ -60,7 +60,11 @@ mod value_mut;
 mod value_own;
 mod write;
 
-use std::{any::TypeId, io::Write, ptr};
+use std::{
+    any::TypeId,
+    io::{BufRead, BufReader, Read, Write},
+    ptr,
+};
 
 pub(crate) use into_owned_value::IntoOwnedValue;
 pub use value::{ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue};
@@ -72,7 +76,7 @@ use zerocopy::{IntoBytes, byteorder};
 use crate::{
     ByteOrder, Error, Result, Tag, ValueScoped, cold_path,
     mutable::{
-        read::{read_unsafe, read_unsafe_fallback},
+        read::{read_unsafe, read_unsafe_fallback, read_unsafe_from_reader},
         trait_impl::Config,
         write::{
             write_compound, write_compound_fallback, write_compound_to_writer,
@@ -171,6 +175,52 @@ pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<
             return Err(Error::TrailingData(
                 end_pos.byte_offset_from_unsigned(current_pos),
             ));
+        }
+
+        Ok(value)
+    }
+}
+
+pub fn read_owned_from_reader<SOURCE: ByteOrder, STORE: ByteOrder>(
+    reader: impl Read,
+) -> Result<OwnedValue<STORE>> {
+    unsafe {
+        let mut reader = BufReader::new(reader);
+
+        let mut tag_id = [0u8];
+        reader.read_exact(&mut tag_id).map_err(Error::IO)?;
+        let tag_id = tag_id[0];
+
+        if tag_id == 0 {
+            cold_path();
+            return Ok(OwnedValue::End);
+        }
+
+        let mut name_len = [0u8; 2];
+        reader.read_exact(&mut name_len).map_err(Error::IO)?;
+        let name_len = byteorder::U16::<SOURCE>::from_bytes(name_len).get() as usize;
+        {
+            let mut skipped = 0;
+            while skipped < name_len {
+                let buf_len = reader.fill_buf().map_err(Error::IO)?.len();
+                if buf_len == 0 {
+                    cold_path();
+                    return Err(Error::EndOfFile);
+                }
+                let read = std::cmp::min(buf_len, name_len - skipped);
+                reader.consume(read);
+                skipped += read;
+            }
+        }
+
+        let value = read_unsafe_from_reader::<SOURCE, STORE>(tag_id, &mut reader)?;
+
+        {
+            let remaining = reader.fill_buf().map_err(Error::IO)?.len();
+            if remaining > 0 {
+                cold_path();
+                return Err(Error::TrailingData(remaining));
+            }
         }
 
         Ok(value)

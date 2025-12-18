@@ -1873,6 +1873,17 @@ impl From<&[u8]> for StringViewOwn {
     }
 }
 
+impl From<Vec<u8>> for StringViewOwn {
+    fn from(value: Vec<u8>) -> Self {
+        let mut encoded = ManuallyDrop::new(value);
+        StringViewOwn {
+            ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
+            len: Unalign::new(encoded.len()),
+            cap: Unalign::new(encoded.capacity()),
+        }
+    }
+}
+
 impl From<&str> for StringViewOwn {
     fn from(value: &str) -> Self {
         let mut encoded = ManuallyDrop::new(simd_cesu8::mutf8::encode(value).into_owned());
