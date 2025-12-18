@@ -1,6 +1,6 @@
 use std::{any::TypeId, hint::assert_unchecked, io::BufRead, marker::PhantomData, ptr, slice};
 
-use zerocopy::{IntoBytes, byteorder};
+use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, Error, OwnedCompound, OwnedList, OwnedValue, Result, Tag, cold_path,
@@ -905,10 +905,10 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
 
                     let mut value = Vec::<u8>::with_capacity(len);
-                    value.set_len(len);
                     reader
-                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr(), len))
                         .map_err(Error::IO)?;
+                    value.set_len(len);
 
                     VecViewOwn::from(value).write(write_ptr);
                     compound_data.set_len(old_len + header_len + SIZE_DYN);
@@ -931,10 +931,10 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     let len = byteorder::U16::<O>::from_bytes(len).get() as usize;
 
                     let mut value = Vec::<u8>::with_capacity(len);
-                    value.set_len(len);
                     reader
-                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr(), len))
                         .map_err(Error::IO)?;
+                    value.set_len(len);
 
                     StringViewOwn::from(value).write(write_ptr);
                     compound_data.set_len(old_len + header_len + SIZE_DYN);
@@ -988,10 +988,13 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     reader.read_exact(&mut len).map_err(Error::IO)?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<byteorder::I32<R>>::with_capacity(len);
-                    value.set_len(len);
                     reader
-                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .read_exact(slice::from_raw_parts_mut(
+                            value.as_mut_ptr().cast(),
+                            len * 4,
+                        ))
                         .map_err(Error::IO)?;
+                    value.set_len(len);
                     if TypeId::of::<R>() != TypeId::of::<O>() {
                         let s =
                             slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 4]>(), len);
@@ -1019,10 +1022,13 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     reader.read_exact(&mut len).map_err(Error::IO)?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<byteorder::I64<R>>::with_capacity(len);
-                    value.set_len(len);
                     reader
-                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .read_exact(slice::from_raw_parts_mut(
+                            value.as_mut_ptr().cast(),
+                            len * 8,
+                        ))
                         .map_err(Error::IO)?;
+                    value.set_len(len);
                     if TypeId::of::<R>() != TypeId::of::<O>() {
                         let s =
                             slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 8]>(), len);
@@ -1143,10 +1149,10 @@ unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
                     reader.read_exact(&mut len).map_err(Error::IO)?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<i8>::with_capacity(len);
-                    value.set_len(len);
                     reader
-                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr().cast(), len))
                         .map_err(Error::IO)?;
+                    value.set_len(len);
                     VecViewOwn::from(value)
                 })
             }
@@ -1156,8 +1162,10 @@ unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
                     reader.read_exact(&mut len).map_err(Error::IO)?;
                     let len = byteorder::U16::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<u8>::with_capacity(len);
+                    reader
+                        .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr(), len))
+                        .map_err(Error::IO)?;
                     value.set_len(len);
-                    reader.read_exact(value.as_mut_slice()).map_err(Error::IO)?;
                     StringViewOwn::from(value)
                 })
             }
@@ -1173,10 +1181,13 @@ unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
                     reader.read_exact(&mut len).map_err(Error::IO)?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<byteorder::I32<R>>::with_capacity(len);
-                    value.set_len(len);
                     reader
-                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .read_exact(slice::from_raw_parts_mut(
+                            value.as_mut_ptr().cast(),
+                            len * 4,
+                        ))
                         .map_err(Error::IO)?;
+                    value.set_len(len);
                     if TypeId::of::<R>() != TypeId::of::<O>() {
                         let s =
                             slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 4]>(), len);
@@ -1193,10 +1204,13 @@ unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
                     reader.read_exact(&mut len).map_err(Error::IO)?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<byteorder::I64<R>>::with_capacity(len);
-                    value.set_len(len);
                     reader
-                        .read_exact(value.as_mut_slice().as_mut_bytes())
+                        .read_exact(slice::from_raw_parts_mut(
+                            value.as_mut_ptr().cast(),
+                            len * 8,
+                        ))
                         .map_err(Error::IO)?;
+                    value.set_len(len);
                     if TypeId::of::<R>() != TypeId::of::<O>() {
                         let s =
                             slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 8]>(), len);
@@ -1264,10 +1278,10 @@ pub unsafe fn read_unsafe_from_reader<O: ByteOrder, R: ByteOrder>(
                 reader.read_exact(&mut len).map_err(Error::IO)?;
                 let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                 let mut value = Vec::<i8>::with_capacity(len);
-                value.set_len(len);
                 reader
-                    .read_exact(value.as_mut_slice().as_mut_bytes())
+                    .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr().cast(), len))
                     .map_err(Error::IO)?;
+                value.set_len(len);
                 Ok(OwnedValue::ByteArray(VecViewOwn::from(value)))
             }
             8 => {
@@ -1275,8 +1289,10 @@ pub unsafe fn read_unsafe_from_reader<O: ByteOrder, R: ByteOrder>(
                 reader.read_exact(&mut len).map_err(Error::IO)?;
                 let len = byteorder::U16::<O>::from_bytes(len).get() as usize;
                 let mut value = Vec::with_capacity(len);
+                reader
+                    .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr(), len))
+                    .map_err(Error::IO)?;
                 value.set_len(len);
-                reader.read_exact(value.as_mut_slice()).map_err(Error::IO)?;
                 Ok(OwnedValue::String(StringViewOwn::from(value)))
             }
             9 => read_list_from_reader::<O, R>(reader),
@@ -1286,10 +1302,13 @@ pub unsafe fn read_unsafe_from_reader<O: ByteOrder, R: ByteOrder>(
                 reader.read_exact(&mut len).map_err(Error::IO)?;
                 let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                 let mut value = Vec::<byteorder::I32<R>>::with_capacity(len);
-                value.set_len(len);
                 reader
-                    .read_exact(value.as_mut_slice().as_mut_bytes())
+                    .read_exact(slice::from_raw_parts_mut(
+                        value.as_mut_ptr().cast(),
+                        len * 4,
+                    ))
                     .map_err(Error::IO)?;
+                value.set_len(len);
                 if TypeId::of::<R>() != TypeId::of::<O>() {
                     let s = slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 4]>(), len);
                     for element in s {
@@ -1303,10 +1322,13 @@ pub unsafe fn read_unsafe_from_reader<O: ByteOrder, R: ByteOrder>(
                 reader.read_exact(&mut len).map_err(Error::IO)?;
                 let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                 let mut value = Vec::<byteorder::I64<R>>::with_capacity(len);
-                value.set_len(len);
                 reader
-                    .read_exact(value.as_mut_slice().as_mut_bytes())
+                    .read_exact(slice::from_raw_parts_mut(
+                        value.as_mut_ptr().cast(),
+                        len * 8,
+                    ))
                     .map_err(Error::IO)?;
+                value.set_len(len);
                 if TypeId::of::<R>() != TypeId::of::<O>() {
                     let s = slice::from_raw_parts_mut(value.as_mut_ptr().cast::<[u8; 8]>(), len);
                     for element in s {
