@@ -41,7 +41,9 @@
 //! | `i64`, `u64` | `Long` |
 //! | `f32` | `Float` |
 //! | `f64` | `Double` |
-//! | `&[u8]` (via `serialize_bytes`) | `ByteArray` |
+//! | `Vec<i8>` (with `na_nbt::byte_array`), `&[u8]` (via `serialize_bytes`) | `ByteArray` |
+//! | `Vec<i32>` (with `na_nbt::int_array`) | `IntArray` |
+//! | `Vec<i64>` (with `na_nbt::long_array`) | `LongArray` |
 //! | `&str`, `String` | `String` |
 //! | `Vec<T>`, `&[T]` | `List` |
 //! | structs, `HashMap<String, T>` | `Compound` |

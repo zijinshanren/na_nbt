@@ -389,6 +389,9 @@
 //! | `i64`, `u64` | Long | |
 //! | `f32` | Float | |
 //! | `f64` | Double | |
+//! | `Vec<i8>` | ByteArray | With `#[serde(with = "na_nbt::byte_array")]` |
+//! | `Vec<i32>` | IntArray | With `#[serde(with = "na_nbt::int_array")]` |
+//! | `Vec<i64>` | LongArray | With `#[serde(with = "na_nbt::long_array")]` |
 //! | `String`, `&str` | String | MUTF-8 encoded |
 //! | `Vec<T>`, `&[T]` | List | Homogeneous elements |
 //! | struct | Compound | Named fields |
@@ -434,7 +437,7 @@
 //! struct ChunkData {
 //!     block_states: Vec<i64>,  // Auto-detects LongArray OR List<Long>
 //!     biomes: Vec<i32>,        // Auto-detects IntArray OR List<Int>
-//!     heightmap: Vec<u8>,      // Auto-detects ByteArray OR List<Byte>
+//!     heightmap: Vec<i8>,      // Auto-detects ByteArray OR List<Byte>
 //! }
 //! ```
 //!
@@ -452,44 +455,7 @@
 //!     biomes: Vec<i32>,        // Serializes as IntArray (zero-copy)
 //!     
 //!     #[serde(with = "na_nbt::byte_array")]
-//!     heightmap: Vec<u8>,      // Serializes as ByteArray (zero-copy)
-//! }
-//! ```
-//!
-//! ## ByteArray Support
-//!
-//! For `Vec<u8>`, use `serialize_bytes` to get NBT's native `ByteArray`:
-//!
-//! ```ignore
-//! use serde::{Serialize, Deserialize, Serializer, Deserializer};
-//!
-//! #[derive(Serialize, Deserialize)]
-//! struct ChunkData {
-//!     #[serde(with = "byte_array")]
-//!     blocks: Vec<u8>,
-//! }
-//!
-//! mod byte_array {
-//!     use super::*;
-//!     use serde::de;
-//!     
-//!     pub fn serialize<S: Serializer>(data: &[u8], s: S) -> Result<S::Ok, S::Error> {
-//!         s.serialize_bytes(data)
-//!     }
-//!     
-//!     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
-//!         struct Visitor;
-//!         impl<'de> de::Visitor<'de> for Visitor {
-//!             type Value = Vec<u8>;
-//!             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//!                 f.write_str("byte array")
-//!             }
-//!             fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
-//!                 Ok(v.to_vec())
-//!             }
-//!         }
-//!         d.deserialize_bytes(Visitor)
-//!     }
+//!     heightmap: Vec<i8>,      // Serializes as ByteArray (zero-copy)
 //! }
 //! ```
 //!

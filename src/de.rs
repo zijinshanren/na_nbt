@@ -39,12 +39,12 @@
 //! | `Long` | `i64`, `u64` |
 //! | `Float` | `f32` |
 //! | `Double` | `f64` |
-//! | `ByteArray` | `&[u8]`, `Vec<u8>` (with `#[serde(with = "serde_bytes")]`) |
+//! | `ByteArray` | `Vec<i8>` (with `#[serde(with = "na_nbt::byte_array")]`), `&[u8]`/`Vec<u8>` (with `serde_bytes`) |
 //! | `String` | `&str`, `String` |
 //! | `List` | `Vec<T>`, `[T; N]` |
 //! | `Compound` | structs, `HashMap<String, T>` |
-//! | `IntArray` | `Vec<i32>` (via List) |
-//! | `LongArray` | `Vec<i64>` (via List) |
+//! | `IntArray` | `Vec<i32>` (via List or `#[serde(with = "na_nbt::int_array")]`) |
+//! | `LongArray` | `Vec<i64>` (via List or `#[serde(with = "na_nbt::long_array")]`) |
 //!
 //! # Enum Support
 //!

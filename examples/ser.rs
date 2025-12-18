@@ -35,7 +35,7 @@ enum Data {
         health: i32,
     },
     #[serde(with = "na_nbt::byte_array")]
-    ByteArray(Vec<u8>),
+    ByteArray(Vec<i8>),
     #[serde(with = "na_nbt::int_array")]
     IntArray(Vec<i32>),
     #[serde(with = "na_nbt::long_array")]

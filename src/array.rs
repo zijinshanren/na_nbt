@@ -4,7 +4,7 @@
 //!
 //! | Module | NBT Tag | Element Type | Tag ID |
 //! |--------|---------|--------------|--------|
-//! | [`byte_array`] | `ByteArray` | `u8` | 7 |
+//! | [`byte_array`] | `ByteArray` | `i8` | 7 |
 //! | [`int_array`] | `IntArray` | `i32` | 11 |
 //! | [`long_array`] | `LongArray` | `i64` | 12 |
 //!
@@ -35,13 +35,13 @@
 //! struct ChunkData {
 //!     block_states: Vec<i64>,  // Auto-detects LongArray or List<Long>
 //!     biomes: Vec<i32>,        // Auto-detects IntArray or List<Int>
-//!     heightmap: Vec<u8>,      // Note: ByteArray requires byte_array module
+//!     heightmap: Vec<i8>,      // Note: ByteArray requires byte_array module
 //! }
 //! ```
 //!
 //! # Serialization (Use These Modules)
 //!
-//! By default, `Vec<u8>`, `Vec<i32>`, and `Vec<i64>` serialize as `List` types.
+//! By default, `Vec<i8>`, `Vec<i32>`, and `Vec<i64>` serialize as `List` types.
 //! Use `#[serde(with = "...")]` to serialize as native arrays:
 //!
 //! ```ignore
@@ -56,7 +56,7 @@
 //!     biomes: Vec<i32>,        // Serializes as IntArray
 //!     
 //!     #[serde(with = "na_nbt::byte_array")]
-//!     heightmap: Vec<u8>,      // Serializes as ByteArray
+//!     heightmap: Vec<i8>,      // Serializes as ByteArray
 //! }
 //! ```
 //!
@@ -89,6 +89,8 @@
 //! let loaded: HeightMap = from_slice_be(&bytes).unwrap();
 //! assert_eq!(heightmap, loaded);
 //! ```
+
+use std::slice;
 
 use serde::{Deserializer, Serialize, Serializer, de};
 
@@ -177,18 +179,18 @@ impl<'de> de::Visitor<'de> for LongArrayVisitor {
 struct ByteArrayVisitor;
 
 impl<'de> de::Visitor<'de> for ByteArrayVisitor {
-    type Value = Vec<u8>;
+    type Value = Vec<i8>;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("a byte array")
     }
 
     fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
-        Ok(v.to_vec())
+        Ok(unsafe { slice::from_raw_parts(v.as_ptr() as *const i8, v.len()).to_vec() })
     }
 
     fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Self::Value, E> {
-        Ok(v)
+        Ok(unsafe { std::mem::transmute::<Vec<u8>, Vec<i8>>(v) })
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -207,7 +209,7 @@ impl<'de> de::Visitor<'de> for ByteArrayVisitor {
 // Serde modules for #[serde(with = "...")]
 // ============================================================================
 
-/// Serde module for `Vec<u8>` as NBT `ByteArray`.
+/// Serde module for `Vec<i8>` as NBT `ByteArray`.
 ///
 /// This module serializes byte vectors as NBT's native `ByteArray` (tag 7)
 /// instead of `List<Byte>` (tag 9), which is more compact.
@@ -220,7 +222,7 @@ impl<'de> de::Visitor<'de> for ByteArrayVisitor {
 /// #[derive(Serialize, Deserialize)]
 /// struct BlockData {
 ///     #[serde(with = "na_nbt::byte_array")]
-///     light_levels: Vec<u8>,
+///     light_levels: Vec<i8>,
 /// }
 /// ```
 ///
@@ -232,18 +234,20 @@ impl<'de> de::Visitor<'de> for ByteArrayVisitor {
 pub mod byte_array {
     use super::*;
 
-    /// Serialize `&[u8]` as NBT `ByteArray`.
+    /// Serialize `&[i8]` as NBT `ByteArray`.
     ///
     /// The bytes are written directly without any intermediate allocation.
-    pub fn serialize<S>(data: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(data: &[i8], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(data)
+        serializer.serialize_bytes(unsafe {
+            slice::from_raw_parts(data.as_ptr() as *const u8, data.len())
+        })
     }
 
-    /// Deserialize `Vec<u8>` from NBT `ByteArray`.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    /// Deserialize `Vec<i8>` from NBT `ByteArray`.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<i8>, D::Error>
     where
         D: Deserializer<'de>,
     {
