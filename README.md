@@ -18,7 +18,7 @@ A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsin
 
 ```toml
 [dependencies]
-na_nbt = "0.1.0"
+na_nbt = "0.1"
 ```
 
 ### Optional Features
@@ -27,10 +27,10 @@ Both `serde` and `shared` features are enabled by default. To use without option
 
 ```toml
 [dependencies]
-na_nbt = { version = "0.1.0", default-features = false }
+na_nbt = { version = "0.1", default-features = false }
 
 # Or enable only what you need:
-na_nbt = { version = "0.1.0", default-features = false, features = ["serde"] }
+na_nbt = { version = "0.1", default-features = false, features = ["serde"] }
 ```
 
 | Feature | Description | Dependencies |
