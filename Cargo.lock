@@ -256,6 +256,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "criterion",
+ "serde",
  "simd_cesu8",
  "zerocopy",
 ]

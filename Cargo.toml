@@ -2,6 +2,14 @@
 name = "na_nbt"
 version = "0.1.0"
 edition = "2024"
+description = "High-performance NBT (Named Binary Tag) library with zero-copy parsing and serde support"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/zijinshanren/na_nbt"
+documentation = "https://docs.rs/na_nbt"
+readme = "README.md"
+keywords = ["nbt", "minecraft", "binary", "serialization", "serde"]
+categories = ["encoding", "game-development", "parser-implementations"]
+rust-version = "1.87"
 
 [features]
 default = []

@@ -642,7 +642,8 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 self.input = &self.input[4..];
-                visitor.visit_seq(IntArrayDeserializer {
+                visitor.visit_seq(ListDeserializer {
+                    tag_id: Tag::Int,
                     index: 0,
                     len: length,
                     deserializer: self,
@@ -654,13 +655,14 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 self.input = &self.input[4..];
-                visitor.visit_seq(LongArrayDeserializer {
+                visitor.visit_seq(ListDeserializer {
+                    tag_id: Tag::Long,
                     index: 0,
                     len: length,
                     deserializer: self,
                 })
             }
-            _ => {
+            Tag::List => {
                 // Standard List format: element_tag (1 byte) + length (4 bytes)
                 check_bounds!(1 + 4, self.input);
                 let tag_id = self.input[0];
@@ -678,6 +680,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                     len: length,
                     deserializer: self,
                 })
+            }
+            _ => {
+                cold_path();
+                Err(Error::TagMismatch(Tag::List as u8, self.current_tag as u8))
             }
         }
     }
@@ -834,62 +840,6 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for ListDeserializer<'a, 'de, O> {
         }
         self.index += 1;
         self.deserializer.current_tag = self.tag_id;
-        seed.deserialize(&mut *self.deserializer).map(Some)
-    }
-}
-
-// For deserializing IntArray (Tag 11)
-struct IntArrayDeserializer<'a, 'de: 'a, O: ByteOrder> {
-    index: u32,
-    len: u32,
-    deserializer: &'a mut Deserializer<'de, O>,
-}
-
-impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for IntArrayDeserializer<'a, 'de, O> {
-    type Error = Error;
-
-    fn next_element_seed<T>(
-        &mut self,
-        seed: T,
-    ) -> std::result::Result<Option<T::Value>, Self::Error>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        if self.index >= self.len {
-            return Ok(None);
-        }
-        self.index += 1;
-        self.deserializer.current_tag = Tag::Int;
-        seed.deserialize(&mut *self.deserializer).map(Some)
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some((self.len - self.index) as usize)
-    }
-}
-
-// For deserializing LongArray (Tag 12)
-struct LongArrayDeserializer<'a, 'de: 'a, O: ByteOrder> {
-    index: u32,
-    len: u32,
-    deserializer: &'a mut Deserializer<'de, O>,
-}
-
-impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for LongArrayDeserializer<'a, 'de, O> {
-    type Error = Error;
-
-    fn next_element_seed<T>(
-        &mut self,
-        seed: T,
-    ) -> std::result::Result<Option<T::Value>, Self::Error>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        if self.index >= self.len {
-            return Ok(None);
-        }
-        self.index += 1;
-        self.deserializer.current_tag = Tag::Long;
         seed.deserialize(&mut *self.deserializer).map(Some)
     }
 
