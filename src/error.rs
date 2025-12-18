@@ -30,6 +30,8 @@
 
 use std::fmt::{self, Display};
 
+use serde::{de, ser};
+
 /// Alias for a `Result` with the error type [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -44,10 +46,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// - [`InvalidTagType`](Error::InvalidTagType) - An unknown NBT tag type was encountered
 #[derive(Debug)]
 pub enum Error {
+    Message(String),
+
     /// An I/O error occurred.
     ///
     /// This typically happens when writing to a [`std::io::Write`] implementation
-    /// that encounters an error.
+    /// or reading from a [`std::io::Read`] implementation that encounters an error.
     IO(std::io::Error),
 
     /// The input ended unexpectedly.
@@ -70,11 +74,34 @@ pub enum Error {
     /// where a tag type is expected, this error is returned with the
     /// invalid byte value.
     InvalidTagType(u8),
+
+    ListTooLong(usize),
+
+    ListLengthUnknown,
+
+    /// Map key must be a string type.
+    ///
+    /// NBT compound tags require string keys. This error is returned when
+    /// attempting to serialize a map with non-string keys.
+    KeyMustBeString,
+}
+
+impl ser::Error for Error {
+    fn custom<T: Display>(msg: T) -> Self {
+        Error::Message(msg.to_string())
+    }
+}
+
+impl de::Error for Error {
+    fn custom<T: Display>(msg: T) -> Self {
+        Error::Message(msg.to_string())
+    }
 }
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Error::Message(message) => formatter.write_str(message),
             Error::IO(error) => formatter.write_str(&error.to_string()),
             Error::EndOfFile => formatter.write_str("unexpected end of input"),
             Error::TrailingData(remaining_bytes) => formatter.write_str(&format!(
@@ -83,9 +110,11 @@ impl Display for Error {
             Error::InvalidTagType(tag) => {
                 formatter.write_str(&format!("invalid NBT tag type: {tag:#04x}"))
             }
+            Error::ListTooLong(len) => formatter.write_str(&format!("list length too long: {len}")),
+            Error::ListLengthUnknown => formatter.write_str("list length unknown"),
+            Error::KeyMustBeString => formatter.write_str("map key must be a string"),
         }
     }
 }
 
 impl std::error::Error for Error {}
-

@@ -305,10 +305,12 @@
 //! \* With appropriate lifetime management  
 //! † Use [`MutableValue`] or [`ImmutableValue`] for borrowed access
 
+pub mod de;
 pub mod error;
 pub mod immutable;
 mod index;
 pub mod mutable;
+pub mod ser;
 pub mod tag;
 pub mod util;
 pub mod value_trait;
@@ -317,6 +319,7 @@ mod view;
 pub use error::*;
 pub use immutable::*;
 pub use mutable::*;
+pub use ser::{Serializer, to_vec, to_writer};
 pub use tag::*;
 pub use util::*;
 pub use value_trait::*;
