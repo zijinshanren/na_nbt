@@ -8,7 +8,8 @@ A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsin
 - **Full mutation** - Create and modify NBT structures with an owned representation  
 - **Endianness support** - Convert between BigEndian and LittleEndian on read or write
 - **Generic traits** - Write code that works with any value type
-- **Serde integration** - Serialize/deserialize Rust types directly to/from NBT
+- **Serde integration** - Serialize/deserialize Rust types directly to/from NBT (optional)
+- **Shared values** - Thread-safe `Arc`-based values with `bytes` crate (optional)
 
 ## Installation
 
@@ -16,6 +17,23 @@ A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsin
 [dependencies]
 na_nbt = "0.1.0"
 ```
+
+### Optional Features
+
+Both `serde` and `shared` features are enabled by default. To use without optional dependencies:
+
+```toml
+[dependencies]
+na_nbt = { version = "0.1.0", default-features = false }
+
+# Or enable only what you need:
+na_nbt = { version = "0.1.0", default-features = false, features = ["serde"] }
+```
+
+| Feature | Description | Dependencies |
+|---------|-------------|--------------|
+| `serde` | Serialize/deserialize Rust types to/from NBT | `serde` |
+| `shared` | `SharedValue` with Arc ownership | `bytes` |
 
 ## Quick Start
 

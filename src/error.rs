@@ -51,8 +51,6 @@
 
 use std::fmt::{self, Display};
 
-use serde::{de, ser};
-
 /// Alias for a `Result` with the error type [`Error`].
 ///
 /// This is used throughout the crate for consistency.
@@ -268,13 +266,15 @@ pub enum Error {
     InvalidCharacter(u32),
 }
 
-impl ser::Error for Error {
+#[cfg(feature = "serde")]
+impl serde::ser::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {
         Error::Message(msg.to_string())
     }
 }
 
-impl de::Error for Error {
+#[cfg(feature = "serde")]
+impl serde::de::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {
         Error::Message(msg.to_string())
     }

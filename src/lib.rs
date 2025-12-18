@@ -13,6 +13,24 @@
 //! | ├─ Int | "score" | 100 |
 //! | └─ List | "inventory" | [Compound, ...] |
 //!
+//! # Features
+//!
+//! This crate has two optional features, both enabled by default:
+//!
+//! | Feature | Description | Dependencies |
+//! |---------|-------------|--------------|
+//! | `serde` | Serialize/deserialize Rust types to/from NBT | `serde` |
+//! | `shared` | [`SharedValue`] with Arc ownership | `bytes` |
+//!
+//! To use without optional dependencies:
+//!
+//! ```toml
+//! [dependencies]
+//! na_nbt = { version = "0.1", default-features = false }
+//! ```
+//!
+//! # Working with NBT
+//!
 //! There are three common ways to work with NBT data in Rust:
 //!
 //! - **As raw bytes.** Binary NBT data you read from a file, receive over the
@@ -494,27 +512,36 @@
 //!
 //! For more details, see the [`de`] and [`ser`] module documentation.
 
+// Serde support (optional, enabled by default)
+#[cfg(feature = "serde")]
 pub mod array;
+#[cfg(feature = "serde")]
 pub mod de;
+#[cfg(feature = "serde")]
+pub mod ser;
+
 pub mod error;
 pub mod immutable;
 mod index;
 pub mod mutable;
-pub mod ser;
 pub mod tag;
 pub mod util;
 pub mod value_trait;
 mod view;
 
+#[cfg(feature = "serde")]
 pub use array::{byte_array, int_array, long_array};
+#[cfg(feature = "serde")]
 pub use de::{
     Deserializer, from_reader, from_reader_be, from_reader_le, from_slice, from_slice_be,
     from_slice_le,
 };
+#[cfg(feature = "serde")]
+pub use ser::{Serializer, to_vec, to_vec_be, to_vec_le, to_writer, to_writer_be, to_writer_le};
+
 pub use error::*;
 pub use immutable::*;
 pub use mutable::*;
-pub use ser::{Serializer, to_vec, to_vec_be, to_vec_le, to_writer, to_writer_be, to_writer_le};
 pub use tag::*;
 pub use util::*;
 pub use value_trait::*;

@@ -12,15 +12,24 @@ categories = ["encoding", "game-development", "parser-implementations"]
 rust-version = "1.87"
 
 [features]
-default = []
+default = ["serde", "shared"]
 nightly = ["simd_cesu8/nightly"]
+# Enable serde serialization/deserialization support
+serde = ["dep:serde"]
+# Enable SharedValue with Arc ownership (requires bytes crate)
+shared = ["dep:bytes"]
 
 [dependencies]
 simd_cesu8 = "1.1"
-bytes = "1.11"
 zerocopy = "0.8"
-serde = "1.0"
+# Optional: for serde support
+serde = { version = "1.0", optional = true }
+# Optional: for SharedValue (Arc-based zero-copy)
+bytes = { version = "1.11", optional = true }
 
 [dev-dependencies]
 criterion = "0.8"
 serde = { version = "1.0", features = ["derive"] }
+
+[package.metadata.docs.rs]
+all-features = true

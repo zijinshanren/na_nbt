@@ -42,8 +42,11 @@
 //! assert_eq!(root.get("x").and_then(|v| v.as_int()), Some(42));
 //! ```
 
-use std::{any::TypeId, io::Write, ptr, sync::Arc};
+use std::{any::TypeId, io::Write, ptr};
+#[cfg(feature = "shared")]
+use std::sync::Arc;
 
+#[cfg(feature = "shared")]
 use bytes::Bytes;
 use zerocopy::{IntoBytes, byteorder};
 
@@ -190,120 +193,130 @@ impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
 unsafe impl<'s, O: ByteOrder> Send for BorrowedDocument<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for BorrowedDocument<'s, O> {}
 
-/// A zero-copy NBT value with shared ownership via `Arc`.
-///
-/// This type is returned by [`read_shared`]. Unlike [`BorrowedValue`], it owns
-/// its data through `Arc`, making it `Clone`, `Send`, `Sync`, and `'static`.
-///
-/// Use this when you need to:
-/// - Pass NBT values across thread boundaries
-/// - Store values without lifetime concerns
-/// - Clone values efficiently (only clones the `Arc`, not the data)
-///
-/// # Example
-///
-/// ```
-/// use na_nbt::read_shared;
-/// use bytes::Bytes;
-/// use zerocopy::byteorder::BigEndian;
-///
-/// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]);
-/// let root = read_shared::<BigEndian>(data).unwrap();
-///
-/// // Clone is cheap - just increments Arc refcount
-/// let cloned = root.clone();
-///
-/// // Can send to another thread
-/// std::thread::spawn(move || {
-///     assert!(cloned.is_compound());
-/// }).join().unwrap();
-/// ```
-pub type SharedValue<O> = value::ReadonlyValue<'static, O, Arc<SharedDocument>>;
+// SharedValue and read_shared require the "shared" feature (bytes crate)
+#[cfg(feature = "shared")]
+mod shared {
+    use super::*;
 
-/// Parses NBT from a `Bytes` buffer with shared ownership.
-///
-/// The returned [`SharedValue`] owns the data via `Arc`, making it `Clone`,
-/// `Send`, `Sync`, and `'static`. This is ideal for multi-threaded scenarios
-/// or when you want to avoid lifetime management.
-///
-/// # Arguments
-///
-/// * `source` - A [`Bytes`] buffer containing NBT data
-///
-/// # Type Parameters
-///
-/// * `O` - The byte order of the input data
-///
-/// # Returns
-///
-/// The root NBT value, or an error if parsing fails.
-///
-/// # Example
-///
-/// ```
-/// use na_nbt::read_shared;
-/// use bytes::Bytes;
-/// use zerocopy::byteorder::BigEndian;
-///
-/// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]);
-/// let root = read_shared::<BigEndian>(data)?;
-///
-/// // Store in a struct with 'static lifetime
-/// struct MyStruct {
-///     nbt: na_nbt::SharedValue<BigEndian>,
-/// }
-///
-/// let s = MyStruct { nbt: root };
-/// # Ok::<(), na_nbt::Error>(())
-/// ```
-///
-/// # Performance Note
-///
-/// While parsing is still zero-copy, accessing the shared value has slightly
-/// more overhead than borrowed values due to `Arc` reference counting.
-/// Use [`read_borrowed`] when the borrowed lifetime is acceptable.
-pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
-    Ok(unsafe {
-        read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {
-            Arc::new(SharedDocument { mark, source })
-        })?
-        .root()
-    })
-}
+    /// A zero-copy NBT value with shared ownership via `Arc`.
+    ///
+    /// This type is returned by [`read_shared`]. Unlike [`BorrowedValue`], it owns
+    /// its data through `Arc`, making it `Clone`, `Send`, `Sync`, and `'static`.
+    ///
+    /// Use this when you need to:
+    /// - Pass NBT values across thread boundaries
+    /// - Store values without lifetime concerns
+    /// - Clone values efficiently (only clones the `Arc`, not the data)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use na_nbt::read_shared;
+    /// use bytes::Bytes;
+    /// use zerocopy::byteorder::BigEndian;
+    ///
+    /// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]);
+    /// let root = read_shared::<BigEndian>(data).unwrap();
+    ///
+    /// // Clone is cheap - just increments Arc refcount
+    /// let cloned = root.clone();
+    ///
+    /// // Can send to another thread
+    /// std::thread::spawn(move || {
+    ///     assert!(cloned.is_compound());
+    /// }).join().unwrap();
+    /// ```
+    pub type SharedValue<O> = value::ReadonlyValue<'static, O, Arc<SharedDocument>>;
 
-/// A parsed NBT document with shared ownership.
-///
-/// This type holds the source data and parsing metadata for [`SharedValue`]s.
-/// It is managed through `Arc` and should not typically be used directly.
-pub struct SharedDocument {
-    mark: Vec<mark::Mark>,
-    source: Bytes,
-}
+    /// Parses NBT from a `Bytes` buffer with shared ownership.
+    ///
+    /// The returned [`SharedValue`] owns the data via `Arc`, making it `Clone`,
+    /// `Send`, `Sync`, and `'static`. This is ideal for multi-threaded scenarios
+    /// or when you want to avoid lifetime management.
+    ///
+    /// # Arguments
+    ///
+    /// * `source` - A [`Bytes`] buffer containing NBT data
+    ///
+    /// # Type Parameters
+    ///
+    /// * `O` - The byte order of the input data
+    ///
+    /// # Returns
+    ///
+    /// The root NBT value, or an error if parsing fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use na_nbt::read_shared;
+    /// use bytes::Bytes;
+    /// use zerocopy::byteorder::BigEndian;
+    ///
+    /// let data = Bytes::from_static(&[0x0a, 0x00, 0x00, 0x00]);
+    /// let root = read_shared::<BigEndian>(data)?;
+    ///
+    /// // Store in a struct with 'static lifetime
+    /// struct MyStruct {
+    ///     nbt: na_nbt::SharedValue<BigEndian>,
+    /// }
+    ///
+    /// let s = MyStruct { nbt: root };
+    /// # Ok::<(), na_nbt::Error>(())
+    /// ```
+    ///
+    /// # Performance Note
+    ///
+    /// While parsing is still zero-copy, accessing the shared value has slightly
+    /// more overhead than borrowed values due to `Arc` reference counting.
+    /// Use [`read_borrowed`] when the borrowed lifetime is acceptable.
+    pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
+        Ok(unsafe {
+            read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {
+                Arc::new(SharedDocument { mark, source })
+            })?
+            .root()
+        })
+    }
 
-impl SharedDocument {
-    /// Returns the root value of the document.
-    #[inline]
-    pub fn root<O: ByteOrder>(self: Arc<Self>) -> SharedValue<O> {
-        let root_tag = unsafe { Tag::from_u8_unchecked(*self.source.get_unchecked(0)) };
+    /// A parsed NBT document with shared ownership.
+    ///
+    /// This type holds the source data and parsing metadata for [`SharedValue`]s.
+    /// It is managed through `Arc` and should not typically be used directly.
+    pub struct SharedDocument {
+        mark: Vec<mark::Mark>,
+        source: Bytes,
+    }
 
-        if root_tag == Tag::End {
-            cold_path();
-            return SharedValue::End;
-        }
+    impl SharedDocument {
+        /// Returns the root value of the document.
+        #[inline]
+        pub fn root<O: ByteOrder>(self: Arc<Self>) -> SharedValue<O> {
+            let root_tag = unsafe { Tag::from_u8_unchecked(*self.source.get_unchecked(0)) };
 
-        let name_len =
-            byteorder::U16::<O>::from_bytes(unsafe { *self.source.as_ptr().add(1).cast() }).get();
+            if root_tag == Tag::End {
+                cold_path();
+                return SharedValue::End;
+            }
 
-        unsafe {
-            SharedValue::read(
-                root_tag,
-                self.source.as_ptr().add(3 + name_len as usize),
-                self.mark.as_ptr(),
-                self,
-            )
+            let name_len =
+                byteorder::U16::<O>::from_bytes(unsafe { *self.source.as_ptr().add(1).cast() })
+                    .get();
+
+            unsafe {
+                SharedValue::read(
+                    root_tag,
+                    self.source.as_ptr().add(3 + name_len as usize),
+                    self.mark.as_ptr(),
+                    self,
+                )
+            }
         }
     }
 }
+
+#[cfg(feature = "shared")]
+pub use shared::{SharedDocument, SharedValue, read_shared};
 
 pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARGET: ByteOrder>(
     value: &value::ReadonlyValue<'s, SOURCE, D>,
