@@ -106,6 +106,24 @@ use zerocopy::byteorder;
 
 use crate::{ByteOrder, Error, Result, Tag, cold_path};
 
+/// NBT deserializer implementing [`serde::Deserializer`].
+///
+/// This deserializer reads NBT binary data from a byte slice and converts it
+/// to Rust types using serde's deserialization framework.
+///
+/// # Example
+///
+/// ```ignore
+/// use na_nbt::de::Deserializer;
+/// use serde::Deserialize;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let mut de = Deserializer::<BigEndian>::from_slice(&data)?;
+/// let player = Player::deserialize(&mut de)?;
+/// ```
+///
+/// For most use cases, prefer the convenience functions [`from_slice`], [`from_slice_be`],
+/// [`from_reader`], etc.
 pub struct Deserializer<'de, O: ByteOrder> {
     current_tag: Tag,
     input: &'de [u8],
@@ -141,6 +159,33 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
     }
 }
 
+/// Deserialize an NBT value from a byte slice.
+///
+/// This is the main entry point for NBT deserialization. The byte order `O`
+/// determines whether to read big-endian (Java Edition) or little-endian
+/// (Bedrock Edition) data.
+///
+/// # Example
+///
+/// ```ignore
+/// use na_nbt::de::from_slice;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let player: Player = from_slice::<BigEndian, _>(&data)?;
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The data is truncated ([`Error::EndOfFile`])
+/// - An invalid tag type is encountered ([`Error::InvalidTagType`])
+/// - There are extra bytes after the root tag ([`Error::TrailingData`])
+/// - Type mismatch during deserialization ([`Error::TagMismatch`])
+///
+/// [`Error::EndOfFile`]: crate::Error::EndOfFile
+/// [`Error::InvalidTagType`]: crate::Error::InvalidTagType
+/// [`Error::TrailingData`]: crate::Error::TrailingData
+/// [`Error::TagMismatch`]: crate::Error::TagMismatch
 pub fn from_slice<'de, O: ByteOrder, T>(input: &'de [u8]) -> Result<T>
 where
     T: Deserialize<'de>,

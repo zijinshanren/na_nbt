@@ -1,3 +1,122 @@
+//! Serde serializer for NBT (Named Binary Tag) format.
+//!
+//! This module provides a [`serde::Serializer`] implementation for serializing
+//! Rust types to NBT binary data.
+//!
+//! # Quick Start
+//!
+//! ```ignore
+//! use serde::Serialize;
+//! use na_nbt::{to_vec_be, to_writer_be};
+//!
+//! #[derive(Serialize)]
+//! struct Player {
+//!     name: String,
+//!     health: f32,
+//!     inventory: Vec<Item>,
+//! }
+//!
+//! #[derive(Serialize)]
+//! struct Item {
+//!     id: i32,
+//!     count: i32,
+//! }
+//!
+//! let player = Player { /* ... */ };
+//!
+//! // To a Vec<u8>
+//! let bytes = to_vec_be(&player)?;
+//!
+//! // To a file or any std::io::Write
+//! to_writer_be(&mut file, &player)?;
+//! ```
+//!
+//! # Rust to NBT Type Mapping
+//!
+//! | Rust Type | NBT Tag |
+//! |-----------|---------|
+//! | `bool`, `i8`, `u8` | `Byte` |
+//! | `i16`, `u16` | `Short` |
+//! | `i32`, `u32`, `char` | `Int` |
+//! | `i64`, `u64` | `Long` |
+//! | `f32` | `Float` |
+//! | `f64` | `Double` |
+//! | `&[u8]` (via `serialize_bytes`) | `ByteArray` |
+//! | `&str`, `String` | `String` |
+//! | `Vec<T>`, `&[T]` | `List` |
+//! | structs, `HashMap<String, T>` | `Compound` |
+//! | `()`, `None` | `Compound` (empty) |
+//! | `Some<T>` | `Compound` (single unnamed field) |
+//!
+//! # Enum Serialization
+//!
+//! All Rust enum variants are supported:
+//!
+//! ```ignore
+//! #[derive(Serialize)]
+//! enum Data {
+//!     // Unit variant → Int (variant index: 0, 1, 2, ...)
+//!     Empty,
+//!     
+//!     // Newtype variant → Compound { "Value": <inner> }
+//!     Value(i32),
+//!     
+//!     // Tuple variant → Compound { "Point": List[Compound] }
+//!     Point(i32, i32),
+//!     
+//!     // Struct variant → Compound { "Player": Compound { fields... } }
+//!     Player { name: String, health: i32 },
+//! }
+//! ```
+//!
+//! # Byte Order
+//!
+//! NBT supports both big-endian (Java Edition) and little-endian (Bedrock Edition):
+//!
+//! ```ignore
+//! use zerocopy::byteorder::{BigEndian, LittleEndian};
+//!
+//! // Java Edition (big-endian)
+//! let bytes = to_vec::<BigEndian>(&player)?;
+//! let bytes = to_vec_be(&player)?;  // convenience
+//!
+//! // Bedrock Edition (little-endian)
+//! let bytes = to_vec::<LittleEndian>(&player)?;
+//! let bytes = to_vec_le(&player)?;  // convenience
+//! ```
+//!
+//! # ByteArray Serialization
+//!
+//! To serialize `Vec<u8>` or `&[u8]` as NBT `ByteArray` instead of `List<Byte>`,
+//! use serde's bytes support:
+//!
+//! ```ignore
+//! use serde::Serialize;
+//!
+//! #[derive(Serialize)]
+//! struct Data {
+//!     #[serde(serialize_with = "serialize_bytes")]
+//!     raw_data: Vec<u8>,
+//! }
+//!
+//! fn serialize_bytes<S: serde::Serializer>(data: &[u8], s: S) -> Result<S::Ok, S::Error> {
+//!     s.serialize_bytes(data)
+//! }
+//! ```
+//!
+//! # Error Handling
+//!
+//! Serialization can fail with these errors:
+//! - [`Error::IO`] - I/O error when writing to a writer
+//! - [`Error::ListTooLong`] - List exceeds 2^32 elements
+//! - [`Error::KeyMustBeString`] - Map key is not a string type
+//! - [`Error::TagMismatch`] - Heterogeneous list elements
+//!
+//! [`Error::IO`]: crate::Error::IO
+//! [`Error::ListTooLong`]: crate::Error::ListTooLong
+//! [`Error::KeyMustBeString`]: crate::Error::KeyMustBeString
+//! [`Error::TagMismatch`]: crate::Error::TagMismatch
+
 use std::{io::Write, marker::PhantomData, ptr};
 
 use serde::{Serialize, ser};
@@ -5,6 +124,13 @@ use zerocopy::byteorder;
 
 use crate::{ByteOrder, Error, Result, Tag, cold_path};
 
+/// NBT serializer implementing [`serde::Serializer`].
+///
+/// This serializer converts Rust types to NBT binary data using serde's
+/// serialization framework.
+///
+/// For most use cases, prefer the convenience functions [`to_vec`], [`to_vec_be`],
+/// [`to_writer`], etc. rather than using this type directly.
 pub struct Serializer<O: ByteOrder> {
     vec: Vec<u8>,
     marker: PhantomData<O>,
@@ -75,6 +201,31 @@ impl<O: ByteOrder> Serializer<O> {
     }
 }
 
+/// Serialize a value to NBT binary data.
+///
+/// This is the main entry point for NBT serialization. The byte order `O`
+/// determines whether to write big-endian (Java Edition) or little-endian
+/// (Bedrock Edition) data.
+///
+/// # Example
+///
+/// ```ignore
+/// use na_nbt::ser::to_vec;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let bytes = to_vec::<BigEndian>(&player)?;
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - A list exceeds 2^32 elements ([`Error::ListTooLong`])
+/// - A map has non-string keys ([`Error::KeyMustBeString`])
+/// - List elements have different types ([`Error::TagMismatch`])
+///
+/// [`Error::ListTooLong`]: crate::Error::ListTooLong
+/// [`Error::KeyMustBeString`]: crate::Error::KeyMustBeString
+/// [`Error::TagMismatch`]: crate::Error::TagMismatch
 #[inline]
 pub fn to_vec<O: ByteOrder>(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>> {
     let mut serializer = Serializer::<O> {
@@ -102,6 +253,21 @@ pub fn to_vec_le(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>> {
     to_vec::<zerocopy::byteorder::LittleEndian>(value)
 }
 
+/// Serialize a value to an [`std::io::Write`] implementation.
+///
+/// This serializes the value to an internal buffer first, then writes
+/// the entire buffer to the writer.
+///
+/// # Example
+///
+/// ```ignore
+/// use na_nbt::ser::to_writer;
+/// use std::fs::File;
+/// use zerocopy::byteorder::BigEndian;
+///
+/// let mut file = File::create("player.nbt")?;
+/// to_writer::<BigEndian>(&mut file, &player)?;
+/// ```
 #[inline]
 pub fn to_writer<O: ByteOrder>(
     writer: &mut impl Write,
