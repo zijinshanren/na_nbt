@@ -42,6 +42,7 @@ na_nbt = { version = "0.1.0", default-features = false, features = ["serde"] }
 
 - [ ] **More convenient APIs**
 - [ ] **Benchmarks**
+- [ ] **Tests and fuzzing**
 - [ ] **MSRV testing**
 - [ ] **`no_std` support**
 - [ ] **Older Rust support**
