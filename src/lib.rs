@@ -304,7 +304,231 @@
 //!
 //! \* With appropriate lifetime management  
 //! † Use [`MutableValue`] or [`ImmutableValue`] for borrowed access
+//!
+//! # Serde Integration
+//!
+//! This crate provides full [serde](https://serde.rs) support for serializing and
+//! deserializing Rust types directly to/from NBT binary format.
+//!
+//! ## Deriving Serialize and Deserialize
+//!
+//! The easiest way to work with NBT is using serde's derive macros:
+//!
+//! ```ignore
+//! use serde::{Serialize, Deserialize};
+//! use na_nbt::{to_vec_be, from_slice_be};
+//!
+//! #[derive(Serialize, Deserialize, Debug)]
+//! struct Player {
+//!     name: String,
+//!     health: f32,
+//!     position: Position,
+//!     inventory: Vec<Item>,
+//! }
+//!
+//! #[derive(Serialize, Deserialize, Debug)]
+//! struct Position {
+//!     x: f64,
+//!     y: f64,
+//!     z: f64,
+//! }
+//!
+//! #[derive(Serialize, Deserialize, Debug)]
+//! struct Item {
+//!     id: String,
+//!     count: i32,
+//! }
+//!
+//! // Serialize to NBT bytes
+//! let player = Player {
+//!     name: "Steve".to_string(),
+//!     health: 20.0,
+//!     position: Position { x: 0.0, y: 64.0, z: 0.0 },
+//!     inventory: vec![
+//!         Item { id: "minecraft:diamond".to_string(), count: 64 },
+//!     ],
+//! };
+//! let bytes = to_vec_be(&player).unwrap();
+//!
+//! // Deserialize from NBT bytes
+//! let loaded: Player = from_slice_be(&bytes).unwrap();
+//! println!("{:?}", loaded);
+//! ```
+//!
+//! ## Convenience Functions
+//!
+//! | Function | Description |
+//! |----------|-------------|
+//! | [`to_vec_be`] / [`to_vec_le`] | Serialize to `Vec<u8>` |
+//! | [`to_writer_be`] / [`to_writer_le`] | Serialize to any `io::Write` |
+//! | [`from_slice_be`] / [`from_slice_le`] | Deserialize from `&[u8]` |
+//! | [`from_reader_be`] / [`from_reader_le`] | Deserialize from any `io::Read` |
+//!
+//! The `_be` suffix means big-endian (Java Edition), `_le` means little-endian (Bedrock Edition).
+//!
+//! ## Generic Byte Order
+//!
+//! For more control, use the generic versions with explicit byte order:
+//!
+//! ```ignore
+//! use na_nbt::{to_vec, from_slice};
+//! use zerocopy::byteorder::{BigEndian, LittleEndian};
+//!
+//! // Explicit byte order
+//! let bytes = to_vec::<BigEndian>(&player)?;
+//! let player: Player = from_slice::<LittleEndian, _>(&bytes)?;
+//! ```
+//!
+//! ## Type Mapping
+//!
+//! | Rust Type | NBT Tag | Notes |
+//! |-----------|---------|-------|
+//! | `bool`, `i8`, `u8` | Byte | |
+//! | `i16`, `u16` | Short | |
+//! | `i32`, `u32`, `char` | Int | |
+//! | `i64`, `u64` | Long | |
+//! | `f32` | Float | |
+//! | `f64` | Double | |
+//! | `String`, `&str` | String | MUTF-8 encoded |
+//! | `Vec<T>`, `&[T]` | List | Homogeneous elements |
+//! | struct | Compound | Named fields |
+//! | `HashMap<String, T>` | Compound | String keys only |
+//! | `Option<T>` | Compound | None = empty, Some = single field |
+//! | `()` | Compound | Empty compound |
+//!
+//! ## Enum Support
+//!
+//! All enum variants are supported with different NBT representations:
+//!
+//! ```ignore
+//! #[derive(Serialize, Deserialize)]
+//! enum GameMode {
+//!     // Unit variant → Int (variant index)
+//!     Survival,     // 0
+//!     Creative,     // 1
+//!     Adventure,    // 2
+//!     
+//!     // Newtype variant → Compound { "Custom": <value> }
+//!     Custom(String),
+//!     
+//!     // Tuple variant → Compound { "Mixed": List[Compound] }
+//!     Mixed(i32, String),
+//!     
+//!     // Struct variant → Compound { "Settings": Compound { ... } }
+//!     Settings { difficulty: i32, hardcore: bool },
+//! }
+//! ```
+//!
+//! ## Native Array Types
+//!
+//! NBT has native array types (`ByteArray`, `IntArray`, `LongArray`) that are more
+//! efficient than `List`.
+//!
+//! ### Deserialization (automatic)
+//!
+//! **Native arrays are automatically detected during deserialization!** When reading
+//! NBT data that contains native array tags, you can deserialize directly to `Vec<T>`:
+//!
+//! ```ignore
+//! #[derive(Deserialize)]
+//! struct ChunkData {
+//!     block_states: Vec<i64>,  // Auto-detects LongArray OR List<Long>
+//!     biomes: Vec<i32>,        // Auto-detects IntArray OR List<Int>
+//!     heightmap: Vec<u8>,      // Auto-detects ByteArray OR List<Byte>
+//! }
+//! ```
+//!
+//! ### Serialization (use serde modules)
+//!
+//! For serialization as native arrays, use `#[serde(with = "...")]`:
+//!
+//! ```ignore
+//! #[derive(Serialize, Deserialize)]
+//! struct ChunkData {
+//!     #[serde(with = "na_nbt::long_array")]
+//!     block_states: Vec<i64>,  // Serializes as LongArray (zero-copy)
+//!     
+//!     #[serde(with = "na_nbt::int_array")]
+//!     biomes: Vec<i32>,        // Serializes as IntArray (zero-copy)
+//!     
+//!     #[serde(with = "na_nbt::byte_array")]
+//!     heightmap: Vec<u8>,      // Serializes as ByteArray (zero-copy)
+//! }
+//! ```
+//!
+//! ## ByteArray Support
+//!
+//! For `Vec<u8>`, use `serialize_bytes` to get NBT's native `ByteArray`:
+//!
+//! ```ignore
+//! use serde::{Serialize, Deserialize, Serializer, Deserializer};
+//!
+//! #[derive(Serialize, Deserialize)]
+//! struct ChunkData {
+//!     #[serde(with = "byte_array")]
+//!     blocks: Vec<u8>,
+//! }
+//!
+//! mod byte_array {
+//!     use super::*;
+//!     use serde::de;
+//!     
+//!     pub fn serialize<S: Serializer>(data: &[u8], s: S) -> Result<S::Ok, S::Error> {
+//!         s.serialize_bytes(data)
+//!     }
+//!     
+//!     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+//!         struct Visitor;
+//!         impl<'de> de::Visitor<'de> for Visitor {
+//!             type Value = Vec<u8>;
+//!             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//!                 f.write_str("byte array")
+//!             }
+//!             fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
+//!                 Ok(v.to_vec())
+//!             }
+//!         }
+//!         d.deserialize_bytes(Visitor)
+//!     }
+//! }
+//! ```
+//!
+//! ## File I/O Example
+//!
+//! ```ignore
+//! use std::fs::File;
+//! use na_nbt::{to_writer_be, from_reader_be};
+//!
+//! // Write to file
+//! let mut file = File::create("player.nbt")?;
+//! to_writer_be(&mut file, &player)?;
+//!
+//! // Read from file
+//! let file = File::open("player.nbt")?;
+//! let player: Player = from_reader_be(file)?;
+//! ```
+//!
+//! ## Error Handling
+//!
+//! Serialization/deserialization uses the same [`Error`] type as parsing:
+//!
+//! ```ignore
+//! use na_nbt::{from_slice_be, Error};
+//!
+//! match from_slice_be::<Player>(&data) {
+//!     Ok(player) => println!("Loaded: {:?}", player),
+//!     Err(Error::EndOfFile) => println!("Data truncated"),
+//!     Err(Error::InvalidTagType(tag)) => println!("Unknown tag: {}", tag),
+//!     Err(Error::TagMismatch(expected, got)) => {
+//!         println!("Type mismatch: expected {}, got {}", expected, got)
+//!     }
+//!     Err(e) => println!("Error: {}", e),
+//! }
+//! ```
+//!
+//! For more details, see the [`de`] and [`ser`] module documentation.
 
+pub mod array;
 pub mod de;
 pub mod error;
 pub mod immutable;
@@ -316,6 +540,7 @@ pub mod util;
 pub mod value_trait;
 mod view;
 
+pub use array::{byte_array, int_array, long_array};
 pub use de::{
     Deserializer, from_reader, from_reader_be, from_reader_le, from_slice, from_slice_be,
     from_slice_le,

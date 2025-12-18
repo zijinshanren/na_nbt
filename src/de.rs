@@ -634,21 +634,52 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_bounds!(1 + 4, self.input);
-        let tag_id = self.input[0];
-        if tag_id > Tag::LongArray as u8 {
-            cold_path();
-            return Err(Error::InvalidTagType(tag_id));
+        // Auto-detect format based on current tag
+        match self.current_tag {
+            Tag::IntArray => {
+                // IntArray format: length (4 bytes) + i32 data
+                check_bounds!(4, self.input);
+                let length =
+                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
+                self.input = &self.input[4..];
+                visitor.visit_seq(IntArrayDeserializer {
+                    index: 0,
+                    len: length,
+                    deserializer: self,
+                })
+            }
+            Tag::LongArray => {
+                // LongArray format: length (4 bytes) + i64 data
+                check_bounds!(4, self.input);
+                let length =
+                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
+                self.input = &self.input[4..];
+                visitor.visit_seq(LongArrayDeserializer {
+                    index: 0,
+                    len: length,
+                    deserializer: self,
+                })
+            }
+            _ => {
+                // Standard List format: element_tag (1 byte) + length (4 bytes)
+                check_bounds!(1 + 4, self.input);
+                let tag_id = self.input[0];
+                if tag_id > Tag::LongArray as u8 {
+                    cold_path();
+                    return Err(Error::InvalidTagType(tag_id));
+                }
+                let length =
+                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() })
+                        .get();
+                self.input = &self.input[1 + 4..];
+                visitor.visit_seq(ListDeserializer {
+                    tag_id: unsafe { Tag::from_u8_unchecked(tag_id) },
+                    index: 0,
+                    len: length,
+                    deserializer: self,
+                })
+            }
         }
-        let length =
-            byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() }).get();
-        self.input = &self.input[1 + 4..];
-        visitor.visit_seq(ListDeserializer {
-            tag_id: unsafe { Tag::from_u8_unchecked(tag_id) },
-            index: 0,
-            len: length,
-            deserializer: self,
-        })
     }
 
     fn deserialize_tuple<V>(
@@ -804,6 +835,66 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for ListDeserializer<'a, 'de, O> {
         self.index += 1;
         self.deserializer.current_tag = self.tag_id;
         seed.deserialize(&mut *self.deserializer).map(Some)
+    }
+}
+
+// For deserializing IntArray (Tag 11)
+struct IntArrayDeserializer<'a, 'de: 'a, O: ByteOrder> {
+    index: u32,
+    len: u32,
+    deserializer: &'a mut Deserializer<'de, O>,
+}
+
+impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for IntArrayDeserializer<'a, 'de, O> {
+    type Error = Error;
+
+    fn next_element_seed<T>(
+        &mut self,
+        seed: T,
+    ) -> std::result::Result<Option<T::Value>, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        if self.index >= self.len {
+            return Ok(None);
+        }
+        self.index += 1;
+        self.deserializer.current_tag = Tag::Int;
+        seed.deserialize(&mut *self.deserializer).map(Some)
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some((self.len - self.index) as usize)
+    }
+}
+
+// For deserializing LongArray (Tag 12)
+struct LongArrayDeserializer<'a, 'de: 'a, O: ByteOrder> {
+    index: u32,
+    len: u32,
+    deserializer: &'a mut Deserializer<'de, O>,
+}
+
+impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for LongArrayDeserializer<'a, 'de, O> {
+    type Error = Error;
+
+    fn next_element_seed<T>(
+        &mut self,
+        seed: T,
+    ) -> std::result::Result<Option<T::Value>, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        if self.index >= self.len {
+            return Ok(None);
+        }
+        self.index += 1;
+        self.deserializer.current_tag = Tag::Long;
+        seed.deserialize(&mut *self.deserializer).map(Some)
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some((self.len - self.index) as usize)
     }
 }
 

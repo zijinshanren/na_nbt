@@ -30,7 +30,16 @@ enum Data {
     // Tuple variant: Compound { "Point": List[Compound] }
     Point(i32, i32),
     // Struct variant: Compound { "Player": Compound { fields... } }
-    Player { name: String, health: i32 },
+    Player {
+        name: String,
+        health: i32,
+    },
+    #[serde(with = "na_nbt::byte_array")]
+    ByteArray(Vec<u8>),
+    #[serde(with = "na_nbt::int_array")]
+    IntArray(Vec<i32>),
+    #[serde(with = "na_nbt::long_array")]
+    LongArray(Vec<i64>),
 }
 
 fn dump<'doc>(value: &impl ScopedReadableValue<'doc>) -> String {
@@ -134,6 +143,30 @@ fn main() {
 
     let point = Data::Point(100, 200);
     let serialized = to_vec_be(&point).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: Data = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let byte_array = Data::ByteArray(vec![1, 2, 3, 4, 5]);
+    let serialized = to_vec_be(&byte_array).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: Data = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let int_array = Data::IntArray(vec![1, 2, 3, 4, 5]);
+    let serialized = to_vec_be(&int_array).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: Data = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let long_array = Data::LongArray(vec![1, 2, 3, 4, 5]);
+    let serialized = to_vec_be(&long_array).unwrap();
     let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
     let root = doc.root();
     let deserialized: Data = from_slice_be(&serialized).unwrap();

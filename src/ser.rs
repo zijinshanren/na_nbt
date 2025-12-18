@@ -124,6 +124,15 @@ use zerocopy::byteorder;
 
 use crate::{ByteOrder, Error, Result, Tag, cold_path};
 
+/// Internal mode for tracking array serialization.
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum ArrayMode {
+    #[default]
+    None,
+    IntArray,
+    LongArray,
+}
+
 /// NBT serializer implementing [`serde::Serializer`].
 ///
 /// This serializer converts Rust types to NBT binary data using serde's
@@ -134,6 +143,7 @@ use crate::{ByteOrder, Error, Result, Tag, cold_path};
 pub struct Serializer<O: ByteOrder> {
     vec: Vec<u8>,
     marker: PhantomData<O>,
+    array_mode: ArrayMode,
 }
 
 impl<O: ByteOrder> Serializer<O> {
@@ -231,6 +241,7 @@ pub fn to_vec<O: ByteOrder>(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>
     let mut serializer = Serializer::<O> {
         vec: vec![0u8; 3],
         marker: PhantomData,
+        array_mode: ArrayMode::None,
     };
     let tag_id = value.serialize(&mut serializer)?;
     if tag_id == Tag::End {
@@ -459,13 +470,27 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     #[inline]
     fn serialize_newtype_struct<T>(
         self,
-        _name: &'static str,
+        name: &'static str,
         value: &T,
     ) -> std::result::Result<Self::Ok, Self::Error>
     where
         T: ?Sized + Serialize,
     {
-        value.serialize(self)
+        match name {
+            "na_nbt:int_array" => {
+                self.array_mode = ArrayMode::IntArray;
+                let result = value.serialize(&mut *self);
+                self.array_mode = ArrayMode::None;
+                result
+            }
+            "na_nbt:long_array" => {
+                self.array_mode = ArrayMode::LongArray;
+                let result = value.serialize(&mut *self);
+                self.array_mode = ArrayMode::None;
+                result
+            }
+            _ => value.serialize(self),
+        }
     }
 
     fn serialize_newtype_variant<T>(
@@ -527,7 +552,37 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
 
     #[inline]
     fn serialize_tuple(self, len: usize) -> std::result::Result<Self::SerializeTuple, Self::Error> {
-        unsafe { self.write_list_of_compound_begin(len) }
+        match self.array_mode {
+            ArrayMode::IntArray => {
+                // Write IntArray: length (4 bytes) + data (4 bytes per element)
+                unsafe {
+                    let old_len = self.vec.len();
+                    self.vec.reserve(4 + len * 4);
+                    let write_ptr = self.vec.as_mut_ptr().add(old_len);
+                    ptr::write(
+                        write_ptr.cast(),
+                        byteorder::U32::<O>::new(len as u32).to_bytes(),
+                    );
+                    self.vec.set_len(old_len + 4);
+                }
+                Ok(self)
+            }
+            ArrayMode::LongArray => {
+                // Write LongArray: length (4 bytes) + data (8 bytes per element)
+                unsafe {
+                    let old_len = self.vec.len();
+                    self.vec.reserve(4 + len * 8);
+                    let write_ptr = self.vec.as_mut_ptr().add(old_len);
+                    ptr::write(
+                        write_ptr.cast(),
+                        byteorder::U32::<O>::new(len as u32).to_bytes(),
+                    );
+                    self.vec.set_len(old_len + 4);
+                }
+                Ok(self)
+            }
+            ArrayMode::None => unsafe { self.write_list_of_compound_begin(len) },
+        }
     }
 
     #[inline]
@@ -694,12 +749,23 @@ impl<O: ByteOrder> ser::SerializeTuple for &mut Serializer<O> {
     where
         T: ?Sized + Serialize,
     {
-        unsafe { self.write_list_of_compound_item(value) }
+        match self.array_mode {
+            ArrayMode::IntArray | ArrayMode::LongArray => {
+                // In array mode, just serialize the raw value (i32 or i64)
+                value.serialize(&mut **self)?;
+                Ok(())
+            }
+            ArrayMode::None => unsafe { self.write_list_of_compound_item(value) },
+        }
     }
 
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
-        Ok(Tag::List)
+        match self.array_mode {
+            ArrayMode::IntArray => Ok(Tag::IntArray),
+            ArrayMode::LongArray => Ok(Tag::LongArray),
+            ArrayMode::None => Ok(Tag::List),
+        }
     }
 }
 
