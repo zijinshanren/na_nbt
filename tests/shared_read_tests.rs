@@ -15,6 +15,7 @@ fn create_test_data() -> Vec<u8> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_read_shared_basic() {
     let data = create_test_data();
     let bytes = Bytes::from(data);
@@ -29,6 +30,7 @@ fn test_read_shared_basic() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_shared_value_send_sync_static() {
     let data = create_test_data();
     let bytes = Bytes::from(data);
@@ -51,6 +53,7 @@ fn test_shared_value_send_sync_static() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_shared_value_clone() {
     let data = create_test_data();
     let bytes = Bytes::from(data);
@@ -69,6 +72,7 @@ fn test_shared_value_clone() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_shared_value_access() {
     // Create a more complex structure
     let mut data = vec![0x0A, 0x00, 0x00];

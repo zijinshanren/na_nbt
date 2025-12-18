@@ -20,7 +20,7 @@ unsafe fn read_compound<O: ByteOrder>(
 ) -> Result<OwnedValue<O>> {
     macro_rules! check_bounds {
         ($extra:expr) => {
-            if (*current_pos).add($extra) > end_pos {
+            if (*current_pos as usize) + $extra > end_pos as usize {
                 cold_path();
                 return Err(Error::EndOfFile);
             }
@@ -132,7 +132,7 @@ unsafe fn read_list<O: ByteOrder>(
 ) -> Result<OwnedValue<O>> {
     macro_rules! check_bounds {
         ($extra:expr) => {
-            if (*current_pos).add($extra) > end_pos {
+            if (*current_pos as usize) + $extra > end_pos as usize {
                 cold_path();
                 return Err(Error::EndOfFile);
             }
@@ -243,7 +243,7 @@ pub unsafe fn read_unsafe<O: ByteOrder>(
 ) -> Result<OwnedValue<O>> {
     macro_rules! check_bounds {
         ($extra:expr) => {
-            if (*current_pos).add($extra) > end_pos {
+            if (*current_pos as usize) + $extra > end_pos as usize {
                 cold_path();
                 return Err(Error::EndOfFile);
             }
@@ -338,7 +338,7 @@ unsafe fn read_compound_fallback<O: ByteOrder, R: ByteOrder>(
 ) -> Result<OwnedValue<R>> {
     macro_rules! check_bounds {
         ($extra:expr) => {
-            if (*current_pos).add($extra) > end_pos {
+            if (*current_pos as usize) + $extra > end_pos as usize {
                 cold_path();
                 return Err(Error::EndOfFile);
             }
@@ -534,7 +534,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
 ) -> Result<OwnedValue<R>> {
     macro_rules! check_bounds {
         ($extra:expr) => {
-            if (*current_pos).add($extra) > end_pos {
+            if (*current_pos as usize) + $extra > end_pos as usize {
                 cold_path();
                 return Err(Error::EndOfFile);
             }
@@ -700,7 +700,7 @@ pub unsafe fn read_unsafe_fallback<O: ByteOrder, R: ByteOrder>(
 ) -> Result<OwnedValue<R>> {
     macro_rules! check_bounds {
         ($extra:expr) => {
-            if (*current_pos).add($extra) > end_pos {
+            if (*current_pos as usize) + $extra > end_pos as usize {
                 cold_path();
                 return Err(Error::EndOfFile);
             }
