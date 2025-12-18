@@ -1,7 +1,13 @@
 //! # na_nbt
 //!
-//! NBT (Named Binary Tag) is a binary format used by Minecraft to store structured
-//! game data including worlds, player inventories, and entity information.
+//! A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsing
+//! and full mutation support.
+//!
+//! > **Note:** This crate is under active development. APIs may change between versions.
+//! > Issues and contributions are welcome!
+//!
+//! NBT is a binary format used by Minecraft to store structured game data including
+//! worlds, player inventories, and entity information.
 //!
 //! An NBT file contains a tree of typed, named values. For example, a simple
 //! player data structure might contain:

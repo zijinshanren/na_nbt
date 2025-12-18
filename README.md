@@ -2,6 +2,9 @@
 
 A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsing and full mutation support.
 
+> ⚠️ **Note:** This crate is under active development. APIs may change between versions.
+> Issues and contributions are welcome!
+
 ## Features
 
 - **Zero-copy parsing** - Read NBT data without allocating memory for values
@@ -305,6 +308,14 @@ struct ChunkData {
 
 For full serde documentation, see the [`de`](https://docs.rs/na_nbt/latest/na_nbt/de/) and [`ser`](https://docs.rs/na_nbt/latest/na_nbt/ser/) module docs.
 
+## Contributing
+
+This crate is under active development. Contributions are welcome!
+
+- **Bug reports**: Please open an issue with a minimal reproducible example
+- **Feature requests**: Open an issue describing the use case
+- **Pull requests**: Fork the repo, make your changes, and submit a PR
+
 ## License
 
-See LICENSE file.
+MIT OR Apache-2.0
