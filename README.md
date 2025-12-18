@@ -1,6 +1,6 @@
 # na_nbt
 
-A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsing and full mutation support.
+A high-performance NBT (Named Binary Tag) library for Rust with zero-copy parsing, full mutation support and serde integration.
 
 > ⚠️ **Note:** This crate is under active development. APIs may change between versions.
 > Issues and contributions are welcome!
@@ -37,6 +37,14 @@ na_nbt = { version = "0.1.0", default-features = false, features = ["serde"] }
 |---------|-------------|--------------|
 | `serde` | Serialize/deserialize Rust types to/from NBT | `serde` |
 | `shared` | `SharedValue` with Arc ownership | `bytes` |
+
+## Todo
+
+- [ ] **More convenient APIs**
+- [ ] **Benchmarks**
+- [ ] **MSRV testing**
+- [ ] **`no_std` support**
+- [ ] **Older Rust support**
 
 ## Quick Start
 
