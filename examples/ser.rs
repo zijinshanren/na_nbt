@@ -21,6 +21,18 @@ struct Item {
     count: u8,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+enum Data {
+    // Unit variant: deserialized from Int (variant index)
+    Empty,
+    // Newtype variant: Compound { "Value": <inner> }
+    Value(i32),
+    // Tuple variant: Compound { "Point": List[Compound] }
+    Point(i32, i32),
+    // Struct variant: Compound { "Player": Compound { fields... } }
+    Player { name: String, health: i32 },
+}
+
 fn dump<'doc>(value: &impl ScopedReadableValue<'doc>) -> String {
     dump_inner(value, 0)
 }
@@ -90,6 +102,48 @@ fn main() {
     let root = doc.root();
 
     let deserialized: Player = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let data = Data::Player {
+        name: "John".to_string(),
+        health: 100,
+    };
+    let serialized = to_vec_be(&data).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: Data = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let empty = Data::Empty;
+    let serialized = to_vec_be(&empty).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: Data = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let value = Data::Value(100);
+    let serialized = to_vec_be(&value).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: Data = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let point = Data::Point(100, 200);
+    let serialized = to_vec_be(&point).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: Data = from_slice_be(&serialized).unwrap();
+    println!("{}", dump(&root));
+    println!("{:#?}", deserialized);
+
+    let serialized = to_vec_be(&()).unwrap();
+    let doc = read_borrowed::<BigEndian>(&serialized).unwrap();
+    let root = doc.root();
+    let deserialized: () = from_slice_be(&serialized).unwrap();
     println!("{}", dump(&root));
     println!("{:#?}", deserialized);
 }
