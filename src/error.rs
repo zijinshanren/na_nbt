@@ -84,6 +84,8 @@ pub enum Error {
     /// NBT compound tags require string keys. This error is returned when
     /// attempting to serialize a map with non-string keys.
     KeyMustBeString,
+
+    TagMismatch(u8, u8),
 }
 
 impl ser::Error for Error {
@@ -113,6 +115,9 @@ impl Display for Error {
             Error::ListTooLong(len) => formatter.write_str(&format!("list length too long: {len}")),
             Error::ListLengthUnknown => formatter.write_str("list length unknown"),
             Error::KeyMustBeString => formatter.write_str("map key must be a string"),
+            Error::TagMismatch(expected, actual) => formatter.write_str(&format!(
+                "tag in list mismatch: expected {expected:#04x}, got {actual:#04x}"
+            )),
         }
     }
 }

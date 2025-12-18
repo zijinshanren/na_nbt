@@ -99,11 +99,11 @@ pub fn to_writer<O: ByteOrder>(
     writer.write_all(&vec).map_err(Error::IO)
 }
 
-impl<O: ByteOrder> ser::Serializer for &mut Serializer<O> {
+impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     type Ok = Tag;
     type Error = Error;
 
-    type SerializeSeq = Self;
+    type SerializeSeq = ListSerializer<'a, O>;
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
     type SerializeTupleVariant = Self;
@@ -291,10 +291,37 @@ impl<O: ByteOrder> ser::Serializer for &mut Serializer<O> {
         len: Option<usize>,
     ) -> std::result::Result<Self::SerializeSeq, Self::Error> {
         if let Some(len) = len {
-            unsafe { self.write_list_of_compound_begin(len) }
+            if len > u32::MAX as usize {
+                cold_path();
+                return Err(Error::ListTooLong(len));
+            }
+
+            unsafe {
+                let old_len = self.vec.len();
+                self.vec.reserve(5);
+                let write_ptr = self.vec.as_mut_ptr().add(old_len);
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<O>::new(len as u32).to_bytes(),
+                );
+                self.vec.set_len(old_len + 5);
+                Ok(ListSerializer {
+                    start_pos: old_len,
+                    len: None,
+                    tag_id: None,
+                    serializer: &mut *self,
+                })
+            }
         } else {
             cold_path();
-            Err(Error::ListLengthUnknown)
+            let old_len = self.vec.len();
+            self.vec.extend_from_slice(&[0u8; 5]);
+            Ok(ListSerializer {
+                start_pos: old_len,
+                len: Some(0),
+                tag_id: None,
+                serializer: &mut *self,
+            })
         }
     }
 
@@ -391,6 +418,59 @@ impl<O: ByteOrder> ser::Serializer for &mut Serializer<O> {
     }
 }
 
+// we process seq as list<T>, otherwise Tag::List will be unused anywhere.
+pub struct ListSerializer<'a, O: ByteOrder> {
+    start_pos: usize,
+    len: Option<u32>,
+    tag_id: Option<Tag>,
+    serializer: &'a mut Serializer<O>,
+}
+
+impl<'a, O: ByteOrder> ser::SerializeSeq for ListSerializer<'a, O> {
+    type Ok = Tag;
+    type Error = Error;
+
+    fn serialize_element<T>(&mut self, value: &T) -> std::result::Result<(), Self::Error>
+    where
+        T: ?Sized + Serialize,
+    {
+        let tag_id = value.serialize(&mut *self.serializer)?;
+        if let Some(len) = self.len {
+            assert!(len < u32::MAX, "list length too long");
+            self.len = Some(len + 1);
+        }
+        match self.tag_id {
+            Some(tag) => {
+                if tag != tag_id {
+                    return Err(Error::TagMismatch(tag as u8, tag_id as u8));
+                }
+            }
+            None => {
+                self.tag_id = Some(tag_id);
+            }
+        }
+        Ok(())
+    }
+
+    fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
+        unsafe {
+            *self.serializer.vec.get_unchecked_mut(self.start_pos) =
+                self.tag_id.unwrap_or(Tag::End) as u8;
+            if let Some(len) = self.len {
+                ptr::write(
+                    self.serializer
+                        .vec
+                        .as_mut_ptr()
+                        .add(self.start_pos + 1)
+                        .cast(),
+                    byteorder::U32::<O>::new(len).to_bytes(),
+                );
+            }
+        }
+        Ok(Tag::List)
+    }
+}
+
 impl<O: ByteOrder> ser::SerializeSeq for &mut Serializer<O> {
     type Ok = Tag;
     type Error = Error;
@@ -484,14 +564,14 @@ impl<'a, O: ByteOrder> ser::Serializer for MapKeySerializer<'a, O> {
     fn serialize_str(self, v: &str) -> std::result::Result<Self::Ok, Self::Error> {
         unsafe {
             let old_len = self.serializer.vec.len();
-            self.serializer.vec.reserve(2 + v.len());
+            self.serializer.vec.reserve(1 + 2 + v.len());
             let write_ptr = self.serializer.vec.as_mut_ptr().add(old_len);
             ptr::write(
-                write_ptr.cast(),
+                write_ptr.add(1).cast(),
                 byteorder::U16::<O>::new(v.len() as u16).to_bytes(),
             );
-            ptr::copy_nonoverlapping(v.as_ptr(), write_ptr.add(2), v.len());
-            self.serializer.vec.set_len(old_len + 2 + v.len());
+            ptr::copy_nonoverlapping(v.as_ptr(), write_ptr.add(3), v.len());
+            self.serializer.vec.set_len(old_len + 1 + 2 + v.len());
         }
         Ok(())
     }

@@ -83,9 +83,11 @@ pub fn list_iter_mut<'s, O: ByteOrder>(data: *mut u8) -> MutableListIter<'s, O> 
 #[inline]
 fn list_increase<O: ByteOrder>(data: &mut VecViewMut<'_, u8>) {
     unsafe {
+        let len = list_len::<O>(data.as_ptr());
+        assert!(len < u32::MAX as usize, "list length too long");
         ptr::write(
             data.as_mut_ptr().add(1).cast(),
-            byteorder::U32::<O>::new(list_len::<O>(data.as_ptr()) as u32 + 1),
+            byteorder::U32::<O>::new(len as u32 + 1),
         )
     };
 }

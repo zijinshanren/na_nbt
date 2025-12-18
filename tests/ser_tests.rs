@@ -11,7 +11,7 @@ struct ByteVec(#[serde(with = "serde_bytes_impl")] Vec<u8>);
 mod serde_bytes_impl {
     use serde::Serializer;
 
-    pub fn serialize<S: Serializer>(data: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: Serializer>(data: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_bytes(data)
     }
 }
