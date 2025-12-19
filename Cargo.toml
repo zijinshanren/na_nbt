@@ -13,12 +13,14 @@ categories = ["encoding", "game-development", "parser-implementations"]
 rust-version = "1.87"
 
 [features]
-default = ["serde", "shared"]
+default = ["serde", "shared", "i128"]
 nightly = ["simd_cesu8/nightly"]
 # Enable serde serialization/deserialization support
 serde = ["dep:serde"]
 # Enable SharedValue with Arc ownership (requires bytes crate)
 shared = ["dep:bytes"]
+# Enable i128/u128 serialization support (requires Rust 1.26+)
+i128 = []
 
 [dependencies]
 simd_cesu8 = "1.1"

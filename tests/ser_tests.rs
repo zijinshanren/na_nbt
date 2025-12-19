@@ -567,3 +567,239 @@ fn test_serialize_special_utf8() {
     // Total length should be 12: "hello" (5) + modified null (2) + "world" (5)
     assert_eq!(len, 12);
 }
+
+// ============================================================================
+// i128/u128 tests (requires "i128" feature)
+// ============================================================================
+
+#[cfg(feature = "i128")]
+#[test]
+fn test_serialize_u128() {
+    use na_nbt::from_slice_be;
+
+    let value: u128 = 0x0123456789ABCDEF_FEDCBA9876543210;
+    let result = to_vec::<BigEndian>(&value).unwrap();
+    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+
+    let p = payload(&result);
+    // IntArray header: length (4 bytes) = 4 elements
+    assert_eq!(read_be_u32(&p[0..4]), 4);
+
+    // 4 x i32 in big-endian, most significant first
+    let x1 = read_be_u32(&p[4..8]);
+    let x2 = read_be_u32(&p[8..12]);
+    let x3 = read_be_u32(&p[12..16]);
+    let x4 = read_be_u32(&p[16..20]);
+
+    assert_eq!(x1, 0x01234567);
+    assert_eq!(x2, 0x89ABCDEF);
+    assert_eq!(x3, 0xFEDCBA98);
+    assert_eq!(x4, 0x76543210);
+
+    // Roundtrip test
+    let deserialized: u128 = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, value);
+}
+
+#[cfg(feature = "i128")]
+#[test]
+fn test_serialize_i128_positive() {
+    use na_nbt::from_slice_be;
+
+    let value: i128 = 0x0123456789ABCDEF_FEDCBA9876543210;
+    let result = to_vec::<BigEndian>(&value).unwrap();
+    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+
+    // Roundtrip test
+    let deserialized: i128 = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, value);
+}
+
+#[cfg(feature = "i128")]
+#[test]
+fn test_serialize_i128_negative() {
+    use na_nbt::from_slice_be;
+
+    let value: i128 = -1;
+    let result = to_vec::<BigEndian>(&value).unwrap();
+    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+
+    let p = payload(&result);
+    // All bits should be 1 for -1
+    assert_eq!(read_be_u32(&p[4..8]), 0xFFFFFFFF);
+    assert_eq!(read_be_u32(&p[8..12]), 0xFFFFFFFF);
+    assert_eq!(read_be_u32(&p[12..16]), 0xFFFFFFFF);
+    assert_eq!(read_be_u32(&p[16..20]), 0xFFFFFFFF);
+
+    // Roundtrip test
+    let deserialized: i128 = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, value);
+}
+
+#[cfg(feature = "i128")]
+#[test]
+fn test_serialize_u128_zero() {
+    use na_nbt::from_slice_be;
+
+    let value: u128 = 0;
+    let result = to_vec::<BigEndian>(&value).unwrap();
+    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+
+    let p = payload(&result);
+    assert_eq!(read_be_u32(&p[4..8]), 0);
+    assert_eq!(read_be_u32(&p[8..12]), 0);
+    assert_eq!(read_be_u32(&p[12..16]), 0);
+    assert_eq!(read_be_u32(&p[16..20]), 0);
+
+    // Roundtrip test
+    let deserialized: u128 = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, value);
+}
+
+#[cfg(feature = "i128")]
+#[test]
+fn test_serialize_u128_max() {
+    use na_nbt::from_slice_be;
+
+    let value: u128 = u128::MAX;
+    let result = to_vec::<BigEndian>(&value).unwrap();
+    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+
+    let p = payload(&result);
+    assert_eq!(read_be_u32(&p[4..8]), 0xFFFFFFFF);
+    assert_eq!(read_be_u32(&p[8..12]), 0xFFFFFFFF);
+    assert_eq!(read_be_u32(&p[12..16]), 0xFFFFFFFF);
+    assert_eq!(read_be_u32(&p[16..20]), 0xFFFFFFFF);
+
+    // Roundtrip test
+    let deserialized: u128 = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, value);
+}
+
+#[cfg(feature = "i128")]
+#[test]
+fn test_serialize_i128_min_max() {
+    use na_nbt::from_slice_be;
+
+    // Test i128::MIN
+    let min_value: i128 = i128::MIN;
+    let result = to_vec::<BigEndian>(&min_value).unwrap();
+    let deserialized: i128 = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, min_value);
+
+    // Test i128::MAX
+    let max_value: i128 = i128::MAX;
+    let result = to_vec::<BigEndian>(&max_value).unwrap();
+    let deserialized: i128 = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, max_value);
+}
+
+// ============================================================================
+// Map serialize_key/serialize_value separated calls tests
+// ============================================================================
+
+#[test]
+fn test_map_serialize_key_value_separated() {
+    use na_nbt::from_slice_be;
+    use std::collections::BTreeMap;
+
+    // BTreeMap uses serialize_key/serialize_value pattern
+    let mut map: BTreeMap<String, i32> = BTreeMap::new();
+    map.insert("alpha".to_string(), 1);
+    map.insert("beta".to_string(), 2);
+    map.insert("gamma".to_string(), 3);
+
+    let result = to_vec::<BigEndian>(&map).unwrap();
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
+
+    // Roundtrip test
+    let deserialized: BTreeMap<String, i32> = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, map);
+}
+
+#[test]
+fn test_map_serialize_key_value_with_various_value_types() {
+    use na_nbt::from_slice_be;
+    use std::collections::BTreeMap;
+
+    // Test with different value types
+    let mut string_map: BTreeMap<String, String> = BTreeMap::new();
+    string_map.insert("key1".to_string(), "value1".to_string());
+    string_map.insert("key2".to_string(), "value2".to_string());
+
+    let result = to_vec::<BigEndian>(&string_map).unwrap();
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
+
+    let deserialized: BTreeMap<String, String> = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, string_map);
+}
+
+#[test]
+fn test_map_serialize_key_value_nested() {
+    use na_nbt::from_slice_be;
+    use std::collections::BTreeMap;
+
+    // Nested maps test serialize_key/serialize_value with compound values
+    let mut inner: BTreeMap<String, i32> = BTreeMap::new();
+    inner.insert("x".to_string(), 10);
+    inner.insert("y".to_string(), 20);
+
+    let mut outer: BTreeMap<String, BTreeMap<String, i32>> = BTreeMap::new();
+    outer.insert("position".to_string(), inner);
+
+    let result = to_vec::<BigEndian>(&outer).unwrap();
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
+
+    let deserialized: BTreeMap<String, BTreeMap<String, i32>> = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, outer);
+}
+
+#[test]
+fn test_map_serialize_key_value_with_list_values() {
+    use na_nbt::from_slice_be;
+    use std::collections::BTreeMap;
+
+    let mut map: BTreeMap<String, Vec<i32>> = BTreeMap::new();
+    map.insert("numbers".to_string(), vec![1, 2, 3, 4, 5]);
+    map.insert("empty".to_string(), vec![]);
+
+    let result = to_vec::<BigEndian>(&map).unwrap();
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
+
+    let deserialized: BTreeMap<String, Vec<i32>> = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, map);
+}
+
+#[test]
+fn test_map_serialize_key_value_empty() {
+    use na_nbt::from_slice_be;
+    use std::collections::BTreeMap;
+
+    let map: BTreeMap<String, i32> = BTreeMap::new();
+
+    let result = to_vec::<BigEndian>(&map).unwrap();
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
+
+    // Empty compound should just have end tag
+    let p = payload(&result);
+    assert_eq!(p[0], Tag::End as u8);
+
+    let deserialized: BTreeMap<String, i32> = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, map);
+}
+
+#[test]
+fn test_hashmap_serialize_key_value() {
+    use na_nbt::from_slice_be;
+
+    // HashMap also uses serialize_key/serialize_value
+    let mut map: HashMap<String, f64> = HashMap::new();
+    map.insert("pi".to_string(), std::f64::consts::PI);
+    map.insert("e".to_string(), std::f64::consts::E);
+
+    let result = to_vec::<BigEndian>(&map).unwrap();
+    assert_eq!(root_tag(&result), Tag::Compound as u8);
+
+    let deserialized: HashMap<String, f64> = from_slice_be(&result).unwrap();
+    assert_eq!(deserialized, map);
+}

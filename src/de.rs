@@ -310,6 +310,20 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    #[cfg(feature = "i128")]
+    fn parse_u128(&mut self) -> Result<u128> {
+        check_bounds!(4 + 4 * 4, self.input);
+        unsafe {
+            let read_ptr = self.input.as_ptr().add(4);
+            let x1 = byteorder::U32::<O>::from_bytes(*read_ptr.cast()).get();
+            let x2 = byteorder::U32::<O>::from_bytes(*read_ptr.add(4).cast()).get();
+            let x3 = byteorder::U32::<O>::from_bytes(*read_ptr.add(8).cast()).get();
+            let x4 = byteorder::U32::<O>::from_bytes(*read_ptr.add(12).cast()).get();
+            self.input = &self.input[4 + 4 * 4..];
+            Ok((x1 as u128) << 96 | (x2 as u128) << 64 | (x3 as u128) << 32 | (x4 as u128))
+        }
+    }
+
     fn parse_f32(&mut self) -> Result<f32> {
         check_bounds!(4, self.input);
         let value = byteorder::F32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -508,6 +522,27 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     {
         check_tag!(Tag::Long, self.current_tag, {
             visitor.visit_u64(self.parse_i64()? as u64)
+        })
+    }
+
+    #[cfg(feature = "i128")]
+    fn deserialize_i128<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        check_tag!(Tag::IntArray, self.current_tag, {
+            visitor.visit_i128(self.parse_u128()? as i128)
+        })
+    }
+
+    /// Deserialize u128 from IntArray with 4 elements (most significant to least significant)
+    #[cfg(feature = "i128")]
+    fn deserialize_u128<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        check_tag!(Tag::IntArray, self.current_tag, {
+            visitor.visit_u128(self.parse_u128()?)
         })
     }
 

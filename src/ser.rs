@@ -347,6 +347,12 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         Ok(Tag::Long)
     }
 
+    #[cfg(feature = "i128")]
+    #[inline]
+    fn serialize_i128(self, v: i128) -> std::result::Result<Self::Ok, Self::Error> {
+        self.serialize_u128(v as u128)
+    }
+
     #[inline]
     fn serialize_u8(self, v: u8) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec.push(v);
@@ -366,6 +372,39 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     #[inline]
     fn serialize_u64(self, v: u64) -> std::result::Result<Self::Ok, Self::Error> {
         self.serialize_i64(v as i64)
+    }
+
+    /// Serialize u128 as IntArray with 4 elements (most significant to least significant)
+    #[cfg(feature = "i128")]
+    fn serialize_u128(self, v: u128) -> std::result::Result<Self::Ok, Self::Error> {
+        let x1: u32 = (v >> 96) as u32;
+        let x2: u32 = ((v >> 64) & 0xFFFFFFFF) as u32;
+        let x3: u32 = ((v >> 32) & 0xFFFFFFFF) as u32;
+        let x4: u32 = (v & 0xFFFFFFFF) as u32;
+        unsafe {
+            let old_len = self.vec.len();
+            self.vec.reserve(4 + 4 * 4);
+            let write_ptr = self.vec.as_mut_ptr().add(old_len);
+            ptr::write(write_ptr.cast(), byteorder::U32::<O>::new(4).to_bytes());
+            ptr::write(
+                write_ptr.add(4).cast(),
+                byteorder::U32::<O>::new(x1).to_bytes(),
+            );
+            ptr::write(
+                write_ptr.add(8).cast(),
+                byteorder::U32::<O>::new(x2).to_bytes(),
+            );
+            ptr::write(
+                write_ptr.add(12).cast(),
+                byteorder::U32::<O>::new(x3).to_bytes(),
+            );
+            ptr::write(
+                write_ptr.add(16).cast(),
+                byteorder::U32::<O>::new(x4).to_bytes(),
+            );
+            self.vec.set_len(old_len + 4 + 4 * 4);
+        }
+        Ok(Tag::IntArray)
     }
 
     #[inline]
