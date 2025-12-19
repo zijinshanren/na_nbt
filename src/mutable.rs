@@ -312,7 +312,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::String(value) => {
                 let payload = value.data.as_ptr().cast::<u8>();
                 let len = value.data.len();
-                let mut buf = Vec::<u8>::with_capacity(1 + 2 + len);
+                let mut buf = Vec::<u8>::with_capacity(1 + 2 + 2 + len);
                 let buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::String as u8, 0u8, 0u8]);
                 ptr::write(
@@ -320,7 +320,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                     byteorder::U16::<TARGET>::new(len as u16).to_bytes(),
                 );
                 ptr::copy_nonoverlapping(payload, buf_ptr.add(1 + 2 + 2), len);
-                buf.set_len(1 + 2 + len);
+                buf.set_len(1 + 2 + 2 + len);
                 Ok(buf)
             }
             ValueScoped::List(value) => {
