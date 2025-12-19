@@ -551,3 +551,7 @@ pub use mutable::*;
 pub use tag::*;
 pub use util::*;
 pub use value_trait::*;
+
+pub use zerocopy::BigEndian;
+pub use zerocopy::LittleEndian;
+pub use zerocopy::NativeEndian;
