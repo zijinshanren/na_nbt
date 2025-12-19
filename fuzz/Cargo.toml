@@ -1,0 +1,22 @@
+[package]
+name = "na_nbt-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+bytes = "1.11"
+
+[dependencies.na_nbt]
+path = ".."
+
+[[bin]]
+name = "read_write"
+path = "fuzz_targets/read_write.rs"
+test = false
+doc = false
+bench = false
