@@ -310,7 +310,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
     type SerializeTupleVariant = Self;
-    type SerializeMap = Self;
+    type SerializeMap = MapSerializer<'a, O>;
     type SerializeStruct = Self;
     type SerializeStructVariant = Self;
 
@@ -636,7 +636,20 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         self,
         _len: Option<usize>,
     ) -> std::result::Result<Self::SerializeMap, Self::Error> {
-        Ok(self)
+        #[cfg(not(debug_assertions))]
+        {
+            Ok(MapSerializer {
+                tag_pos: usize::MAX,
+                serializer: &mut *self,
+            })
+        }
+        #[cfg(debug_assertions)]
+        {
+            Ok(MapSerializer {
+                tag_pos: None,
+                serializer: &mut *self,
+            })
+        }
     }
 
     #[inline]
@@ -1057,43 +1070,87 @@ impl<'a, O: ByteOrder> ser::Serializer for MapKeySerializer<'a, O> {
     }
 }
 
-impl<O: ByteOrder> ser::SerializeMap for &mut Serializer<O> {
+pub struct MapSerializer<'a, O: ByteOrder> {
+    #[cfg(not(debug_assertions))]
+    tag_pos: usize,
+    #[cfg(debug_assertions)]
+    tag_pos: Option<usize>,
+    serializer: &'a mut Serializer<O>,
+}
+
+impl<'a, O: ByteOrder> ser::SerializeMap for MapSerializer<'a, O> {
     type Ok = Tag;
     type Error = Error;
 
-    #[inline]
-    fn serialize_key<T>(&mut self, _key: &T) -> std::result::Result<(), Self::Error>
+    fn serialize_key<T>(&mut self, key: &T) -> std::result::Result<(), Self::Error>
     where
         T: ?Sized + Serialize,
     {
-        unimplemented!("use serialize_entry")
+        #[cfg(not(debug_assertions))]
+        {
+            self.tag_pos = self.serializer.vec.len();
+            key.serialize(MapKeySerializer {
+                serializer: self.serializer,
+            })?;
+        }
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(
+                self.tag_pos.is_none(),
+                "serialize_key called without tag_pos consumed"
+            );
+            self.tag_pos = Some(self.serializer.vec.len());
+            key.serialize(MapKeySerializer {
+                serializer: self.serializer,
+            })?;
+        }
+        Ok(())
     }
 
-    #[inline]
-    fn serialize_value<T>(&mut self, _value: &T) -> std::result::Result<(), Self::Error>
+    fn serialize_value<T>(&mut self, value: &T) -> std::result::Result<(), Self::Error>
     where
         T: ?Sized + Serialize,
     {
-        unimplemented!("use serialize_entry")
+        #[cfg(not(debug_assertions))]
+        {
+            let tag_id = value.serialize(&mut *self.serializer)?;
+            unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos) = tag_id as u8 };
+            Ok(())
+        }
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(
+                self.tag_pos.is_some(),
+                "serialize_value called without serialize_key"
+            );
+            let tag_id = value.serialize(&mut *self.serializer)?;
+            unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos.unwrap()) = tag_id as u8 };
+            self.tag_pos = None;
+            Ok(())
+        }
     }
 
-    #[inline]
-    fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
-        self.vec.push(Tag::End as u8);
-        Ok(Tag::Compound)
-    }
-
-    #[inline]
     fn serialize_entry<K, V>(&mut self, key: &K, value: &V) -> std::result::Result<(), Self::Error>
     where
         K: ?Sized + Serialize,
         V: ?Sized + Serialize,
     {
-        let tag_pos = self.vec.len();
-        key.serialize(MapKeySerializer { serializer: self })?;
-        let tag_id = value.serialize(&mut **self)?;
-        unsafe { *self.vec.get_unchecked_mut(tag_pos) = tag_id as u8 };
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(self.tag_pos.is_none());
+        }
+        let tag_pos = self.serializer.vec.len();
+        key.serialize(MapKeySerializer {
+            serializer: self.serializer,
+        })?;
+        let tag_id = value.serialize(&mut *self.serializer)?;
+        unsafe { *self.serializer.vec.get_unchecked_mut(tag_pos) = tag_id as u8 };
         Ok(())
+    }
+
+    fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
+        self.serializer.vec.push(Tag::End as u8);
+        Ok(Tag::Compound)
     }
 }
 
