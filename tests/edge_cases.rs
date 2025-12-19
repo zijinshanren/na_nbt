@@ -58,7 +58,7 @@ fn test_invalid_element_type_in_list() {
     let res = read_borrowed::<BE>(&data);
     match res {
         Err(e) => match e {
-            Error::InvalidTagType(15) => {}
+            Error::InvalidTagType(0xFF) => {}
             _ => panic!("unexpected result: {:?}", e),
         },
         Ok(_) => panic!("expected error"),

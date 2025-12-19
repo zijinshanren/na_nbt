@@ -107,10 +107,13 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                     current_pos = current_pos.add(5 + total_size);
                     cur.cache.list_total_length = 0;
                     cur.cache.list_current_length = 0;
-                } else {
+                } else if element_type <= 12 {
                     current_pos = current_pos.add(5);
                     cur.cache.list_total_length = element_count;
                     cur.cache.list_current_length = 0;
+                } else {
+                    cold_path();
+                    return Err(Error::InvalidTagType(element_type));
                 }
                 label = Label::ListItemBegin;
             }};
