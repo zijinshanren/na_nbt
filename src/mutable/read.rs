@@ -345,6 +345,7 @@ unsafe fn read_list<O: ByteOrder>(
                 _marker: PhantomData,
             }))
         } else {
+            check_bounds!(len); // one non-primitive tag is at least 1 byte (empty Tag::Compound)
             let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
             ptr::copy_nonoverlapping((*current_pos).sub(1 + 4), list_data.as_mut_ptr(), 1 + 4);
             let mut guard: ListBuildGuard<O> = ListBuildGuard::new(list_data, tag_id);
@@ -814,6 +815,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 case!(8, U64)
             }
             7 => {
+                check_bounds!(4 * len); // one Tag::ByteArray is at least 4 bytes (empty Tag::ByteArray)
                 let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
@@ -842,6 +844,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }))
             }
             8 => {
+                check_bounds!(2 * len); // one Tag::String is at least 2 bytes (empty Tag::String)
                 let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
@@ -870,6 +873,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }))
             }
             9 => {
+                check_bounds!((1 + 4) * len); // one Tag::List is at least 5 bytes (empty Tag::List)
                 let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
@@ -891,6 +895,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }))
             }
             10 => {
+                check_bounds!(len); // one Tag::Compound is at least 1 bytes (empty Tag::Compound)
                 let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
@@ -912,6 +917,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }))
             }
             11 => {
+                check_bounds!(4 * len); // one Tag::IntArray is at least 4 bytes (empty Tag::IntArray)
                 let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
@@ -944,6 +950,7 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }))
             }
             12 => {
+                check_bounds!(4 * len); // one Tag::LongArray is at least 4 bytes (empty Tag::LongArray)
                 let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);

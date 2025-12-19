@@ -352,7 +352,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::IntArray(value) => {
                 let payload = value.as_ptr().cast::<u8>();
                 let len = value.len();
-                let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + len);
+                let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 4 * len);
                 let mut buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::IntArray as u8, 0u8, 0u8]);
                 ptr::write(
@@ -377,7 +377,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::LongArray(value) => {
                 let payload = value.as_ptr().cast::<u8>();
                 let len = value.len();
-                let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8 + len);
+                let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8 + 8 * len);
                 let mut buf_ptr = buf.as_mut_ptr();
                 ptr::write(buf_ptr.cast(), [Tag::LongArray as u8, 0u8, 0u8]);
                 ptr::write(
