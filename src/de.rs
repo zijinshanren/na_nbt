@@ -132,7 +132,7 @@ pub struct Deserializer<'de, O: ByteOrder> {
 
 macro_rules! check_bounds {
     ($len:expr, $input:expr) => {
-        if $len as usize > $input.len() {
+        if $len > $input.len() {
             cold_path();
             return Err(Error::EndOfFile);
         }
@@ -150,7 +150,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         check_bounds!(1 + 2, input);
         let name_len =
             byteorder::U16::<O>::from_bytes(unsafe { *input.as_ptr().add(1).cast() }).get();
-        check_bounds!(1 + 2 + name_len, input);
+        check_bounds!(1 + 2 + name_len as usize, input);
         Ok(Self {
             current_tag: unsafe { Tag::from_u8_unchecked(tag_id) },
             input: &input[1 + 2 + name_len as usize..],
@@ -341,7 +341,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
     fn parse_str(&mut self) -> Result<Cow<'de, str>> {
         check_bounds!(2, self.input);
         let length = byteorder::U16::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-        check_bounds!(2 + length, self.input);
+        check_bounds!(2 + length as usize, self.input);
         let value = simd_cesu8::mutf8::decode_lossy(&self.input[2..2 + length as usize]);
         self.input = &self.input[2 + length as usize..];
         Ok(value)
@@ -350,7 +350,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
     fn parse_bytes(&mut self) -> Result<&'de [u8]> {
         check_bounds!(4, self.input);
         let length = byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-        check_bounds!(4 + length, self.input);
+        check_bounds!(4 + length as usize, self.input);
         let value = &self.input[4..4 + length as usize];
         self.input = &self.input[4 + length as usize..];
         Ok(value)
