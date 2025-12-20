@@ -183,7 +183,7 @@ pub fn test_direct(data: &[u8]) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let data = include_bytes!();
+    let data = include_bytes!("../bench/tests/hypixel.nbt");
 
     test_direct(data);
     test_serde(data);
