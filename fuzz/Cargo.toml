@@ -12,6 +12,7 @@ afl = "*"
 honggfuzz = "0.5"
 libfuzzer-sys = "0.4"
 bytes = "1.11"
+serde = { version = "1", features = ["derive"] }
 
 [dependencies.na_nbt]
 path = ".."
