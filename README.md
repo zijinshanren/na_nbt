@@ -41,6 +41,7 @@ na_nbt = { version = "0.1", default-features = false, features = ["serde"] }
 ## Todo
 
 - [ ] **More convenient APIs**
+- [ ] **Documentation**
 - [ ] **Benchmarks**
 - [ ] **Tests and fuzzing**
 - [ ] **MSRV testing**
@@ -200,16 +201,6 @@ fn print_compound_keys<'doc>(value: &impl ScopedReadableValue<'doc>) {
 | `OwnedValue` | Fully owned, mutable NBT value |
 | `MutableValue` | Mutable view into an `OwnedValue` |
 | `ImmutableValue` | Immutable view into an `OwnedValue` |
-
-## Feature Comparison
-
-| Feature | `BorrowedValue` | `OwnedValue` |
-|---------|-----------------|--------------|
-| Zero-copy parsing | ✅ | ❌ |
-| Modify values | ❌ | ✅ |
-| Outlives source | ❌ | ✅ |
-| Endianness conversion | On write | On read or write |
-| Memory usage | Minimal | Proportional to data |
 
 ## Serde Integration
 

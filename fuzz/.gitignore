@@ -1,4 +1,7 @@
-target
-corpus
-artifacts
-coverage
+/target
+/corpus
+/artifacts
+/coverage
+/hfuzz_target
+/hfuzz_workspace
+/out

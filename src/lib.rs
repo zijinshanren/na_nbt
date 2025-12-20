@@ -316,19 +316,6 @@
 //! | [`Error`] | Error type for parsing and writing |
 //! | [`Result`] | Result type alias using [`Error`] |
 //!
-//! # Feature comparison
-//!
-//! | Feature | `BorrowedValue` | `SharedValue` | `OwnedValue` |
-//! |---------|-----------------|---------------|--------------|
-//! | Zero-copy parsing | ✅ | ✅ | ❌ |
-//! | Modify values | ❌ | ❌ | ✅ |
-//! | Outlives source | ❌ | ✅ | ✅ |
-//! | Thread-safe sharing | ✅* | ✅ | ✅ |
-//! | Clone | ✅ | ✅ | ❌† |
-//!
-//! \* With appropriate lifetime management  
-//! † Use [`MutableValue`] or [`ImmutableValue`] for borrowed access
-//!
 //! # Serde Integration
 //!
 //! This crate provides full [serde](https://serde.rs) support for serializing and

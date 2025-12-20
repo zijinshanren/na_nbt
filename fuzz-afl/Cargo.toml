@@ -1,9 +1,0 @@
-[package]
-name = "na_nbt-fuzz-target"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-afl = "*"
-na_nbt = { path = ".." }
-bytes = "1.11"

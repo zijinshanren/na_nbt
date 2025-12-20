@@ -1,10 +1,7 @@
-#![no_main]
-
 use bytes::Bytes;
-use libfuzzer_sys::fuzz_target;
 use na_nbt::{BigEndian, LittleEndian, read_borrowed, read_owned, read_shared};
 
-fuzz_target!(|data: &[u8]| {
+pub fn test(data: &[u8]) {
     if let Ok(doc) = read_borrowed::<BigEndian>(data) {
         let _ = doc.root().write_to_vec::<BigEndian>();
         let _ = doc.root().write_to_vec::<LittleEndian>();
@@ -41,4 +38,4 @@ fuzz_target!(|data: &[u8]| {
         let _ = root.write_to_vec::<LittleEndian>();
         let _ = root.write_to_vec::<BigEndian>();
     }
-});
+}
