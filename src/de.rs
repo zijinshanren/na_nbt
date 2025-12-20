@@ -632,6 +632,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 cold_path();
                 Err(Error::InvalidTagType(tag_id))
             };
+            check_bounds!(1, self.input);
             self.input = &self.input[1..];
             value
         })
