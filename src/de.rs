@@ -386,7 +386,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         V: de::Visitor<'de>,
     {
         match self.current_tag {
-            Tag::End => visitor.visit_unit(),
+            Tag::End => Err(Error::InvalidTagType(Tag::End as u8)),
             Tag::Byte => visitor.visit_i8(self.parse_i8()?),
             Tag::Short => visitor.visit_i16(self.parse_i16()?),
             Tag::Int => visitor.visit_i32(self.parse_i32()?),
@@ -405,6 +405,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() })
                         .get();
+                if tag_id == Tag::End as u8 && length > 0 {
+                    cold_path();
+                    return Err(Error::InvalidTagType(tag_id));
+                }
                 self.input = &self.input[1 + 4..];
                 visitor.visit_seq(ListDeserializer {
                     tag_id: unsafe { Tag::from_u8_unchecked(tag_id) },
@@ -708,6 +712,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() })
                         .get();
+                if tag_id == Tag::End as u8 && length > 0 {
+                    cold_path();
+                    return Err(Error::InvalidTagType(tag_id));
+                }
                 self.input = &self.input[1 + 4..];
                 visitor.visit_seq(ListDeserializer {
                     tag_id: unsafe { Tag::from_u8_unchecked(tag_id) },

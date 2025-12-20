@@ -79,18 +79,22 @@ struct SimpleCompound {
     name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 enum TestEnum {
+    #[default]
     Unit,
     Newtype(i32),
     Tuple(i32, String),
-    Struct { x: i32, y: i32 },
+    Struct {
+        x: i32,
+        y: i32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct WithEnum {
     #[serde(default)]
-    mode: Option<TestEnum>,
+    mode: TestEnum,
     #[serde(default)]
     value: i32,
 }
@@ -110,37 +114,30 @@ pub fn test_serde(data: &[u8]) {
         let _ = to_vec_be(&val);
         let _ = to_vec_le(&val);
     }
-
     if let Ok(val) = from_slice_le::<TestCompound>(data) {
         let _ = to_vec_le(&val);
         let _ = to_vec_be(&val);
     }
-
     if let Ok(val) = from_slice_be::<WithEnum>(data) {
         let _ = to_vec_be(&val);
         let _ = to_vec_le(&val);
     }
-
     if let Ok(val) = from_slice_le::<WithEnum>(data) {
         let _ = to_vec_le(&val);
         let _ = to_vec_be(&val);
     }
-
     if let Ok(val) = from_slice_be::<HashMap<String, i32>>(data) {
         let _ = to_vec_be(&val);
         let _ = to_vec_le(&val);
     }
-
     if let Ok(val) = from_slice_le::<HashMap<String, i32>>(data) {
         let _ = to_vec_le(&val);
         let _ = to_vec_be(&val);
     }
-
     if let Ok(val) = from_slice_be::<Vec<i32>>(data) {
         let _ = to_vec_be(&val);
         let _ = to_vec_le(&val);
     }
-
     if let Ok(val) = from_slice_le::<Vec<i32>>(data) {
         let _ = to_vec_le(&val);
         let _ = to_vec_be(&val);
@@ -186,9 +183,9 @@ pub fn test_direct(data: &[u8]) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let data = include_bytes!(r"D:\cmp\na_nbt\fuzz\out\default\crashes\id000000,sig06,src000000,time5439,execs7241,oparith16,pos1,valbe-6");
+    let data = include_bytes!();
 
-    test_serde(data);
     test_direct(data);
+    test_serde(data);
     Ok(())
 }

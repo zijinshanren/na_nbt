@@ -31,18 +31,22 @@ struct SimpleCompound {
     name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 enum TestEnum {
+    #[default]
     Unit,
     Newtype(i32),
     Tuple(i32, String),
-    Struct { x: i32, y: i32 },
+    Struct {
+        x: i32,
+        y: i32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct WithEnum {
     #[serde(default)]
-    mode: Option<TestEnum>,
+    mode: TestEnum,
     #[serde(default)]
     value: i32,
 }
