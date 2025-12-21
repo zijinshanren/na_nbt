@@ -1,10 +1,10 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData, slice};
+use std::{hint::unreachable_unchecked, marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ImmutableString, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue,
-    Tag, cold_path,
+    ByteOrder, EMPTY_COMPOUND, ImmutableString, ImmutableValue, MutableValue, OwnedCompound,
+    OwnedList, OwnedValue, Tag, cold_path,
     mutable::util::tag_size,
     view::{StringViewOwn, VecViewOwn},
 };
@@ -15,6 +15,17 @@ pub struct ImmutableListIter<'s, O: ByteOrder> {
     pub(crate) remaining: u32,
     pub(crate) data: *const u8,
     pub(crate) _marker: PhantomData<(&'s (), O)>,
+}
+
+impl<'s, O: ByteOrder> Default for ImmutableListIter<'s, O> {
+    fn default() -> Self {
+        Self {
+            tag_id: Tag::End,
+            remaining: 0,
+            data: ptr::null(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 unsafe impl<'s, O: ByteOrder> Send for ImmutableListIter<'s, O> {}
@@ -51,6 +62,15 @@ impl<'s, O: ByteOrder> ExactSizeIterator for ImmutableListIter<'s, O> {}
 pub struct ImmutableCompoundIter<'s, O: ByteOrder> {
     pub(crate) data: *const u8,
     pub(crate) _marker: PhantomData<(&'s (), O)>,
+}
+
+impl<'s, O: ByteOrder> Default for ImmutableCompoundIter<'s, O> {
+    fn default() -> Self {
+        Self {
+            data: EMPTY_COMPOUND.as_ptr(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 unsafe impl<'s, O: ByteOrder> Send for ImmutableCompoundIter<'s, O> {}

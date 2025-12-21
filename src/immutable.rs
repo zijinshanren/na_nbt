@@ -42,9 +42,9 @@
 //! assert_eq!(root.get("x").and_then(|v| v.as_int()), Some(42));
 //! ```
 
-use std::{any::TypeId, io::Write, ptr};
 #[cfg(feature = "shared")]
 use std::sync::Arc;
+use std::{any::TypeId, io::Write, ptr};
 
 #[cfg(feature = "shared")]
 use bytes::Bytes;
@@ -147,6 +147,10 @@ pub struct BorrowedDocument<'s, O: ByteOrder> {
     mark: Vec<mark::Mark>,
     source: *const u8,
     _marker: core::marker::PhantomData<(&'s (), O)>,
+}
+
+impl value::Never for () {
+    unsafe fn never() -> Self {}
 }
 
 impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
@@ -286,6 +290,15 @@ mod shared {
     pub struct SharedDocument {
         mark: Vec<mark::Mark>,
         source: Bytes,
+    }
+
+    impl value::Never for Arc<SharedDocument> {
+        unsafe fn never() -> Self {
+            Arc::new(SharedDocument {
+                mark: Vec::new(),
+                source: Bytes::new(),
+            })
+        }
     }
 
     impl SharedDocument {

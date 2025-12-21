@@ -14,7 +14,9 @@ use crate::{
 /// to nested values.
 ///
 /// Most code should use [`ScopedReadableValue`] instead, as it is implemented by more types.
-pub trait ReadableValue<'doc>: ScopedReadableValue<'doc> + Send + Sync + Sized + Clone {
+pub trait ReadableValue<'doc>:
+    ScopedReadableValue<'doc> + Send + Sync + Sized + Clone + Default
+{
     /// Returns the value as a byte array, if it is one.
     fn as_byte_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::ByteArray<'doc>>
     where
@@ -55,7 +57,9 @@ pub trait ReadableValue<'doc>: ScopedReadableValue<'doc> + Send + Sync + Sized +
 }
 
 /// A trait for NBT lists.
-pub trait ReadableList<'doc>: ScopedReadableList<'doc> + Send + Sync + Sized + Clone {
+pub trait ReadableList<'doc>:
+    ScopedReadableList<'doc> + Send + Sync + Sized + Clone + Default
+{
     /// Gets the element at the given index.
     fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
 
@@ -65,7 +69,7 @@ pub trait ReadableList<'doc>: ScopedReadableList<'doc> + Send + Sync + Sized + C
 
 /// A trait for NBT compounds.
 pub trait ReadableCompound<'doc>:
-    ScopedReadableCompound<'doc> + Send + Sync + Sized + Clone
+    ScopedReadableCompound<'doc> + Send + Sync + Sized + Clone + Default
 {
     /// Gets the value associated with the given key.
     fn get(&self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;

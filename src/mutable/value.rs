@@ -3,7 +3,7 @@ use std::{borrow::Cow, io::Write, marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Result, ScopedReadableValue as _, Tag,
+    ByteOrder, EMPTY_COMPOUND, EMPTY_LIST, Result, ScopedReadableValue as _, Tag,
     index::Index,
     mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter},
@@ -21,8 +21,9 @@ use crate::{
 ///
 /// This type is typically used when you need a lightweight, immutable view of data that might
 /// be part of a mutable structure or when the mark-based overhead is not desired.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ImmutableValue<'s, O: ByteOrder> {
+    #[default]
     End,
     Byte(i8),
     Short(i16),
@@ -353,6 +354,15 @@ pub struct ImmutableList<'s, O: ByteOrder> {
     pub(crate) _marker: PhantomData<(&'s (), O)>,
 }
 
+impl<'s, O: ByteOrder> Default for ImmutableList<'s, O> {
+    fn default() -> Self {
+        Self {
+            data: EMPTY_LIST.as_ptr(),
+            _marker: PhantomData,
+        }
+    }
+}
+
 unsafe impl<'s, O: ByteOrder> Send for ImmutableList<'s, O> {}
 unsafe impl<'s, O: ByteOrder> Sync for ImmutableList<'s, O> {}
 
@@ -401,6 +411,15 @@ impl<'s, O: ByteOrder> ImmutableList<'s, O> {
 pub struct ImmutableCompound<'s, O: ByteOrder> {
     pub(crate) data: *const u8,
     pub(crate) _marker: PhantomData<(&'s (), O)>,
+}
+
+impl<'s, O: ByteOrder> Default for ImmutableCompound<'s, O> {
+    fn default() -> Self {
+        Self {
+            data: EMPTY_COMPOUND.as_ptr(),
+            _marker: PhantomData,
+        }
+    }
 }
 
 unsafe impl<'s, O: ByteOrder> Send for ImmutableCompound<'s, O> {}

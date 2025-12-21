@@ -1,9 +1,9 @@
-use std::{borrow::Cow, io::Write, marker::PhantomData, ops::Deref, slice};
+use std::{borrow::Cow, io::Write, marker::PhantomData, ops::Deref, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Result, Tag, cold_path,
+    ByteOrder, EMPTY_COMPOUND, EMPTY_LIST, Result, Tag, cold_path,
     immutable::{mark::Mark, util::tag_size},
     index::Index,
     write_value_to_vec, write_value_to_writer,
@@ -17,9 +17,13 @@ use crate::{
 /// The two main implementations are:
 /// - `()` - For borrowed values that reference external data
 /// - `Arc<SharedDocument>` - For shared values with `Arc` ownership
-pub trait Document: Send + Sync + Clone + 'static {}
+pub trait Document: Send + Sync + Clone + Never + 'static {}
 
-impl<T: Send + Sync + Clone + 'static> Document for T {}
+pub trait Never {
+    unsafe fn never() -> Self;
+}
+
+impl<T: Send + Sync + Clone + Never + 'static> Document for T {}
 
 /// A zero-copy, immutable NBT value.
 ///
@@ -80,9 +84,10 @@ impl<T: Send + Sync + Clone + 'static> Document for T {}
 ///
 /// - [`ImmutableValue`](crate::ImmutableValue) - Immutable view into owned data
 /// - [`OwnedValue`](crate::OwnedValue) - Fully owned, mutable NBT value
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ReadonlyValue<'doc, O: ByteOrder, D: Document> {
     /// End tag (0) - marks the end of a compound.
+    #[default]
     End,
     /// Byte tag (1) - a signed 8-bit integer.
     Byte(i8),
@@ -612,6 +617,17 @@ pub struct ReadonlyList<'doc, O: ByteOrder, D: Document> {
     _marker: PhantomData<O>,
 }
 
+impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyList<'doc, O, D> {
+    fn default() -> Self {
+        Self {
+            data: &EMPTY_LIST,
+            mark: ptr::null(),
+            doc: unsafe { Never::never() },
+            _marker: PhantomData,
+        }
+    }
+}
+
 unsafe impl<'doc, O: ByteOrder, D: Document> Send for ReadonlyList<'doc, O, D> {}
 unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ReadonlyList<'doc, O, D> {}
 
@@ -763,6 +779,19 @@ pub struct ReadonlyListIter<'doc, O: ByteOrder, D: Document> {
     _marker: PhantomData<(&'doc (), O)>,
 }
 
+impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyListIter<'doc, O, D> {
+    fn default() -> Self {
+        Self {
+            tag_id: Tag::End,
+            remaining: 0,
+            data: ptr::null(),
+            mark: ptr::null(),
+            doc: unsafe { Never::never() },
+            _marker: PhantomData,
+        }
+    }
+}
+
 unsafe impl<'doc, O: ByteOrder, D: Document> Send for ReadonlyListIter<'doc, O, D> {}
 unsafe impl<'doc, O: ByteOrder, D: Document> Sync for ReadonlyListIter<'doc, O, D> {}
 
@@ -839,6 +868,17 @@ pub struct ReadonlyCompound<'doc, O: ByteOrder, D: Document> {
     pub(crate) mark: *const Mark,
     doc: D,
     _marker: PhantomData<O>,
+}
+
+impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyCompound<'doc, O, D> {
+    fn default() -> Self {
+        Self {
+            data: &EMPTY_COMPOUND,
+            mark: ptr::null(),
+            doc: unsafe { Never::never() },
+            _marker: PhantomData,
+        }
+    }
 }
 
 unsafe impl<'doc, O: ByteOrder, D: Document> Send for ReadonlyCompound<'doc, O, D> {}
@@ -918,6 +958,17 @@ pub struct ReadonlyCompoundIter<'doc, O: ByteOrder, D: Document> {
     mark: *const Mark,
     doc: D,
     _marker: PhantomData<(&'doc (), O)>,
+}
+
+impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyCompoundIter<'doc, O, D> {
+    fn default() -> Self {
+        Self {
+            data: EMPTY_COMPOUND.as_ptr(),
+            mark: ptr::null(),
+            doc: unsafe { Never::never() },
+            _marker: PhantomData,
+        }
+    }
 }
 
 unsafe impl<'doc, O: ByteOrder, D: Document> Send for ReadonlyCompoundIter<'doc, O, D> {}

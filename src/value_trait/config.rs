@@ -13,9 +13,11 @@ pub trait ReadableConfig: Send + Sync + Sized + 'static {
     type ByteArray<'doc>: Deref<Target = [i8]> + Clone;
     type String<'doc>: ReadableString<'doc>;
     type List<'doc>: ReadableList<'doc, Config = Self, Item = Self::Value<'doc>>;
-    type ListIter<'doc>: Iterator<Item = Self::Value<'doc>> + ExactSizeIterator + Clone;
+    type ListIter<'doc>: Iterator<Item = Self::Value<'doc>> + ExactSizeIterator + Clone + Default;
     type Compound<'doc>: ReadableCompound<'doc, Config = Self, Item = (Self::String<'doc>, Self::Value<'doc>)>;
-    type CompoundIter<'doc>: Iterator<Item = (Self::String<'doc>, Self::Value<'doc>)> + Clone;
+    type CompoundIter<'doc>: Iterator<Item = (Self::String<'doc>, Self::Value<'doc>)>
+        + Clone
+        + Default;
     type IntArray<'doc>: Deref<Target = [byteorder::I32<Self::ByteOrder>]> + Clone;
     type LongArray<'doc>: Deref<Target = [byteorder::I64<Self::ByteOrder>]> + Clone;
 }
