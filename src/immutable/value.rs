@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, EMPTY_COMPOUND, EMPTY_LIST, Result, Tag, cold_path,
-    immutable::{mark::Mark, util::tag_size},
+    immutable::{mark::Mark, typed_list::ReadonlyPrimitiveList, util::tag_size},
     index::Index,
     write_value_to_vec, write_value_to_writer,
 };
@@ -763,6 +763,84 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
             doc: self.doc.clone(),
             _marker: PhantomData,
         }
+    }
+
+    pub fn as_end_list(&self) -> Option<ReadonlyPrimitiveList<'doc, O, D, (), ()>> {
+        (self.tag_id() == Tag::End).then_some(ReadonlyPrimitiveList {
+            data: unsafe {
+                slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
+            },
+            _doc: self.doc.clone(),
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn as_byte_list(&self) -> Option<ReadonlyPrimitiveList<'doc, O, D, i8, i8>> {
+        (self.tag_id() == Tag::Byte).then_some(ReadonlyPrimitiveList {
+            data: unsafe {
+                slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
+            },
+            _doc: self.doc.clone(),
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn as_short_list(
+        &self,
+    ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::I16<O>, i16>> {
+        (self.tag_id() == Tag::Short).then_some(ReadonlyPrimitiveList {
+            data: unsafe {
+                slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
+            },
+            _doc: self.doc.clone(),
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn as_int_list(&self) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::I32<O>, i32>> {
+        (self.tag_id() == Tag::Int).then_some(ReadonlyPrimitiveList {
+            data: unsafe {
+                slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
+            },
+            _doc: self.doc.clone(),
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn as_long_list(
+        &self,
+    ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::I64<O>, i64>> {
+        (self.tag_id() == Tag::Long).then_some(ReadonlyPrimitiveList {
+            data: unsafe {
+                slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
+            },
+            _doc: self.doc.clone(),
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn as_float_list(
+        &self,
+    ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::F32<O>, f32>> {
+        (self.tag_id() == Tag::Float).then_some(ReadonlyPrimitiveList {
+            data: unsafe {
+                slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
+            },
+            _doc: self.doc.clone(),
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn as_double_list(
+        &self,
+    ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::F64<O>, f64>> {
+        (self.tag_id() == Tag::Double).then_some(ReadonlyPrimitiveList {
+            data: unsafe {
+                slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
+            },
+            _doc: self.doc.clone(),
+            _marker: PhantomData,
+        })
     }
 }
 

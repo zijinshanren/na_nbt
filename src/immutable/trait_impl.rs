@@ -6,9 +6,12 @@ use crate::{
     ByteOrder, ReadableCompound, ReadableConfig, ReadableList, ReadableString, ReadableValue,
     ReadonlyArray, Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag,
     Value, ValueScoped,
-    immutable::value::{
-        Document, ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter,
-        ReadonlyString, ReadonlyValue,
+    immutable::{
+        typed_list::ReadonlyPrimitiveList,
+        value::{
+            Document, ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter,
+            ReadonlyString, ReadonlyValue,
+        },
     },
     index::Index,
 };
@@ -40,6 +43,21 @@ impl<O: ByteOrder, D: Document> ReadableConfig for Config<O, D> {
     type CompoundIter<'doc> = ReadonlyCompoundIter<'doc, O, D>;
     type IntArray<'doc> = ReadonlyArray<'doc, byteorder::I32<O>, D>;
     type LongArray<'doc> = ReadonlyArray<'doc, byteorder::I64<O>, D>;
+
+    type EndList<'doc> = ReadonlyPrimitiveList<'doc, O, D, (), ()>;
+    type EndListIter<'doc> = ReadonlyPrimitiveList<'doc, O, D, (), ()>;
+    type ByteList<'doc> = ReadonlyPrimitiveList<'doc, O, D, i8, i8>;
+    type ByteListIter<'doc> = ReadonlyPrimitiveList<'doc, O, D, i8, i8>;
+    type ShortList<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::I16<O>, i16>;
+    type ShortListIter<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::I16<O>, i16>;
+    type IntList<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::I32<O>, i32>;
+    type IntListIter<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::I32<O>, i32>;
+    type LongList<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::I64<O>, i64>;
+    type LongListIter<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::I64<O>, i64>;
+    type FloatList<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::F32<O>, f32>;
+    type FloatListIter<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::F32<O>, f32>;
+    type DoubleList<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::F64<O>, f64>;
+    type DoubleListIter<'doc> = ReadonlyPrimitiveList<'doc, O, D, byteorder::F64<O>, f64>;
 }
 
 impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
@@ -353,6 +371,109 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
     {
         self.iter()
     }
+
+    fn as_end_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::EndList<'a>>
+    where
+        'doc: 'a,
+    {
+        self.as_end_list()
+    }
+
+    fn as_byte_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteList<'a>>
+    where
+        'doc: 'a,
+    {
+        self.as_byte_list()
+    }
+
+    fn as_short_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ShortList<'a>>
+    where
+        'doc: 'a,
+    {
+        self.as_short_list()
+    }
+
+    fn as_int_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntList<'a>>
+    where
+        'doc: 'a,
+    {
+        self.as_int_list()
+    }
+
+    fn as_long_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongList<'a>>
+    where
+        'doc: 'a,
+    {
+        self.as_long_list()
+    }
+
+    fn as_float_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::FloatList<'a>>
+    where
+        'doc: 'a,
+    {
+        self.as_float_list()
+    }
+
+    fn as_double_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::DoubleList<'a>>
+    where
+        'doc: 'a,
+    {
+        self.as_double_list()
+    }
+
+    fn as_byte_array_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::ByteArrayList<'a>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_string_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::StringList<'a>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_list_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ListList<'a>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_compound_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::CompoundList<'a>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_int_array_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::IntArrayList<'a>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_long_array_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::LongArrayList<'a>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, O, D> {
@@ -364,6 +485,105 @@ impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, 
     #[inline]
     fn iter(&self) -> <Self::Config as ReadableConfig>::ListIter<'doc> {
         self.iter()
+    }
+
+    fn as_end_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::EndList<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_end_list()
+    }
+
+    fn as_byte_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteList<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_byte_list()
+    }
+
+    fn as_short_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ShortList<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_short_list()
+    }
+
+    fn as_int_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntList<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_int_list()
+    }
+
+    fn as_long_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongList<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_long_list()
+    }
+
+    fn as_float_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::FloatList<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_float_list()
+    }
+
+    fn as_double_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::DoubleList<'doc>>
+    where
+        'doc: 'a,
+    {
+        self.as_double_list()
+    }
+
+    fn as_byte_array_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::ByteArrayList<'doc>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_string_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::StringList<'doc>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_list_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ListList<'doc>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_compound_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::CompoundList<'doc>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_int_array_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::IntArrayList<'doc>>
+    where
+        'doc: 'a,
+    {
+        todo!()
+    }
+
+    fn as_long_array_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::LongArrayList<'doc>>
+    where
+        'doc: 'a,
+    {
+        todo!()
     }
 }
 

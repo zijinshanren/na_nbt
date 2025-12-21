@@ -1,10 +1,9 @@
 use crate::{
-    index::Index,
-    value_trait::{
-        config::ReadableConfig,
-        scoped_readable::{ScopedReadableCompound, ScopedReadableList, ScopedReadableValue},
-        value::Value,
-    },
+    ReadableConfig, ScopedReadableByteArrayList, ScopedReadableByteList, ScopedReadableCompound,
+    ScopedReadableCompoundList, ScopedReadableDoubleList, ScopedReadableEndList,
+    ScopedReadableFloatList, ScopedReadableIntArrayList, ScopedReadableIntList, ScopedReadableList,
+    ScopedReadableListList, ScopedReadableLongArrayList, ScopedReadableLongList,
+    ScopedReadableShortList, ScopedReadableStringList, ScopedReadableValue, Value, index::Index,
 };
 
 /// Extended trait for reading NBT values with full lifetime access.
@@ -65,6 +64,66 @@ pub trait ReadableList<'doc>:
 
     /// Returns an iterator over the elements of the list.
     fn iter(&self) -> <Self::Config as ReadableConfig>::ListIter<'doc>;
+
+    fn as_end_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::EndList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_byte_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_short_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ShortList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_int_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_long_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_float_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::FloatList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_double_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::DoubleList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_byte_array_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::ByteArrayList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_string_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::StringList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_list_list<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ListList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_compound_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::CompoundList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_int_array_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::IntArrayList<'doc>>
+    where
+        'doc: 'a;
+
+    fn as_long_array_list<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::LongArrayList<'doc>>
+    where
+        'doc: 'a;
 }
 
 /// A trait for NBT compounds.
@@ -76,4 +135,88 @@ pub trait ReadableCompound<'doc>:
 
     /// Returns an iterator over the entries of the compound.
     fn iter(&self) -> <Self::Config as ReadableConfig>::CompoundIter<'doc>;
+}
+
+pub trait ReadableEndList<'doc>:
+    ScopedReadableEndList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn iter(&self) -> <Self::Config as ReadableConfig>::EndListIter<'doc>;
+}
+
+pub trait ReadableByteList<'doc>:
+    ScopedReadableByteList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn iter(&self) -> <Self::Config as ReadableConfig>::ByteListIter<'doc>;
+}
+
+pub trait ReadableShortList<'doc>:
+    ScopedReadableShortList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn iter(&self) -> <Self::Config as ReadableConfig>::ShortListIter<'doc>;
+}
+
+pub trait ReadableIntList<'doc>:
+    ScopedReadableIntList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn iter(&self) -> <Self::Config as ReadableConfig>::IntListIter<'doc>;
+}
+
+pub trait ReadableLongList<'doc>:
+    ScopedReadableLongList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn iter(&self) -> <Self::Config as ReadableConfig>::LongListIter<'doc>;
+}
+
+pub trait ReadableFloatList<'doc>:
+    ScopedReadableFloatList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn iter(&self) -> <Self::Config as ReadableConfig>::FloatListIter<'doc>;
+}
+
+pub trait ReadableDoubleList<'doc>:
+    ScopedReadableDoubleList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn iter(&self) -> <Self::Config as ReadableConfig>::DoubleListIter<'doc>;
+}
+
+pub trait ReadableByteArrayList<'doc>:
+    ScopedReadableByteArrayList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::ByteArray<'doc>>;
+    fn iter(&self) -> <Self::Config as ReadableConfig>::ByteArrayListIter<'doc>;
+}
+
+pub trait ReadableStringList<'doc>:
+    ScopedReadableStringList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::String<'doc>>;
+    fn iter(&self) -> <Self::Config as ReadableConfig>::StringListIter<'doc>;
+}
+
+pub trait ReadableListList<'doc>:
+    ScopedReadableListList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::List<'doc>>;
+    fn iter(&self) -> <Self::Config as ReadableConfig>::ListListIter<'doc>;
+}
+
+pub trait ReadableCompoundList<'doc>:
+    ScopedReadableCompoundList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::Compound<'doc>>;
+    fn iter(&self) -> <Self::Config as ReadableConfig>::CompoundListIter<'doc>;
+}
+
+pub trait ReadableIntArrayList<'doc>:
+    ScopedReadableIntArrayList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::IntArray<'doc>>;
+    fn iter(&self) -> <Self::Config as ReadableConfig>::IntArrayListIter<'doc>;
+}
+
+pub trait ReadableLongArrayList<'doc>:
+    ScopedReadableLongArrayList<'doc> + Send + Sync + Sized + Clone + Default
+{
+    fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::LongArray<'doc>>;
+    fn iter(&self) -> <Self::Config as ReadableConfig>::LongArrayListIter<'doc>;
 }

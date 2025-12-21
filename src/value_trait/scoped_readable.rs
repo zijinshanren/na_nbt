@@ -1,10 +1,6 @@
 use std::io::Write;
 
-use crate::{
-    ByteOrder, Result, Tag,
-    index::Index,
-    value_trait::{ReadableConfig, ValueScoped},
-};
+use crate::{ByteOrder, ReadableConfig, Result, Tag, ValueScoped, index::Index};
 
 /// Core trait for reading NBT values.
 ///
@@ -169,6 +165,74 @@ pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
     fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::ListIter<'a>
     where
         'doc: 'a;
+
+    fn as_end_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::EndList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_byte_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ByteList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_short_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::ShortList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_int_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::IntList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_long_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::LongList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_float_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::FloatList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_double_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::DoubleList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_byte_array_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::ByteArrayList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_string_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::StringList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_list_list_scoped<'a>(&'a self) -> Option<<Self::Config as ReadableConfig>::ListList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_compound_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::CompoundList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_int_array_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::IntArrayList<'a>>
+    where
+        'doc: 'a;
+
+    fn as_long_array_list_scoped<'a>(
+        &'a self,
+    ) -> Option<<Self::Config as ReadableConfig>::LongArrayList<'a>>
+    where
+        'doc: 'a;
 }
 
 pub trait ScopedReadableCompound<'doc>: IntoIterator + Send + Sync + Sized {
@@ -179,6 +243,232 @@ pub trait ScopedReadableCompound<'doc>: IntoIterator + Send + Sync + Sized {
         'doc: 'a;
 
     fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::CompoundIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableEndList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::End
+    }
+
+    fn len(&self) -> usize;
+
+    fn is_empty(&self) -> bool;
+
+    fn get(&self, index: usize) -> Option<()>;
+
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::EndListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableByteList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::Byte
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get(&self, index: usize) -> Option<i8>;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::ByteListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableShortList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::Short
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get(&self, index: usize) -> Option<i16>;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::ShortListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableIntList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::Int
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get(&self, index: usize) -> Option<i32>;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::IntListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableLongList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::Long
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get(&self, index: usize) -> Option<i64>;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::LongListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableFloatList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::Float
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get(&self, index: usize) -> Option<f32>;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::FloatListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableDoubleList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::Double
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get(&self, index: usize) -> Option<f64>;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::DoubleListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableByteArrayList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::ByteArray
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get_scoped<'a>(
+        &'a self,
+        index: usize,
+    ) -> Option<<Self::Config as ReadableConfig>::ByteArray<'a>>
+    where
+        'doc: 'a;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::ByteArrayListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableStringList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::String
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get_scoped<'a>(
+        &'a self,
+        index: usize,
+    ) -> Option<<Self::Config as ReadableConfig>::String<'a>>
+    where
+        'doc: 'a;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::StringListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableListList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::List
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get_scoped<'a>(&'a self, index: usize) -> Option<<Self::Config as ReadableConfig>::List<'a>>
+    where
+        'doc: 'a;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::ListListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableCompoundList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::Compound
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get_scoped<'a>(
+        &'a self,
+        index: usize,
+    ) -> Option<<Self::Config as ReadableConfig>::Compound<'a>>
+    where
+        'doc: 'a;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::CompoundListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableIntArrayList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::IntArray
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get_scoped<'a>(
+        &'a self,
+        index: usize,
+    ) -> Option<<Self::Config as ReadableConfig>::IntArray<'a>>
+    where
+        'doc: 'a;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::IntArrayListIter<'a>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableLongArrayList<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    #[inline]
+    fn tag_id(&self) -> Tag {
+        Tag::LongArray
+    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get_scoped<'a>(
+        &'a self,
+        index: usize,
+    ) -> Option<<Self::Config as ReadableConfig>::LongArray<'a>>
+    where
+        'doc: 'a;
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::LongArrayListIter<'a>
     where
         'doc: 'a;
 }

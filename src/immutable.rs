@@ -55,6 +55,7 @@ use crate::{ByteOrder, Error, Result, Tag, cold_path};
 mod mark;
 mod read;
 mod trait_impl;
+mod typed_list;
 mod util;
 mod value;
 mod write;
