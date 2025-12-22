@@ -114,15 +114,15 @@
 mod config;
 mod readable;
 mod scoped_readable;
-// mod scoped_writable;
+mod scoped_writable;
 mod string;
 mod value;
-// mod writable;
+mod writable;
 
 pub use config::*;
 pub use readable::*;
 pub use scoped_readable::*;
-// pub use scoped_writable::*;
+pub use scoped_writable::*;
 pub use string::*;
 pub use value::*;
-// pub use writable::*;
+pub use writable::*;

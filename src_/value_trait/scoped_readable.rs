@@ -1,9 +1,6 @@
 use std::io::Write;
 
-use crate::{
-    ByteOrder, NBT, NBTExtract, ReadableConfig, Result, TagByte, TagID, TagList, ValueScoped,
-    index::Index,
-};
+use crate::{ByteOrder, NBT, ReadableConfig, Result, TagID, Value, index::Index};
 
 /// Core trait for reading NBT values.
 ///
@@ -33,21 +30,32 @@ use crate::{
 /// - `is_*()` - Check if value is a specific type
 /// - `visit_scoped()` - Pattern match on the value type
 pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
-    /// The configuration associated with this value.
     type Config: ReadableConfig;
 
-    /// Returns the tag ID of the value.
     fn tag_id(&self) -> TagID;
 
-    fn cast<'a, T: NBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn to_unchecked<'a, T: NBT>(&'a self) -> T::Type<'a, Self::Config>
     where
         'doc: 'a;
 
+    fn to<'a, T: NBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a;
+
+    #[inline]
     fn is<T: NBT>(&self) -> bool {
         self.tag_id() == T::TAG_ID
     }
 
-    /// Gets a value at the specified index (for lists) or key (for compounds) with a scoped lifetime.
+    fn to_readable<'a>(&'a self) -> <Self::Config as ReadableConfig>::Value<'a>
+    where
+        'doc: 'a;
+
     fn get_scoped<'a, I: Index>(
         &'a self,
         index: I,
@@ -55,40 +63,25 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     where
         'doc: 'a;
 
-    /// Visits the value with a closure, allowing for efficient pattern matching with scoped lifetimes.
-    fn visit_scoped<'a, R>(
-        &'a self,
-        match_fn: impl FnOnce(ValueScoped<'a, Self::Config>) -> R,
-    ) -> R
+    fn with<'a, R>(&'a self, match_fn: impl FnOnce(Value<'a, Self::Config>) -> R) -> R
     where
         'doc: 'a;
 
-    /// Writes the value to a byte vector.
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Result<Vec<u8>>;
 
-    /// Writes the value to a writer.
     fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()>;
-}
-
-fn test<'doc>(x: &impl ScopedReadableValue<'doc>) {
-    let y = x.cast::<TagList>().unwrap();
 }
 
 /// A trait for NBT lists with scoped lifetimes.
 pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
-    /// The configuration associated with this list.
     type Config: ReadableConfig;
 
-    /// Returns the tag ID of the elements in the list.
     fn tag_id(&self) -> TagID;
 
-    /// Returns the number of elements in the list.
     fn len(&self) -> usize;
 
-    /// Returns `true` if the list is empty.
     fn is_empty(&self) -> bool;
 
-    /// Gets the element at the given index with a scoped lifetime.
     fn get_scoped<'a>(
         &'a self,
         index: usize,
@@ -100,21 +93,20 @@ pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
     where
         'doc: 'a;
 
-    fn cast_typed_list<'a, T: NBT>(
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn to_typed_list_unchecked<'a, T: NBT>(
+        &'a self,
+    ) -> <Self::Config as ReadableConfig>::TypedList<'a, T>
+    where
+        'doc: 'a;
+
+    fn to_typed_list<'a, T: NBT>(
         &'a self,
     ) -> Option<<Self::Config as ReadableConfig>::TypedList<'a, T>>
-    where
-        'doc: 'a;
-}
-
-pub trait ScopedReadableCompound<'doc>: IntoIterator + Send + Sync + Sized {
-    type Config: ReadableConfig;
-
-    fn get_scoped<'a>(&'a self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
-    where
-        'doc: 'a;
-
-    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::CompoundIter<'a>
     where
         'doc: 'a;
 }
@@ -136,6 +128,18 @@ pub trait ScopedReadableTypedList<'doc, T: NBT>: IntoIterator + Send + Sync + Si
         'doc: 'a;
 
     fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::TypedListIter<'a, T>
+    where
+        'doc: 'a;
+}
+
+pub trait ScopedReadableCompound<'doc>: IntoIterator + Send + Sync + Sized {
+    type Config: ReadableConfig;
+
+    fn get_scoped<'a>(&'a self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
+    where
+        'doc: 'a;
+
+    fn iter_scoped<'a>(&'a self) -> <Self::Config as ReadableConfig>::CompoundIter<'a>
     where
         'doc: 'a;
 }

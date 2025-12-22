@@ -13,43 +13,31 @@ use crate::{
 pub trait ReadableValue<'doc>:
     ScopedReadableValue<'doc> + Send + Sync + Sized + Clone + Default
 {
-    /// Returns the value as a byte array, if it is one.
-    fn as_byte_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::ByteArray<'doc>>
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn peek_unchecked<'a, T: NBT>(&'a self) -> &'a T::Type<'doc, Self::Config>
     where
         'doc: 'a;
 
-    /// Returns the value as a string, if it is one.
-    fn as_string<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::String<'doc>>
+    fn peek<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::Config>>
     where
         'doc: 'a;
 
-    /// Returns the value as a list, if it is one.
-    fn as_list<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::List<'doc>>
-    where
-        'doc: 'a;
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn extract_unchecked<T: NBT>(self) -> T::Type<'doc, Self::Config>;
 
-    /// Returns the value as a compound, if it is one.
-    fn as_compound<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::Compound<'doc>>
-    where
-        'doc: 'a;
+    fn extract<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>>;
 
-    /// Returns the value as an int array, if it is one.
-    fn as_int_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::IntArray<'doc>>
-    where
-        'doc: 'a;
-
-    /// Returns the value as a long array, if it is one.
-    fn as_long_array<'a>(&'a self) -> Option<&'a <Self::Config as ReadableConfig>::LongArray<'doc>>
-    where
-        'doc: 'a;
-
-    /// Gets a value at the specified index (for lists) or key (for compounds).
     fn get<I: Index>(&self, index: I) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
 
-    /// Visits the value with a closure, allowing for efficient pattern matching.
-    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(Value<'a, 'doc, Self::Config>) -> R) -> R
-    where
-        'doc: 'a;
+    fn visit<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R;
 }
 
 /// A trait for NBT lists.
@@ -62,9 +50,17 @@ pub trait ReadableList<'doc>:
     /// Returns an iterator over the elements of the list.
     fn iter(&self) -> <Self::Config as ReadableConfig>::ListIter<'doc>;
 
-    fn into_typed_list<T: NBT>(
+    fn extract_typed_list<T: NBT>(
         self,
     ) -> Option<<Self::Config as ReadableConfig>::TypedList<'doc, T>>;
+}
+
+pub trait ReadableTypedList<'doc, T: NBT>:
+    ScopedReadableTypedList<'doc, T> + Send + Sync + Sized + Clone + Default
+{
+    fn get(&self, index: usize) -> Option<T::Type<'doc, Self::Config>>;
+
+    fn iter(&self) -> <Self::Config as ReadableConfig>::TypedListIter<'doc, T>;
 }
 
 /// A trait for NBT compounds.
@@ -76,12 +72,4 @@ pub trait ReadableCompound<'doc>:
 
     /// Returns an iterator over the entries of the compound.
     fn iter(&self) -> <Self::Config as ReadableConfig>::CompoundIter<'doc>;
-}
-
-pub trait ReadableTypedList<'doc, T: NBT>:
-    ScopedReadableTypedList<'doc, T> + Send + Sync + Sized + Clone + Default
-{
-    fn get(&self, index: usize) -> Option<T::Type<'doc, Self::Config>>;
-
-    fn iter(&self) -> <Self::Config as ReadableConfig>::TypedListIter<'doc, T>;
 }

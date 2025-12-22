@@ -1,0 +1,29 @@
+use std::marker::PhantomData;
+
+use zerocopy::byteorder;
+
+use crate::{
+    ByteOrder, Document, NBT, ReadableConfig, ReadonlyArray, ReadonlyCompound,
+    ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter, ReadonlyString, ReadonlyTypedList,
+    ReadonlyValue,
+};
+
+#[derive(Clone)]
+pub struct ReadonlyConfig<O: ByteOrder, D: Document> {
+    _marker: PhantomData<(O, D)>,
+}
+
+impl<O: ByteOrder, D: Document> ReadableConfig for ReadonlyConfig<O, D> {
+    type ByteOrder = O;
+    type Value<'doc> = ReadonlyValue<'doc, O, D>;
+    type ByteArray<'doc> = ReadonlyArray<'doc, i8, D>;
+    type String<'doc> = ReadonlyString<'doc, D>;
+    type List<'doc> = ReadonlyList<'doc, O, D>;
+    type ListIter<'doc> = ReadonlyListIter<'doc, O, D>;
+    type TypedList<'doc, T: NBT> = ReadonlyTypedList<'doc, O, D, T>;
+    type TypedListIter<'doc, T: NBT> = ReadonlyTypedList<'doc, O, D, T>;
+    type Compound<'doc> = ReadonlyCompound<'doc, O, D>;
+    type CompoundIter<'doc> = ReadonlyCompoundIter<'doc, O, D>;
+    type IntArray<'doc> = ReadonlyArray<'doc, byteorder::I32<O>, D>;
+    type LongArray<'doc> = ReadonlyArray<'doc, byteorder::I64<O>, D>;
+}

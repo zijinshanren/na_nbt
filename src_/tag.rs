@@ -37,7 +37,12 @@
 
 use std::marker::PhantomData;
 
-use crate::ReadableConfig;
+use zerocopy::byteorder;
+
+use crate::{
+    ByteOrder, ReadableConfig, WritableConfig,
+    view::{StringViewMut, StringViewOwn, VecViewMut, VecViewOwn},
+};
 
 /// Represents an NBT tag type.
 ///
@@ -161,109 +166,180 @@ impl TagID {
 }
 
 // todo: Sealed NBT
-pub trait NBT {
+pub trait NBTBase: Send + Sync + Sized + Clone + 'static {
     const TAG_ID: TagID;
     type Type<'a, Config: ReadableConfig>;
+    type TypeMut<'a, ConfigMut: WritableConfig>;
+    type TypeOwn<O: ByteOrder>;
 }
 
-pub(crate) trait NBTExtract<'doc, Config: ReadableConfig, V>: NBT {
+pub trait NBT: NBTBase + ImmutableNBTImpl {}
+
+pub trait PrimitiveNBT: NBTBase {}
+
+pub(crate) trait NBTImpl<'doc, Config: ReadableConfig, V>: NBTBase {
     fn extract(value: V) -> Option<Self::Type<'doc, Config>>;
+    fn peek<'a>(value: &'a V) -> Option<&'a Self::Type<'doc, Config>>
+    where
+        'doc: 'a;
 }
 
+#[derive(Clone)]
 pub struct TagEnd;
 
-impl NBT for TagEnd {
+impl NBTBase for TagEnd {
     const TAG_ID: TagID = TagID::End;
     type Type<'a, Config: ReadableConfig> = ();
+    type TypeMut<'a, ConfigMut: WritableConfig> = &'a mut ();
+    type TypeOwn<O: ByteOrder> = ();
 }
 
+impl PrimitiveNBT for TagEnd {}
+
+#[derive(Clone)]
 pub struct TagByte;
 
-impl NBT for TagByte {
+impl NBTBase for TagByte {
     const TAG_ID: TagID = TagID::Byte;
     type Type<'a, Config: ReadableConfig> = i8;
+    type TypeMut<'a, ConfigMut: WritableConfig> = &'a mut i8;
+    type TypeOwn<O: ByteOrder> = i8;
 }
 
+impl PrimitiveNBT for TagByte {}
+
+#[derive(Clone)]
 pub struct TagShort;
 
-impl NBT for TagShort {
+impl NBTBase for TagShort {
     const TAG_ID: TagID = TagID::Short;
     type Type<'a, Config: ReadableConfig> = i16;
+    type TypeMut<'a, ConfigMut: WritableConfig> = &'a mut byteorder::I16<ConfigMut::ByteOrder>;
+    type TypeOwn<O: ByteOrder> = byteorder::I16<O>;
 }
 
+impl PrimitiveNBT for TagShort {}
+
+#[derive(Clone)]
 pub struct TagInt;
 
-impl NBT for TagInt {
+impl NBTBase for TagInt {
     const TAG_ID: TagID = TagID::Int;
     type Type<'a, Config: ReadableConfig> = i32;
+    type TypeMut<'a, ConfigMut: WritableConfig> = &'a mut byteorder::I32<ConfigMut::ByteOrder>;
+    type TypeOwn<O: ByteOrder> = byteorder::I32<O>;
 }
 
+impl PrimitiveNBT for TagInt {}
+
+#[derive(Clone)]
 pub struct TagLong;
 
-impl NBT for TagLong {
+impl NBTBase for TagLong {
     const TAG_ID: TagID = TagID::Long;
     type Type<'a, Config: ReadableConfig> = i64;
+    type TypeMut<'a, ConfigMut: WritableConfig> = &'a mut byteorder::I64<ConfigMut::ByteOrder>;
+    type TypeOwn<O: ByteOrder> = byteorder::I64<O>;
 }
 
+impl PrimitiveNBT for TagLong {}
+
+#[derive(Clone)]
 pub struct TagFloat;
 
-impl NBT for TagFloat {
+impl NBTBase for TagFloat {
     const TAG_ID: TagID = TagID::Float;
     type Type<'a, Config: ReadableConfig> = f32;
+    type TypeMut<'a, ConfigMut: WritableConfig> = &'a mut byteorder::F32<ConfigMut::ByteOrder>;
+    type TypeOwn<O: ByteOrder> = byteorder::F32<O>;
 }
 
+impl PrimitiveNBT for TagFloat {}
+
+#[derive(Clone)]
 pub struct TagDouble;
 
-impl NBT for TagDouble {
+impl NBTBase for TagDouble {
     const TAG_ID: TagID = TagID::Double;
     type Type<'a, Config: ReadableConfig> = f64;
+    type TypeMut<'a, ConfigMut: WritableConfig> = &'a mut byteorder::F64<ConfigMut::ByteOrder>;
+    type TypeOwn<O: ByteOrder> = byteorder::F64<O>;
 }
 
+impl PrimitiveNBT for TagDouble {}
+
+#[derive(Clone)]
 pub struct TagByteArray;
 
-impl NBT for TagByteArray {
+impl NBTBase for TagByteArray {
     const TAG_ID: TagID = TagID::ByteArray;
     type Type<'a, Config: ReadableConfig> = Config::ByteArray<'a>;
+    type TypeMut<'a, ConfigMut: WritableConfig> = VecViewMut<'a, i8>;
+    type TypeOwn<O: ByteOrder> = VecViewOwn<i8>;
 }
 
+#[derive(Clone)]
 pub struct TagString;
 
-impl NBT for TagString {
+impl NBTBase for TagString {
     const TAG_ID: TagID = TagID::String;
     type Type<'a, Config: ReadableConfig> = Config::String<'a>;
+    type TypeMut<'a, ConfigMut: WritableConfig> = StringViewMut<'a>;
+    type TypeOwn<O: ByteOrder> = StringViewOwn;
 }
 
+#[derive(Clone)]
 pub struct TagList;
 
-impl NBT for TagList {
+impl NBTBase for TagList {
     const TAG_ID: TagID = TagID::List;
     type Type<'a, Config: ReadableConfig> = Config::List<'a>;
+    type TypeMut<'a, ConfigMut: WritableConfig> = <ConfigMut as WritableConfig>::ListMut<'a>;
+    type TypeOwn<O: ByteOrder> = ();
+    // type TypeOwn<O: ByteOrder> = OwnedList<O>;
 }
 
-pub struct TagTypedList<T: NBT>(PhantomData<T>);
+#[derive(Clone)]
+pub struct TagTypedList<T: NBTBase>(PhantomData<T>);
 
-impl<T: NBT> NBT for TagTypedList<T> {
+impl<T: NBTBase> NBTBase for TagTypedList<T> {
     const TAG_ID: TagID = TagID::List;
     type Type<'a, Config: ReadableConfig> = Config::TypedList<'a, T>;
+    type TypeMut<'a, ConfigMut: WritableConfig> =
+        <ConfigMut as WritableConfig>::TypedListMut<'a, T>;
+    type TypeOwn<O: ByteOrder> = ();
+    // type TypeOwn<O: ByteOrder> = OwnedTypedList<O, T>;
 }
 
+#[derive(Clone)]
 pub struct TagCompound;
 
-impl NBT for TagCompound {
+impl NBTBase for TagCompound {
     const TAG_ID: TagID = TagID::Compound;
     type Type<'a, Config: ReadableConfig> = Config::Compound<'a>;
+    type TypeMut<'a, ConfigMut: WritableConfig> = <ConfigMut as WritableConfig>::CompoundMut<'a>;
+    type TypeOwn<O: ByteOrder> = ();
+    // type TypeOwn<O: ByteOrder> = OwnedCompound<O>;
 }
 
+#[derive(Clone)]
 pub struct TagIntArray;
 
-impl NBT for TagIntArray {
+impl NBTBase for TagIntArray {
     const TAG_ID: TagID = TagID::IntArray;
     type Type<'a, Config: ReadableConfig> = Config::IntArray<'a>;
+    type TypeMut<'a, ConfigMut: WritableConfig> =
+        VecViewMut<'a, byteorder::I32<ConfigMut::ByteOrder>>;
+    type TypeOwn<O: ByteOrder> = VecViewOwn<byteorder::I32<O>>;
 }
 
+#[derive(Clone)]
 pub struct TagLongArray;
 
-impl NBT for TagLongArray {
+impl NBTBase for TagLongArray {
     const TAG_ID: TagID = TagID::LongArray;
     type Type<'a, Config: ReadableConfig> = Config::LongArray<'a>;
+    type TypeMut<'a, ConfigMut: WritableConfig> =
+        VecViewMut<'a, byteorder::I64<ConfigMut::ByteOrder>>;
+    type TypeOwn<O: ByteOrder> = VecViewOwn<byteorder::I64<O>>;
 }
