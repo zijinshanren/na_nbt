@@ -1,4 +1,4 @@
-use na_nbt::Tag;
+use na_nbt::TagID;
 use zerocopy::byteorder::BigEndian as BE;
 use zerocopy::byteorder::{I32, I64};
 
@@ -96,7 +96,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 1. Byte
     if let Some(mut mv) = comp.get_mut("b") {
         assert!(mv.is_byte());
-        assert_eq!(mv.tag_id(), Tag::Byte);
+        assert_eq!(mv.tag_id(), TagID::Byte);
         assert_eq!(mv.as_byte(), Some(10));
         assert_eq!(mv.as_byte_mut(), Some(&mut 10));
         assert!(mv.set_byte(11));
@@ -117,7 +117,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 2. Short
     if let Some(mut mv) = comp.get_mut("s") {
         assert!(mv.is_short());
-        assert_eq!(mv.tag_id(), Tag::Short);
+        assert_eq!(mv.tag_id(), TagID::Short);
         assert_eq!(mv.as_short(), Some(20));
         assert!(mv.as_short_mut().is_some());
         assert!(mv.set_short(21));
@@ -134,7 +134,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 3. Int
     if let Some(mut mv) = comp.get_mut("i") {
         assert!(mv.is_int());
-        assert_eq!(mv.tag_id(), Tag::Int);
+        assert_eq!(mv.tag_id(), TagID::Int);
         assert_eq!(mv.as_int(), Some(30));
         assert!(mv.as_int_mut().is_some());
         assert!(mv.set_int(31));
@@ -148,7 +148,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 4. Long
     if let Some(mut mv) = comp.get_mut("l") {
         assert!(mv.is_long());
-        assert_eq!(mv.tag_id(), Tag::Long);
+        assert_eq!(mv.tag_id(), TagID::Long);
         assert_eq!(mv.as_long(), Some(40));
         assert!(mv.as_long_mut().is_some());
         assert!(mv.set_long(41));
@@ -162,7 +162,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 5. Float
     if let Some(mut mv) = comp.get_mut("f") {
         assert!(mv.is_float());
-        assert_eq!(mv.tag_id(), Tag::Float);
+        assert_eq!(mv.tag_id(), TagID::Float);
         assert_eq!(mv.as_float(), Some(50.5));
         assert!(mv.as_float_mut().is_some());
         assert!(mv.set_float(51.5));
@@ -176,7 +176,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 6. Double
     if let Some(mut mv) = comp.get_mut("d") {
         assert!(mv.is_double());
-        assert_eq!(mv.tag_id(), Tag::Double);
+        assert_eq!(mv.tag_id(), TagID::Double);
         assert_eq!(mv.as_double(), Some(60.6));
         assert!(mv.as_double_mut().is_some());
         assert!(mv.set_double(61.6));
@@ -190,7 +190,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 7. ByteArray
     if let Some(mut mv) = comp.get_mut("ba") {
         assert!(mv.is_byte_array());
-        assert_eq!(mv.tag_id(), Tag::ByteArray);
+        assert_eq!(mv.tag_id(), TagID::ByteArray);
         assert!(mv.as_byte_array().is_some());
         assert!(mv.as_byte_array_mut().is_some());
         
@@ -204,7 +204,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 8. String
     if let Some(mut mv) = comp.get_mut("st") {
         assert!(mv.is_string());
-        assert_eq!(mv.tag_id(), Tag::String);
+        assert_eq!(mv.tag_id(), TagID::String);
         assert!(mv.as_string().is_some());
         assert!(mv.as_string_mut().is_some());
 
@@ -218,7 +218,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 9. List
     if let Some(mut mv) = comp.get_mut("li") {
         assert!(mv.is_list());
-        assert_eq!(mv.tag_id(), Tag::List);
+        assert_eq!(mv.tag_id(), TagID::List);
         assert!(mv.as_list().is_some());
         assert!(mv.as_list_mut().is_some());
         
@@ -232,7 +232,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 10. Compound
     if let Some(mut mv) = comp.get_mut("co") {
         assert!(mv.is_compound());
-        assert_eq!(mv.tag_id(), Tag::Compound);
+        assert_eq!(mv.tag_id(), TagID::Compound);
         assert!(mv.as_compound().is_some());
         assert!(mv.as_compound_mut().is_some());
         
@@ -246,7 +246,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 11. IntArray
     if let Some(mut mv) = comp.get_mut("ia") {
         assert!(mv.is_int_array());
-        assert_eq!(mv.tag_id(), Tag::IntArray);
+        assert_eq!(mv.tag_id(), TagID::IntArray);
         assert!(mv.as_int_array().is_some());
         assert!(mv.as_int_array_mut().is_some());
         
@@ -260,7 +260,7 @@ fn test_mutable_value_accessors_and_mutators() {
     // 12. LongArray
     if let Some(mut mv) = comp.get_mut("la") {
         assert!(mv.is_long_array());
-        assert_eq!(mv.tag_id(), Tag::LongArray);
+        assert_eq!(mv.tag_id(), TagID::LongArray);
         assert!(mv.as_long_array().is_some());
         assert!(mv.as_long_array_mut().is_some());
 

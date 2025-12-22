@@ -104,7 +104,7 @@ use serde::{
 };
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, Error, Result, Tag, cold_path};
+use crate::{ByteOrder, Error, Result, TagID, cold_path};
 
 /// NBT deserializer implementing [`serde::Deserializer`].
 ///
@@ -125,7 +125,7 @@ use crate::{ByteOrder, Error, Result, Tag, cold_path};
 /// For most use cases, prefer the convenience functions [`from_slice`], [`from_slice_be`],
 /// [`from_reader`], etc.
 pub struct Deserializer<'de, O: ByteOrder> {
-    current_tag: Tag,
+    current_tag: TagID,
     input: &'de [u8],
     marker: PhantomData<O>,
 }
@@ -143,7 +143,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
     pub fn from_slice(input: &'de [u8]) -> Result<Self> {
         check_bounds!(1, input);
         let tag_id = input[0];
-        if tag_id == Tag::End as u8 || tag_id > Tag::LongArray as u8 {
+        if tag_id == TagID::End as u8 || tag_id > TagID::LongArray as u8 {
             cold_path();
             return Err(Error::InvalidTagType(tag_id));
         }
@@ -152,7 +152,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
             byteorder::U16::<O>::from_bytes(unsafe { *input.as_ptr().add(1).cast() }).get();
         check_bounds!(1 + 2 + name_len as usize, input);
         Ok(Self {
-            current_tag: unsafe { Tag::from_u8_unchecked(tag_id) },
+            current_tag: unsafe { TagID::from_u8_unchecked(tag_id) },
             input: &input[1 + 2 + name_len as usize..],
             marker: PhantomData,
         })
@@ -359,7 +359,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
     fn parse_unit(&mut self) -> Result<()> {
         check_bounds!(1, self.input);
         let value = self.input[0];
-        if value != Tag::End as u8 {
+        if value != TagID::End as u8 {
             return Err(Error::InvalidTagType(value));
         }
         self.input = &self.input[1..];
@@ -386,60 +386,60 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         V: de::Visitor<'de>,
     {
         match self.current_tag {
-            Tag::End => Err(Error::InvalidTagType(Tag::End as u8)),
-            Tag::Byte => visitor.visit_i8(self.parse_i8()?),
-            Tag::Short => visitor.visit_i16(self.parse_i16()?),
-            Tag::Int => visitor.visit_i32(self.parse_i32()?),
-            Tag::Long => visitor.visit_i64(self.parse_i64()?),
-            Tag::Float => visitor.visit_f32(self.parse_f32()?),
-            Tag::Double => visitor.visit_f64(self.parse_f64()?),
-            Tag::ByteArray => visitor.visit_borrowed_bytes(self.parse_bytes()?),
-            Tag::String => visitor.visit_str(self.parse_str()?.as_ref()),
-            Tag::List => {
+            TagID::End => Err(Error::InvalidTagType(TagID::End as u8)),
+            TagID::Byte => visitor.visit_i8(self.parse_i8()?),
+            TagID::Short => visitor.visit_i16(self.parse_i16()?),
+            TagID::Int => visitor.visit_i32(self.parse_i32()?),
+            TagID::Long => visitor.visit_i64(self.parse_i64()?),
+            TagID::Float => visitor.visit_f32(self.parse_f32()?),
+            TagID::Double => visitor.visit_f64(self.parse_f64()?),
+            TagID::ByteArray => visitor.visit_borrowed_bytes(self.parse_bytes()?),
+            TagID::String => visitor.visit_str(self.parse_str()?.as_ref()),
+            TagID::List => {
                 check_bounds!(1 + 4, self.input);
                 let tag_id = self.input[0];
-                if tag_id > Tag::LongArray as u8 {
+                if tag_id > TagID::LongArray as u8 {
                     cold_path();
                     return Err(Error::InvalidTagType(tag_id));
                 }
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() })
                         .get();
-                if tag_id == Tag::End as u8 && length > 0 {
+                if tag_id == TagID::End as u8 && length > 0 {
                     cold_path();
                     return Err(Error::InvalidTagType(tag_id));
                 }
                 self.input = &self.input[1 + 4..];
                 visitor.visit_seq(ListDeserializer {
-                    tag_id: unsafe { Tag::from_u8_unchecked(tag_id) },
+                    tag_id: unsafe { TagID::from_u8_unchecked(tag_id) },
                     index: 0,
                     len: length,
                     deserializer: self,
                 })
             }
-            Tag::Compound => visitor.visit_map(CompoundAccess {
+            TagID::Compound => visitor.visit_map(CompoundAccess {
                 deserializer: self,
-                value_tag: Tag::End,
+                value_tag: TagID::End,
             }),
-            Tag::IntArray => {
+            TagID::IntArray => {
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 self.input = &self.input[4..];
                 visitor.visit_seq(ListDeserializer {
-                    tag_id: Tag::Int,
+                    tag_id: TagID::Int,
                     index: 0,
                     len: length,
                     deserializer: self,
                 })
             }
-            Tag::LongArray => {
+            TagID::LongArray => {
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 self.input = &self.input[4..];
                 visitor.visit_seq(ListDeserializer {
-                    tag_id: Tag::Long,
+                    tag_id: TagID::Long,
                     index: 0,
                     len: length,
                     deserializer: self,
@@ -452,7 +452,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Byte, self.current_tag, {
+        check_tag!(TagID::Byte, self.current_tag, {
             visitor.visit_bool(self.parse_i8()? != 0)
         })
     }
@@ -461,7 +461,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Byte, self.current_tag, {
+        check_tag!(TagID::Byte, self.current_tag, {
             visitor.visit_i8(self.parse_i8()?)
         })
     }
@@ -470,7 +470,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Short, self.current_tag, {
+        check_tag!(TagID::Short, self.current_tag, {
             visitor.visit_i16(self.parse_i16()?)
         })
     }
@@ -479,7 +479,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Int, self.current_tag, {
+        check_tag!(TagID::Int, self.current_tag, {
             visitor.visit_i32(self.parse_i32()?)
         })
     }
@@ -488,7 +488,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Long, self.current_tag, {
+        check_tag!(TagID::Long, self.current_tag, {
             visitor.visit_i64(self.parse_i64()?)
         })
     }
@@ -497,7 +497,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Byte, self.current_tag, {
+        check_tag!(TagID::Byte, self.current_tag, {
             visitor.visit_u8(self.parse_i8()? as u8)
         })
     }
@@ -506,7 +506,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Short, self.current_tag, {
+        check_tag!(TagID::Short, self.current_tag, {
             visitor.visit_u16(self.parse_i16()? as u16)
         })
     }
@@ -515,7 +515,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Int, self.current_tag, {
+        check_tag!(TagID::Int, self.current_tag, {
             visitor.visit_u32(self.parse_i32()? as u32)
         })
     }
@@ -524,7 +524,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Long, self.current_tag, {
+        check_tag!(TagID::Long, self.current_tag, {
             visitor.visit_u64(self.parse_i64()? as u64)
         })
     }
@@ -534,7 +534,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::IntArray, self.current_tag, {
+        check_tag!(TagID::IntArray, self.current_tag, {
             visitor.visit_i128(self.parse_u128()? as i128)
         })
     }
@@ -545,7 +545,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::IntArray, self.current_tag, {
+        check_tag!(TagID::IntArray, self.current_tag, {
             visitor.visit_u128(self.parse_u128()?)
         })
     }
@@ -554,7 +554,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Float, self.current_tag, {
+        check_tag!(TagID::Float, self.current_tag, {
             visitor.visit_f32(self.parse_f32()?)
         })
     }
@@ -563,7 +563,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Double, self.current_tag, {
+        check_tag!(TagID::Double, self.current_tag, {
             visitor.visit_f64(self.parse_f64()?)
         })
     }
@@ -572,7 +572,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Int, self.current_tag, {
+        check_tag!(TagID::Int, self.current_tag, {
             let value = self.parse_i32()? as u32;
             visitor.visit_char(char::from_u32(value).ok_or(Error::InvalidCharacter(value))?)
         })
@@ -582,7 +582,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::String, self.current_tag, {
+        check_tag!(TagID::String, self.current_tag, {
             visitor.visit_str(self.parse_str()?.as_ref())
         })
     }
@@ -591,7 +591,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::String, self.current_tag, {
+        check_tag!(TagID::String, self.current_tag, {
             visitor.visit_string(self.parse_str()?.into_owned())
         })
     }
@@ -600,7 +600,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::ByteArray, self.current_tag, {
+        check_tag!(TagID::ByteArray, self.current_tag, {
             visitor.visit_borrowed_bytes(self.parse_bytes()?)
         })
     }
@@ -609,7 +609,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::ByteArray, self.current_tag, {
+        check_tag!(TagID::ByteArray, self.current_tag, {
             visitor.visit_byte_buf(self.parse_bytes()?.to_vec())
         })
     }
@@ -618,15 +618,15 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Compound, self.current_tag, {
+        check_tag!(TagID::Compound, self.current_tag, {
             check_bounds!(1, self.input);
             let tag_id = self.input[0];
-            let value = if tag_id == Tag::End as u8 {
+            let value = if tag_id == TagID::End as u8 {
                 visitor.visit_none()
-            } else if tag_id <= Tag::LongArray as u8 {
+            } else if tag_id <= TagID::LongArray as u8 {
                 check_bounds!(1 + 2, self.input);
                 self.input = &self.input[1 + 2..];
-                self.current_tag = unsafe { Tag::from_u8_unchecked(tag_id) };
+                self.current_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
                 visitor.visit_some(&mut *self)
             } else {
                 cold_path();
@@ -642,7 +642,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Compound, self.current_tag, {
+        check_tag!(TagID::Compound, self.current_tag, {
             self.parse_unit()?;
             visitor.visit_unit()
         })
@@ -676,50 +676,50 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     {
         // Auto-detect format based on current tag
         match self.current_tag {
-            Tag::IntArray => {
+            TagID::IntArray => {
                 // IntArray format: length (4 bytes) + i32 data
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 self.input = &self.input[4..];
                 visitor.visit_seq(ListDeserializer {
-                    tag_id: Tag::Int,
+                    tag_id: TagID::Int,
                     index: 0,
                     len: length,
                     deserializer: self,
                 })
             }
-            Tag::LongArray => {
+            TagID::LongArray => {
                 // LongArray format: length (4 bytes) + i64 data
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 self.input = &self.input[4..];
                 visitor.visit_seq(ListDeserializer {
-                    tag_id: Tag::Long,
+                    tag_id: TagID::Long,
                     index: 0,
                     len: length,
                     deserializer: self,
                 })
             }
-            Tag::List => {
+            TagID::List => {
                 // Standard List format: element_tag (1 byte) + length (4 bytes)
                 check_bounds!(1 + 4, self.input);
                 let tag_id = self.input[0];
-                if tag_id > Tag::LongArray as u8 {
+                if tag_id > TagID::LongArray as u8 {
                     cold_path();
                     return Err(Error::InvalidTagType(tag_id));
                 }
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() })
                         .get();
-                if tag_id == Tag::End as u8 && length > 0 {
+                if tag_id == TagID::End as u8 && length > 0 {
                     cold_path();
                     return Err(Error::InvalidTagType(tag_id));
                 }
                 self.input = &self.input[1 + 4..];
                 visitor.visit_seq(ListDeserializer {
-                    tag_id: unsafe { Tag::from_u8_unchecked(tag_id) },
+                    tag_id: unsafe { TagID::from_u8_unchecked(tag_id) },
                     index: 0,
                     len: length,
                     deserializer: self,
@@ -727,7 +727,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
             }
             _ => {
                 cold_path();
-                Err(Error::TagMismatch(Tag::List as u8, self.current_tag as u8))
+                Err(Error::TagMismatch(TagID::List as u8, self.current_tag as u8))
             }
         }
     }
@@ -741,12 +741,12 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         V: de::Visitor<'de>,
     {
         // Tuples are serialized as List<Compound> where each compound has a single unnamed field
-        check_tag!(Tag::List, self.current_tag, {
+        check_tag!(TagID::List, self.current_tag, {
             check_bounds!(1 + 4, self.input);
             let tag_id = self.input[0];
-            if tag_id != Tag::Compound as u8 {
+            if tag_id != TagID::Compound as u8 {
                 cold_path();
-                return Err(Error::TagMismatch(Tag::Compound as u8, tag_id));
+                return Err(Error::TagMismatch(TagID::Compound as u8, tag_id));
             }
             let length =
                 byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() })
@@ -776,10 +776,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Compound, self.current_tag, {
+        check_tag!(TagID::Compound, self.current_tag, {
             visitor.visit_map(CompoundAccess {
                 deserializer: self,
-                value_tag: Tag::End,
+                value_tag: TagID::End,
             })
         })
     }
@@ -793,10 +793,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(Tag::Compound, self.current_tag, {
+        check_tag!(TagID::Compound, self.current_tag, {
             visitor.visit_map(CompoundAccess {
                 deserializer: self,
-                value_tag: Tag::End,
+                value_tag: TagID::End,
             })
         })
     }
@@ -812,7 +812,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     {
         match self.current_tag {
             // Unit variant - serialized as variant index (u32)
-            Tag::Int => {
+            TagID::Int => {
                 let variant_index = self.parse_i32()? as u32;
                 visitor.visit_enum(UnitVariantAccess { variant_index })
             }
@@ -821,10 +821,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
             // - Newtype: inner tag is the value's tag
             // - Tuple: inner tag is Tag::List (List<Compound>)
             // - Struct: inner tag is Tag::Compound
-            Tag::Compound => {
+            TagID::Compound => {
                 check_bounds!(1, self.input);
                 let tag_id = self.input[0];
-                if tag_id == Tag::End as u8 || tag_id > Tag::LongArray as u8 {
+                if tag_id == TagID::End as u8 || tag_id > TagID::LongArray as u8 {
                     cold_path();
                     return Err(Error::InvalidTagType(tag_id));
                 }
@@ -834,13 +834,13 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 visitor.visit_enum(VariantDeserializer {
                     deserializer: self,
                     variant_name,
-                    variant_tag: unsafe { Tag::from_u8_unchecked(tag_id) },
+                    variant_tag: unsafe { TagID::from_u8_unchecked(tag_id) },
                 })
             }
             _ => {
                 cold_path();
                 Err(Error::TagMismatch(
-                    Tag::Compound as u8,
+                    TagID::Compound as u8,
                     self.current_tag as u8,
                 ))
             }
@@ -863,7 +863,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
 }
 
 struct ListDeserializer<'a, 'de: 'a, O: ByteOrder> {
-    tag_id: Tag,
+    tag_id: TagID,
     index: u32,
     len: u32,
     deserializer: &'a mut Deserializer<'de, O>,
@@ -895,7 +895,7 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for ListDeserializer<'a, 'de, O> {
 // For deserializing compounds (structs and maps)
 struct CompoundAccess<'a, 'de: 'a, O: ByteOrder> {
     deserializer: &'a mut Deserializer<'de, O>,
-    value_tag: Tag,
+    value_tag: TagID,
 }
 
 impl<'a, 'de, O: ByteOrder> MapAccess<'de> for CompoundAccess<'a, 'de, O> {
@@ -908,18 +908,18 @@ impl<'a, 'de, O: ByteOrder> MapAccess<'de> for CompoundAccess<'a, 'de, O> {
         check_bounds!(1, self.deserializer.input);
         let tag_id = self.deserializer.input[0];
 
-        if tag_id == Tag::End as u8 {
+        if tag_id == TagID::End as u8 {
             self.deserializer.input = &self.deserializer.input[1..];
             return Ok(None);
         }
 
-        if tag_id > Tag::LongArray as u8 {
+        if tag_id > TagID::LongArray as u8 {
             cold_path();
             return Err(Error::InvalidTagType(tag_id));
         }
 
         self.deserializer.input = &self.deserializer.input[1..];
-        self.value_tag = unsafe { Tag::from_u8_unchecked(tag_id) };
+        self.value_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
 
         // Deserialize the key (field name as string)
         seed.deserialize(FieldNameDeserializer {
@@ -1002,7 +1002,7 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for TupleDeserializer<'a, 'de, O> {
         // Each element is wrapped: tag_id (1), name_len (2, always 0), value, Tag::End (1)
         check_bounds!(1 + 2, self.deserializer.input);
         let tag_id = self.deserializer.input[0];
-        if tag_id == Tag::End as u8 || tag_id > Tag::LongArray as u8 {
+        if tag_id == TagID::End as u8 || tag_id > TagID::LongArray as u8 {
             cold_path();
             return Err(Error::InvalidTagType(tag_id));
         }
@@ -1019,13 +1019,13 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for TupleDeserializer<'a, 'de, O> {
         }
         // Skip tag_id and empty name
         self.deserializer.input = &self.deserializer.input[1 + 2..];
-        self.deserializer.current_tag = unsafe { Tag::from_u8_unchecked(tag_id) };
+        self.deserializer.current_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
 
         let value = seed.deserialize(&mut *self.deserializer)?;
 
         // Consume the Tag::End
         check_bounds!(1, self.deserializer.input);
-        if self.deserializer.input[0] != Tag::End as u8 {
+        if self.deserializer.input[0] != TagID::End as u8 {
             cold_path();
             return Err(Error::InvalidTagType(self.deserializer.input[0]));
         }
@@ -1089,7 +1089,7 @@ impl<'de> VariantAccess<'de> for UnitVariantAccess {
 struct VariantDeserializer<'a, 'de: 'a, O: ByteOrder> {
     deserializer: &'a mut Deserializer<'de, O>,
     variant_name: Cow<'de, str>,
-    variant_tag: Tag,
+    variant_tag: TagID,
 }
 
 impl<'a, 'de, O: ByteOrder> EnumAccess<'de> for VariantDeserializer<'a, 'de, O> {
@@ -1117,7 +1117,7 @@ impl<'a, 'de, O: ByteOrder> EnumAccess<'de> for VariantDeserializer<'a, 'de, O> 
 // Separate struct for variant value deserialization
 struct VariantValueDeserializer<'a, 'de: 'a, O: ByteOrder> {
     deserializer: &'a mut Deserializer<'de, O>,
-    variant_tag: Tag,
+    variant_tag: TagID,
 }
 
 impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for VariantValueDeserializer<'a, 'de, O> {
@@ -1138,7 +1138,7 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for VariantValueDeserializer<'a, 
         let value = seed.deserialize(&mut *self.deserializer)?;
         // Consume the outer compound's End tag
         check_bounds!(1, self.deserializer.input);
-        if self.deserializer.input[0] != Tag::End as u8 {
+        if self.deserializer.input[0] != TagID::End as u8 {
             cold_path();
             return Err(Error::InvalidTagType(self.deserializer.input[0]));
         }
@@ -1151,12 +1151,12 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for VariantValueDeserializer<'a, 
         V: de::Visitor<'de>,
     {
         // Tuple variant is serialized as a List inside the compound
-        check_tag!(Tag::List, self.variant_tag, {
+        check_tag!(TagID::List, self.variant_tag, {
             check_bounds!(1 + 4, self.deserializer.input);
             let tag_id = self.deserializer.input[0];
-            if tag_id != Tag::Compound as u8 {
+            if tag_id != TagID::Compound as u8 {
                 cold_path();
-                return Err(Error::TagMismatch(Tag::Compound as u8, tag_id));
+                return Err(Error::TagMismatch(TagID::Compound as u8, tag_id));
             }
             let length = byteorder::U32::<O>::from_bytes(unsafe {
                 *self.deserializer.input.as_ptr().add(1).cast()
@@ -1170,7 +1170,7 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for VariantValueDeserializer<'a, 
             })?;
             // Consume the outer compound's End tag
             check_bounds!(1, self.deserializer.input);
-            if self.deserializer.input[0] != Tag::End as u8 {
+            if self.deserializer.input[0] != TagID::End as u8 {
                 cold_path();
                 return Err(Error::InvalidTagType(self.deserializer.input[0]));
             }
@@ -1184,14 +1184,14 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for VariantValueDeserializer<'a, 
         V: de::Visitor<'de>,
     {
         // Struct variant is serialized as a Compound inside the compound
-        check_tag!(Tag::Compound, self.variant_tag, {
+        check_tag!(TagID::Compound, self.variant_tag, {
             let value = visitor.visit_map(CompoundAccess {
                 deserializer: self.deserializer,
-                value_tag: Tag::End,
+                value_tag: TagID::End,
             })?;
             // Consume the outer compound's End tag
             check_bounds!(1, self.deserializer.input);
-            if self.deserializer.input[0] != Tag::End as u8 {
+            if self.deserializer.input[0] != TagID::End as u8 {
                 cold_path();
                 return Err(Error::InvalidTagType(self.deserializer.input[0]));
             }

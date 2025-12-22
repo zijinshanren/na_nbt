@@ -5,7 +5,7 @@ use zerocopy::byteorder;
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, ReadableCompound,
     ReadableConfig, ReadableList, ReadableString, ReadableValue, Result, ScopedReadableCompound,
-    ScopedReadableList, ScopedReadableValue, Tag, Value, ValueScoped,
+    ScopedReadableList, ScopedReadableValue, TagID, Value, ValueScoped,
     index::Index,
     mutable::iter::{ImmutableCompoundIter, ImmutableListIter},
 };
@@ -43,7 +43,7 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for ImmutableValue<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 
@@ -321,7 +321,7 @@ impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for ImmutableList<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 

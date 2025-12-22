@@ -551,9 +551,9 @@ pub mod de;
 pub mod ser;
 
 pub mod error;
-pub mod immutable;
+// pub mod immutable;
 mod index;
-pub mod mutable;
+// pub mod mutable;
 pub mod tag;
 pub mod util;
 pub mod value_trait;
@@ -570,8 +570,8 @@ pub use de::{
 pub use ser::{Serializer, to_vec, to_vec_be, to_vec_le, to_writer, to_writer_be, to_writer_le};
 
 pub use error::*;
-pub use immutable::*;
-pub use mutable::*;
+// pub use immutable::*;
+// pub use mutable::*;
 pub use tag::*;
 pub use util::*;
 pub use value_trait::*;

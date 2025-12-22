@@ -1,6 +1,6 @@
 //! Tests for ScopedReadableValue impl on mutable module's ImmutableValue
 
-use na_nbt::{ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag, read_owned};
+use na_nbt::{ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, TagID, read_owned};
 use zerocopy::byteorder::{BigEndian as BE, LittleEndian as LE};
 
 // Helper functions to create test NBT data
@@ -164,7 +164,7 @@ fn test_immutable_from_owned_tag_id() {
     let data = create_byte_nbt(42);
     let owned = read_owned::<BE, BE>(&data).unwrap();
     let root = owned.get("root").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&root), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&root), TagID::Byte);
 }
 
 #[test]
@@ -333,7 +333,7 @@ fn test_immutable_list_from_owned() {
     let root = owned.get("root").unwrap();
     let list = ScopedReadableValue::as_list_scoped(&root).unwrap();
 
-    assert_eq!(ScopedReadableList::tag_id(&list), Tag::Int);
+    assert_eq!(ScopedReadableList::tag_id(&list), TagID::Int);
     assert_eq!(ScopedReadableList::len(&list), 3);
     assert!(!ScopedReadableList::is_empty(&list));
 

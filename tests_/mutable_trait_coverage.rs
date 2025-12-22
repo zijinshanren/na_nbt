@@ -1,6 +1,6 @@
 use na_nbt::{
     ScopedWritableValue, WritableValue, ScopedReadableValue,
-    read_owned, read_borrowed, ReadableValue, ReadableString, Tag
+    read_owned, read_borrowed, ReadableValue, ReadableString, TagID
 };
 use zerocopy::byteorder::BigEndian as BE;
 
@@ -144,7 +144,7 @@ fn test_immutable_value_trait_wrappers() {
 
     // 1. Byte
     let v = comp.get("b").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&v), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&v), TagID::Byte);
     assert!(ScopedReadableValue::is_byte(&v));
     assert_eq!(ScopedReadableValue::as_byte(&v), Some(10));
     assert!(!ScopedReadableValue::is_short(&v));

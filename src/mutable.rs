@@ -74,7 +74,7 @@ pub use value_own::{OwnedCompound, OwnedList, OwnedValue};
 use zerocopy::{IntoBytes, byteorder};
 
 use crate::{
-    ByteOrder, Error, Result, Tag, ValueScoped, cold_path,
+    ByteOrder, Error, Result, TagID, ValueScoped, cold_path,
     mutable::{
         read::{read_unsafe, read_unsafe_fallback, read_unsafe_from_reader},
         trait_impl::Config,
@@ -236,14 +236,14 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::Byte(value) => {
                 let mut buf = Vec::<u8>::with_capacity(4);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Byte as u8, 0u8, 0u8, value as u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Byte as u8, 0u8, 0u8, value as u8]);
                 buf.set_len(4);
                 Ok(buf)
             }
             ValueScoped::Short(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 2);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Short as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Short as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::I16::<TARGET>::new(value).to_bytes(),
@@ -254,7 +254,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::Int(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Int as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Int as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::I32::<TARGET>::new(value).to_bytes(),
@@ -265,7 +265,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::Long(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Long as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Long as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::I64::<TARGET>::new(value).to_bytes(),
@@ -276,7 +276,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::Float(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Float as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Float as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::F32::<TARGET>::new(value).to_bytes(),
@@ -287,7 +287,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             ValueScoped::Double(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Double as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Double as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::F64::<TARGET>::new(value).to_bytes(),
@@ -300,7 +300,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let len = value.len();
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + len);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::ByteArray as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::ByteArray as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
                     byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
@@ -314,7 +314,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let len = value.data.len();
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 2 + len);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::String as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::String as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
                     byteorder::U16::<TARGET>::new(len as u16).to_bytes(),
@@ -327,7 +327,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let payload = value.data;
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::List as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
                 buf.set_len(1 + 2);
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     write_list::<TARGET>(payload, &mut buf)?;
@@ -340,7 +340,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let payload = value.data;
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Compound as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
                 buf.set_len(1 + 2);
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     write_compound::<TARGET>(payload, &mut buf)?;
@@ -354,7 +354,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let len = value.len();
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 4 * len);
                 let mut buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::IntArray as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::IntArray as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
                     byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
@@ -379,7 +379,7 @@ pub(crate) fn write_owned_to_vec<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let len = value.len();
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8 + 8 * len);
                 let mut buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::LongArray as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::LongArray as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
                     byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
@@ -411,11 +411,11 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
         match value {
             ValueScoped::End => writer.write_all(&[0]).map_err(Error::IO),
             ValueScoped::Byte(value) => writer
-                .write_all(&[Tag::Byte as u8, 0u8, 0u8, value as u8])
+                .write_all(&[TagID::Byte as u8, 0u8, 0u8, value as u8])
                 .map_err(Error::IO),
             ValueScoped::Short(value) => {
                 let mut buf = [0u8; 1 + 2 + 2];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Short as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Short as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::I16::<TARGET>::new(value).to_bytes(),
@@ -424,7 +424,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             }
             ValueScoped::Int(value) => {
                 let mut buf = [0u8; 1 + 2 + 4];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Int as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Int as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::I32::<TARGET>::new(value).to_bytes(),
@@ -433,7 +433,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             }
             ValueScoped::Long(value) => {
                 let mut buf = [0u8; 1 + 2 + 8];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Long as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Long as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::I64::<TARGET>::new(value).to_bytes(),
@@ -442,7 +442,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             }
             ValueScoped::Float(value) => {
                 let mut buf = [0u8; 1 + 2 + 4];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Float as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Float as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::F32::<TARGET>::new(value).to_bytes(),
@@ -451,7 +451,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             }
             ValueScoped::Double(value) => {
                 let mut buf = [0u8; 1 + 2 + 8];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Double as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Double as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::F64::<TARGET>::new(value).to_bytes(),
@@ -462,7 +462,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
-                    [Tag::ByteArray as u8, 0u8, 0u8],
+                    [TagID::ByteArray as u8, 0u8, 0u8],
                 );
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),
@@ -473,7 +473,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             }
             ValueScoped::String(value) => {
                 let mut buf_head = [0u8; 1 + 2 + 2];
-                ptr::write(buf_head.as_mut_ptr().cast(), [Tag::String as u8, 0u8, 0u8]);
+                ptr::write(buf_head.as_mut_ptr().cast(), [TagID::String as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),
                     byteorder::U16::<TARGET>::new(value.data.len() as u16).to_bytes(),
@@ -483,7 +483,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             }
             ValueScoped::List(value) => {
                 writer
-                    .write_all(&[Tag::List as u8, 0u8, 0u8])
+                    .write_all(&[TagID::List as u8, 0u8, 0u8])
                     .map_err(Error::IO)?;
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     write_list_to_writer::<TARGET>(value.data, &mut writer)?;
@@ -494,7 +494,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
             }
             ValueScoped::Compound(value) => {
                 writer
-                    .write_all(&[Tag::Compound as u8, 0u8, 0u8])
+                    .write_all(&[TagID::Compound as u8, 0u8, 0u8])
                     .map_err(Error::IO)?;
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     write_compound_to_writer::<TARGET>(value.data, &mut writer)?;
@@ -507,7 +507,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
-                    [Tag::IntArray as u8, 0u8, 0u8],
+                    [TagID::IntArray as u8, 0u8, 0u8],
                 );
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),
@@ -529,7 +529,7 @@ pub(crate) fn write_owned_to_writer<'a, SOURCE: ByteOrder, TARGET: ByteOrder>(
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
-                    [Tag::LongArray as u8, 0u8, 0u8],
+                    [TagID::LongArray as u8, 0u8, 0u8],
                 );
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),

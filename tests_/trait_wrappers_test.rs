@@ -1,11 +1,11 @@
-use na_nbt::{OwnedValue, Tag, ScopedReadableValue, ScopedWritableValue};
+use na_nbt::{OwnedValue, TagID, ScopedReadableValue, ScopedWritableValue};
 use zerocopy::byteorder::BigEndian as BE;
 
 #[test]
 fn test_owned_value_trait_wrappers() {
     // 1. Byte
     let mut val = OwnedValue::<BE>::from(10i8);
-    assert_eq!(ScopedReadableValue::tag_id(&val), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&val), TagID::Byte);
     assert!(ScopedReadableValue::is_byte(&val));
     assert_eq!(ScopedReadableValue::as_byte(&val), Some(10));
     assert!(!ScopedReadableValue::is_short(&val));
@@ -205,7 +205,7 @@ fn test_trait_wrappers_list_compound() {
         // ScopedReadableList
         assert_eq!(ScopedReadableList::len(&list_scoped), 2);
         assert!(!ScopedReadableList::is_empty(&list_scoped));
-        assert_eq!(ScopedReadableList::tag_id(&list_scoped), Tag::Int);
+        assert_eq!(ScopedReadableList::tag_id(&list_scoped), TagID::Int);
         
         // get_scoped
         assert_eq!(ScopedReadableList::get_scoped(&list_scoped, 0).unwrap().as_int(), Some(1));
@@ -307,7 +307,7 @@ fn test_trait_wrappers_list_compound() {
     let mut list = na_nbt::OwnedList::<BE>::default();
     ScopedWritableList::push(&mut list, 1i32);
     assert_eq!(ScopedReadableList::len(&list), 1);
-    assert_eq!(ScopedReadableList::tag_id(&list), Tag::Int);
+    assert_eq!(ScopedReadableList::tag_id(&list), TagID::Int);
     assert!(ScopedReadableList::get_scoped(&list, 0).is_some());
     
     // push_unchecked

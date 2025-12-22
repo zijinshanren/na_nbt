@@ -35,6 +35,10 @@
 //! assert!(root.tag_id().is_composite());
 //! ```
 
+use std::marker::PhantomData;
+
+use crate::ReadableConfig;
+
 /// Represents an NBT tag type.
 ///
 /// This enum corresponds to the tag type byte in the NBT binary format.
@@ -49,7 +53,7 @@
 /// - **Composite** ([`is_composite`](Tag::is_composite)): List, Compound
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Tag {
+pub enum TagID {
     /// End tag (0) - Marks the end of a compound.
     End = 0,
     /// Byte tag (1) - A signed 8-bit integer.
@@ -78,7 +82,7 @@ pub enum Tag {
     LongArray = 12,
 }
 
-impl Tag {
+impl TagID {
     /// Creates a `Tag` from a raw byte value without validation.
     ///
     /// # Safety
@@ -156,3 +160,110 @@ impl Tag {
     }
 }
 
+// todo: Sealed NBT
+pub trait NBT {
+    const TAG_ID: TagID;
+    type Type<'a, Config: ReadableConfig>;
+}
+
+pub(crate) trait NBTExtract<'doc, Config: ReadableConfig, V>: NBT {
+    fn extract(value: V) -> Option<Self::Type<'doc, Config>>;
+}
+
+pub struct TagEnd;
+
+impl NBT for TagEnd {
+    const TAG_ID: TagID = TagID::End;
+    type Type<'a, Config: ReadableConfig> = ();
+}
+
+pub struct TagByte;
+
+impl NBT for TagByte {
+    const TAG_ID: TagID = TagID::Byte;
+    type Type<'a, Config: ReadableConfig> = i8;
+}
+
+pub struct TagShort;
+
+impl NBT for TagShort {
+    const TAG_ID: TagID = TagID::Short;
+    type Type<'a, Config: ReadableConfig> = i16;
+}
+
+pub struct TagInt;
+
+impl NBT for TagInt {
+    const TAG_ID: TagID = TagID::Int;
+    type Type<'a, Config: ReadableConfig> = i32;
+}
+
+pub struct TagLong;
+
+impl NBT for TagLong {
+    const TAG_ID: TagID = TagID::Long;
+    type Type<'a, Config: ReadableConfig> = i64;
+}
+
+pub struct TagFloat;
+
+impl NBT for TagFloat {
+    const TAG_ID: TagID = TagID::Float;
+    type Type<'a, Config: ReadableConfig> = f32;
+}
+
+pub struct TagDouble;
+
+impl NBT for TagDouble {
+    const TAG_ID: TagID = TagID::Double;
+    type Type<'a, Config: ReadableConfig> = f64;
+}
+
+pub struct TagByteArray;
+
+impl NBT for TagByteArray {
+    const TAG_ID: TagID = TagID::ByteArray;
+    type Type<'a, Config: ReadableConfig> = Config::ByteArray<'a>;
+}
+
+pub struct TagString;
+
+impl NBT for TagString {
+    const TAG_ID: TagID = TagID::String;
+    type Type<'a, Config: ReadableConfig> = Config::String<'a>;
+}
+
+pub struct TagList;
+
+impl NBT for TagList {
+    const TAG_ID: TagID = TagID::List;
+    type Type<'a, Config: ReadableConfig> = Config::List<'a>;
+}
+
+pub struct TagTypedList<T: NBT>(PhantomData<T>);
+
+impl<T: NBT> NBT for TagTypedList<T> {
+    const TAG_ID: TagID = TagID::List;
+    type Type<'a, Config: ReadableConfig> = Config::TypedList<'a, T>;
+}
+
+pub struct TagCompound;
+
+impl NBT for TagCompound {
+    const TAG_ID: TagID = TagID::Compound;
+    type Type<'a, Config: ReadableConfig> = Config::Compound<'a>;
+}
+
+pub struct TagIntArray;
+
+impl NBT for TagIntArray {
+    const TAG_ID: TagID = TagID::IntArray;
+    type Type<'a, Config: ReadableConfig> = Config::IntArray<'a>;
+}
+
+pub struct TagLongArray;
+
+impl NBT for TagLongArray {
+    const TAG_ID: TagID = TagID::LongArray;
+    type Type<'a, Config: ReadableConfig> = Config::LongArray<'a>;
+}

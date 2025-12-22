@@ -754,7 +754,7 @@ fn test_byte_array_all_values() {
 
 #[test]
 fn test_int_array_tag_is_correct() {
-    use na_nbt::Tag;
+    use na_nbt::TagID;
 
     #[derive(Serialize)]
     struct Data {
@@ -768,20 +768,20 @@ fn test_int_array_tag_is_correct() {
     let bytes = to_vec_be(&data).unwrap();
 
     // First byte is the root compound tag
-    assert_eq!(bytes[0], Tag::Compound as u8);
+    assert_eq!(bytes[0], TagID::Compound as u8);
     // After compound tag (1) + name length (2) + name "values" (6) = offset 9
     // Then field tag should be IntArray (11)
     // Layout: [Tag::Compound, 0, 0, Tag::IntArray, 0, 6, 'v', 'a', 'l', 'u', 'e', 's', ...]
     assert_eq!(
         bytes[3],
-        Tag::IntArray as u8,
+        TagID::IntArray as u8,
         "Field tag should be IntArray (11)"
     );
 }
 
 #[test]
 fn test_long_array_tag_is_correct() {
-    use na_nbt::Tag;
+    use na_nbt::TagID;
 
     #[derive(Serialize)]
     struct Data {
@@ -794,17 +794,17 @@ fn test_long_array_tag_is_correct() {
     };
     let bytes = to_vec_be(&data).unwrap();
 
-    assert_eq!(bytes[0], Tag::Compound as u8);
+    assert_eq!(bytes[0], TagID::Compound as u8);
     assert_eq!(
         bytes[3],
-        Tag::LongArray as u8,
+        TagID::LongArray as u8,
         "Field tag should be LongArray (12)"
     );
 }
 
 #[test]
 fn test_byte_array_tag_is_correct() {
-    use na_nbt::Tag;
+    use na_nbt::TagID;
 
     #[derive(Serialize)]
     struct Data {
@@ -817,10 +817,10 @@ fn test_byte_array_tag_is_correct() {
     };
     let bytes = to_vec_be(&data).unwrap();
 
-    assert_eq!(bytes[0], Tag::Compound as u8);
+    assert_eq!(bytes[0], TagID::Compound as u8);
     assert_eq!(
         bytes[3],
-        Tag::ByteArray as u8,
+        TagID::ByteArray as u8,
         "Field tag should be ByteArray (7)"
     );
 }

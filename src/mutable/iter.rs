@@ -4,14 +4,14 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, EMPTY_COMPOUND, ImmutableString, ImmutableValue, MutableValue, OwnedCompound,
-    OwnedList, OwnedValue, Tag, cold_path,
+    OwnedList, OwnedValue, TagID, cold_path,
     mutable::util::tag_size,
     view::{StringViewOwn, VecViewOwn},
 };
 
 #[derive(Clone)]
 pub struct ImmutableListIter<'s, O: ByteOrder> {
-    pub(crate) tag_id: Tag,
+    pub(crate) tag_id: TagID,
     pub(crate) remaining: u32,
     pub(crate) data: *const u8,
     pub(crate) _marker: PhantomData<(&'s (), O)>,
@@ -20,7 +20,7 @@ pub struct ImmutableListIter<'s, O: ByteOrder> {
 impl<'s, O: ByteOrder> Default for ImmutableListIter<'s, O> {
     fn default() -> Self {
         Self {
-            tag_id: Tag::End,
+            tag_id: TagID::End,
             remaining: 0,
             data: ptr::null(),
             _marker: PhantomData,
@@ -83,7 +83,7 @@ impl<'s, O: ByteOrder> Iterator for ImmutableCompoundIter<'s, O> {
         unsafe {
             let tag_id = *self.data.cast();
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 return None;
             }
@@ -103,7 +103,7 @@ impl<'s, O: ByteOrder> Iterator for ImmutableCompoundIter<'s, O> {
 }
 
 pub struct MutableListIter<'s, O: ByteOrder> {
-    pub(crate) tag_id: Tag,
+    pub(crate) tag_id: TagID,
     pub(crate) remaining: u32,
     pub(crate) data: *mut u8,
     pub(crate) _marker: PhantomData<(&'s (), O)>,
@@ -154,7 +154,7 @@ impl<'s, O: ByteOrder> Iterator for MutableCompoundIter<'s, O> {
         unsafe {
             let tag_id = *self.data.cast();
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 return None;
             }
@@ -174,7 +174,7 @@ impl<'s, O: ByteOrder> Iterator for MutableCompoundIter<'s, O> {
 }
 
 pub struct OwnedListIter<O: ByteOrder> {
-    pub(crate) tag_id: Tag,
+    pub(crate) tag_id: TagID,
     pub(crate) remaining: u32,
     pub(crate) ptr: *mut u8,
     pub(crate) _data: VecViewOwn<u8>,
@@ -220,37 +220,37 @@ impl<O: ByteOrder> Drop for OwnedListIter<O> {
 
         unsafe {
             match tag_id {
-                Tag::ByteArray => {
+                TagID::ByteArray => {
                     for _ in 0..self.remaining {
                         VecViewOwn::<i8>::read(self.ptr);
                         self.ptr = self.ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::String => {
+                TagID::String => {
                     for _ in 0..self.remaining {
                         StringViewOwn::read(self.ptr);
                         self.ptr = self.ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::List => {
+                TagID::List => {
                     for _ in 0..self.remaining {
                         OwnedList::<O>::read(self.ptr);
                         self.ptr = self.ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::Compound => {
+                TagID::Compound => {
                     for _ in 0..self.remaining {
                         OwnedCompound::<O>::read(self.ptr);
                         self.ptr = self.ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::IntArray => {
+                TagID::IntArray => {
                     for _ in 0..self.remaining {
                         VecViewOwn::<byteorder::I32<O>>::read(self.ptr);
                         self.ptr = self.ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::LongArray => {
+                TagID::LongArray => {
                     for _ in 0..self.remaining {
                         VecViewOwn::<byteorder::I64<O>>::read(self.ptr);
                         self.ptr = self.ptr.add(tag_size(tag_id));
@@ -278,7 +278,7 @@ impl<O: ByteOrder> Iterator for OwnedCompoundIter<O> {
         unsafe {
             let tag_id = *self.ptr.cast();
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 return None;
             }
@@ -308,7 +308,7 @@ impl<O: ByteOrder> Drop for OwnedCompoundIter<O> {
                 let tag_id = *self.ptr.cast();
                 self.ptr = self.ptr.add(1);
 
-                if tag_id == Tag::End {
+                if tag_id == TagID::End {
                     cold_path();
                     return;
                 }

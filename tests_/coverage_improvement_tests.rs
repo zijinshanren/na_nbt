@@ -4,7 +4,7 @@ use bytes::Bytes;
 use na_nbt::{
     OwnedCompound, OwnedList, OwnedValue, ReadableCompound, ReadableList, ReadableValue,
     ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, ScopedWritableCompound,
-    ScopedWritableList, ScopedWritableValue, Tag, Value, ValueScoped, WritableValue, read_borrowed,
+    ScopedWritableList, ScopedWritableValue, TagID, Value, ValueScoped, WritableValue, read_borrowed,
     read_owned, read_shared,
 };
 use zerocopy::byteorder::{BigEndian as BE, I32, I64, LittleEndian as LE};
@@ -674,7 +674,7 @@ fn test_empty_list_be() {
     let root = doc.root();
     let list = root.as_list().unwrap();
     assert!(list.is_empty());
-    assert_eq!(list.tag_id(), Tag::End);
+    assert_eq!(list.tag_id(), TagID::End);
 }
 
 #[test]
@@ -765,7 +765,7 @@ fn test_scoped_writable_list_push() {
     ScopedWritableList::push(&mut list, 20i32);
     assert_eq!(ScopedReadableList::len(&list), 2);
     assert!(!ScopedReadableList::is_empty(&list));
-    assert_eq!(ScopedReadableList::tag_id(&list), Tag::Int);
+    assert_eq!(ScopedReadableList::tag_id(&list), TagID::Int);
 }
 
 #[test]
@@ -1227,7 +1227,7 @@ fn test_scoped_readable_list_methods() {
     list.push(30i32);
     assert_eq!(ScopedReadableList::len(&list), 3);
     assert!(!ScopedReadableList::is_empty(&list));
-    assert_eq!(ScopedReadableList::tag_id(&list), Tag::Int);
+    assert_eq!(ScopedReadableList::tag_id(&list), TagID::Int);
 
     let item = ScopedReadableList::get_scoped(&list, 1);
     assert!(item.is_some());
@@ -2101,22 +2101,22 @@ fn test_immutable_value_trait_tag_id() {
     let root = doc.root();
 
     let byte_val = ScopedReadableValue::get_scoped(&root, "b").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&byte_val), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&byte_val), TagID::Byte);
 
     let short_val = ScopedReadableValue::get_scoped(&root, "s").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&short_val), Tag::Short);
+    assert_eq!(ScopedReadableValue::tag_id(&short_val), TagID::Short);
 
     let int_val = ScopedReadableValue::get_scoped(&root, "i").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&int_val), Tag::Int);
+    assert_eq!(ScopedReadableValue::tag_id(&int_val), TagID::Int);
 
     let long_val = ScopedReadableValue::get_scoped(&root, "l").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&long_val), Tag::Long);
+    assert_eq!(ScopedReadableValue::tag_id(&long_val), TagID::Long);
 
     let float_val = ScopedReadableValue::get_scoped(&root, "f").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&float_val), Tag::Float);
+    assert_eq!(ScopedReadableValue::tag_id(&float_val), TagID::Float);
 
     let double_val = ScopedReadableValue::get_scoped(&root, "d").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&double_val), Tag::Double);
+    assert_eq!(ScopedReadableValue::tag_id(&double_val), TagID::Double);
 }
 
 #[test]
@@ -2233,7 +2233,7 @@ fn test_immutable_list_trait_methods() {
     let list = ScopedReadableValue::as_list_scoped(&lb_val).unwrap();
 
     // Test ScopedReadableList methods
-    assert_eq!(ScopedReadableList::tag_id(&list), Tag::Byte);
+    assert_eq!(ScopedReadableList::tag_id(&list), TagID::Byte);
     assert_eq!(ScopedReadableList::len(&list), 2);
     assert!(!ScopedReadableList::is_empty(&list));
 
@@ -2331,7 +2331,7 @@ fn test_immutable_end_via_trait() {
 
     assert!(ScopedReadableValue::is_end(&root));
     assert_eq!(ScopedReadableValue::as_end(&root), Some(()));
-    assert_eq!(ScopedReadableValue::tag_id(&root), Tag::End);
+    assert_eq!(ScopedReadableValue::tag_id(&root), TagID::End);
 }
 
 // ============ Tests for mutable module's ImmutableValue trait (via OwnedValue::get) ============
@@ -2449,22 +2449,22 @@ fn test_mutable_immutable_value_trait_tag_id() {
     let doc = read_owned::<BE, BE>(&data).unwrap();
 
     let byte_val = doc.get("b").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&byte_val), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&byte_val), TagID::Byte);
 
     let short_val = doc.get("s").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&short_val), Tag::Short);
+    assert_eq!(ScopedReadableValue::tag_id(&short_val), TagID::Short);
 
     let int_val = doc.get("i").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&int_val), Tag::Int);
+    assert_eq!(ScopedReadableValue::tag_id(&int_val), TagID::Int);
 
     let long_val = doc.get("l").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&long_val), Tag::Long);
+    assert_eq!(ScopedReadableValue::tag_id(&long_val), TagID::Long);
 
     let float_val = doc.get("f").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&float_val), Tag::Float);
+    assert_eq!(ScopedReadableValue::tag_id(&float_val), TagID::Float);
 
     let double_val = doc.get("d").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&double_val), Tag::Double);
+    assert_eq!(ScopedReadableValue::tag_id(&double_val), TagID::Double);
 }
 
 #[test]
@@ -2573,7 +2573,7 @@ fn test_mutable_immutable_list_trait_methods() {
     let list = ScopedReadableValue::as_list_scoped(&lb_val).unwrap();
 
     // Test ScopedReadableList methods
-    assert_eq!(ScopedReadableList::tag_id(&list), Tag::Byte);
+    assert_eq!(ScopedReadableList::tag_id(&list), TagID::Byte);
     assert_eq!(ScopedReadableList::len(&list), 2);
     assert!(!ScopedReadableList::is_empty(&list));
 
@@ -2789,22 +2789,22 @@ fn test_mutable_value_trait_tag_id() {
     let mut doc = read_owned::<BE, BE>(&data).unwrap();
 
     let byte_mv = doc.get_mut("b").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&byte_mv), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&byte_mv), TagID::Byte);
 
     let short_mv = doc.get_mut("s").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&short_mv), Tag::Short);
+    assert_eq!(ScopedReadableValue::tag_id(&short_mv), TagID::Short);
 
     let int_mv = doc.get_mut("i").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&int_mv), Tag::Int);
+    assert_eq!(ScopedReadableValue::tag_id(&int_mv), TagID::Int);
 
     let long_mv = doc.get_mut("l").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&long_mv), Tag::Long);
+    assert_eq!(ScopedReadableValue::tag_id(&long_mv), TagID::Long);
 
     let float_mv = doc.get_mut("f").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&float_mv), Tag::Float);
+    assert_eq!(ScopedReadableValue::tag_id(&float_mv), TagID::Float);
 
     let double_mv = doc.get_mut("d").unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&double_mv), Tag::Double);
+    assert_eq!(ScopedReadableValue::tag_id(&double_mv), TagID::Double);
 }
 
 #[test]
@@ -2992,7 +2992,7 @@ fn test_mutable_list_trait_methods() {
     let mut list = ScopedWritableValue::as_list_mut_scoped(&mut lb_mv).unwrap();
 
     // Test ScopedReadableList methods on MutableList
-    assert_eq!(ScopedReadableList::tag_id(&list), Tag::Byte);
+    assert_eq!(ScopedReadableList::tag_id(&list), TagID::Byte);
     assert_eq!(ScopedReadableList::len(&list), 2);
     assert!(!ScopedReadableList::is_empty(&list));
 
@@ -3110,13 +3110,13 @@ fn test_owned_value_scoped_readable_trait_tag_id() {
     let double_val = OwnedValue::<BE>::Double(zerocopy::byteorder::F64::<BE>::new(2.5));
     let end_val = OwnedValue::<BE>::End;
 
-    assert_eq!(ScopedReadableValue::tag_id(&byte_val), Tag::Byte);
-    assert_eq!(ScopedReadableValue::tag_id(&short_val), Tag::Short);
-    assert_eq!(ScopedReadableValue::tag_id(&int_val), Tag::Int);
-    assert_eq!(ScopedReadableValue::tag_id(&long_val), Tag::Long);
-    assert_eq!(ScopedReadableValue::tag_id(&float_val), Tag::Float);
-    assert_eq!(ScopedReadableValue::tag_id(&double_val), Tag::Double);
-    assert_eq!(ScopedReadableValue::tag_id(&end_val), Tag::End);
+    assert_eq!(ScopedReadableValue::tag_id(&byte_val), TagID::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&short_val), TagID::Short);
+    assert_eq!(ScopedReadableValue::tag_id(&int_val), TagID::Int);
+    assert_eq!(ScopedReadableValue::tag_id(&long_val), TagID::Long);
+    assert_eq!(ScopedReadableValue::tag_id(&float_val), TagID::Float);
+    assert_eq!(ScopedReadableValue::tag_id(&double_val), TagID::Double);
+    assert_eq!(ScopedReadableValue::tag_id(&end_val), TagID::End);
 }
 
 #[test]
@@ -3338,7 +3338,7 @@ fn test_owned_list_scoped_readable_trait() {
     let list = lb.as_list().unwrap();
 
     // Test all ScopedReadableList methods via trait
-    assert_eq!(ScopedReadableList::tag_id(list), Tag::Byte);
+    assert_eq!(ScopedReadableList::tag_id(list), TagID::Byte);
     assert_eq!(ScopedReadableList::len(list), 2);
     assert!(!ScopedReadableList::is_empty(list));
 
@@ -3449,7 +3449,7 @@ fn test_owned_value_end_trait() {
 
     assert!(ScopedReadableValue::is_end(&doc));
     assert_eq!(ScopedReadableValue::as_end(&doc), Some(()));
-    assert_eq!(ScopedReadableValue::tag_id(&doc), Tag::End);
+    assert_eq!(ScopedReadableValue::tag_id(&doc), TagID::End);
 
     // visit_scoped on End
     let res = ScopedReadableValue::visit_scoped(&doc, |v| matches!(v, ValueScoped::End));

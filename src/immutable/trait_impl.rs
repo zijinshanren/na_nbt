@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ReadableCompound, ReadableConfig, ReadableList, ReadableString, ReadableValue,
-    ReadonlyArray, Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag,
+    ReadonlyArray, Result, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, TagID,
     Value, ValueScoped,
     immutable::{
         typed_list::ReadonlyPrimitiveList,
@@ -64,7 +64,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     type Config = Config<O, D>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 
@@ -342,7 +342,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
     type Config = Config<O, D>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 

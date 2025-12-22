@@ -1,4 +1,4 @@
-use na_nbt::{OwnedCompound, OwnedList, OwnedValue, Tag};
+use na_nbt::{OwnedCompound, OwnedList, OwnedValue, TagID};
 use zerocopy::byteorder::BigEndian as BE;
 use zerocopy::byteorder::{F32, F64, I16, I32, I64};
 
@@ -54,17 +54,17 @@ fn test_unit_list_push() {
     l.push(());
 }
 
-test_into_owned!(test_i8, 10i8, Tag::Byte);
-test_into_owned!(test_i16_native, 10i16, Tag::Short);
-test_into_owned!(test_i16_wrapped, I16::<BE>::new(10), Tag::Short);
-test_into_owned!(test_i32_native, 10i32, Tag::Int);
-test_into_owned!(test_i32_wrapped, I32::<BE>::new(10), Tag::Int);
-test_into_owned!(test_i64_native, 10i64, Tag::Long);
-test_into_owned!(test_i64_wrapped, I64::<BE>::new(10), Tag::Long);
-test_into_owned!(test_f32_native, 10.0f32, Tag::Float);
-test_into_owned!(test_f32_wrapped, F32::<BE>::new(10.0), Tag::Float);
-test_into_owned!(test_f64_native, 10.0f64, Tag::Double);
-test_into_owned!(test_f64_wrapped, F64::<BE>::new(10.0), Tag::Double);
+test_into_owned!(test_i8, 10i8, TagID::Byte);
+test_into_owned!(test_i16_native, 10i16, TagID::Short);
+test_into_owned!(test_i16_wrapped, I16::<BE>::new(10), TagID::Short);
+test_into_owned!(test_i32_native, 10i32, TagID::Int);
+test_into_owned!(test_i32_wrapped, I32::<BE>::new(10), TagID::Int);
+test_into_owned!(test_i64_native, 10i64, TagID::Long);
+test_into_owned!(test_i64_wrapped, I64::<BE>::new(10), TagID::Long);
+test_into_owned!(test_f32_native, 10.0f32, TagID::Float);
+test_into_owned!(test_f32_wrapped, F32::<BE>::new(10.0), TagID::Float);
+test_into_owned!(test_f64_native, 10.0f64, TagID::Double);
+test_into_owned!(test_f64_wrapped, F64::<BE>::new(10.0), TagID::Double);
 
 // Arrays/Vectors need clone or recreation in macro if passed as expr, or handle separately
 #[test]
@@ -76,17 +76,17 @@ fn test_byte_arrays() {
     // Vec<i8>
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", v.clone());
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::ByteArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::ByteArray);
 
     // &[i8]
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", s);
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::ByteArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::ByteArray);
 
     // [i8; 3]
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", a);
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::ByteArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::ByteArray);
 
     // Test list ops for Vec<i8>
     let mut l = OwnedList::<BE>::default();
@@ -121,7 +121,7 @@ fn test_strings() {
     // String
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", s_owned.clone());
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::String);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::String);
 
     let mut l = OwnedList::<BE>::default();
     l.push(s_owned.clone());
@@ -133,7 +133,7 @@ fn test_strings() {
     // &str
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", s_borrowed);
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::String);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::String);
 
     let mut l = OwnedList::<BE>::default();
     l.push(s_borrowed);
@@ -150,7 +150,7 @@ fn test_owned_list_recursive() {
     let mut c = OwnedCompound::<BE>::default();
     // Move child_l into insert
     c.insert("k", OwnedList::<BE>::default());
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::List);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::List);
 
     let mut l = OwnedList::<BE>::default();
     l.push(OwnedList::<BE>::default());
@@ -164,7 +164,7 @@ fn test_owned_list_recursive() {
 fn test_owned_compound_recursive() {
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", OwnedCompound::<BE>::default());
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::Compound);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::Compound);
 
     let mut l = OwnedList::<BE>::default();
     l.push(OwnedCompound::<BE>::default());
@@ -183,7 +183,7 @@ fn test_int_arrays() {
     // Vec
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", v.clone());
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::IntArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::IntArray);
 
     let mut l = OwnedList::<BE>::default();
     l.push(v.clone());
@@ -195,7 +195,7 @@ fn test_int_arrays() {
     // Slice
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", s);
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::IntArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::IntArray);
 
     let mut l = OwnedList::<BE>::default();
     l.push(s);
@@ -207,7 +207,7 @@ fn test_int_arrays() {
     // Array
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", a);
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::IntArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::IntArray);
 
     let mut l = OwnedList::<BE>::default();
     l.push(a);
@@ -226,7 +226,7 @@ fn test_long_arrays() {
     // Vec
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", v.clone());
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::LongArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::LongArray);
 
     let mut l = OwnedList::<BE>::default();
     l.push(v.clone());
@@ -238,7 +238,7 @@ fn test_long_arrays() {
     // Slice
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", s);
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::LongArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::LongArray);
 
     let mut l = OwnedList::<BE>::default();
     l.push(s);
@@ -250,7 +250,7 @@ fn test_long_arrays() {
     // Array
     let mut c = OwnedCompound::<BE>::default();
     c.insert("k", a);
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::LongArray);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::LongArray);
 
     let mut l = OwnedList::<BE>::default();
     l.push(a);
@@ -271,7 +271,7 @@ fn test_owned_value() {
     // Let's create new ones.
 
     c.insert("k", OwnedValue::<BE>::from(10i32));
-    assert_eq!(c.get("k").unwrap().tag_id(), Tag::Int);
+    assert_eq!(c.get("k").unwrap().tag_id(), TagID::Int);
 
     let mut l = OwnedList::<BE>::default();
     l.push(OwnedValue::<BE>::from(10i32));

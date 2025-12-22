@@ -366,20 +366,20 @@ fn test_is_methods() {
 
 #[test]
 fn test_tag_id() {
-    use na_nbt::Tag;
+    use na_nbt::TagID;
 
     let data = create_byte_nbt(1);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
-    assert_eq!(root.tag_id(), Tag::Byte);
+    assert_eq!(root.tag_id(), TagID::Byte);
 
     let data = create_short_nbt_be(1);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
-    assert_eq!(root.tag_id(), Tag::Short);
+    assert_eq!(root.tag_id(), TagID::Short);
 
     let data = create_int_nbt_be(1);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
-    assert_eq!(root.tag_id(), Tag::Int);
+    assert_eq!(root.tag_id(), TagID::Int);
 }

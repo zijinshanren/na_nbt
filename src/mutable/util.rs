@@ -3,7 +3,7 @@ use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue, Tag, cold_path,
+    ByteOrder, ImmutableValue, MutableValue, OwnedCompound, OwnedList, OwnedValue, TagID, cold_path,
     mutable::iter::{
         ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter,
     },
@@ -14,7 +14,7 @@ pub const SIZE_USIZE: usize = std::mem::size_of::<usize>();
 pub const SIZE_DYN: usize = SIZE_USIZE * 3;
 
 #[inline]
-pub const unsafe fn tag_size(tag_id: Tag) -> usize {
+pub const unsafe fn tag_size(tag_id: TagID) -> usize {
     const TAG_SIZES: [usize; 13] = [
         0, 1, 2, 4, 8, 4, 8, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN,
     ];
@@ -24,7 +24,7 @@ pub const unsafe fn tag_size(tag_id: Tag) -> usize {
 }
 
 #[inline]
-pub fn list_tag_id(data: *const u8) -> Tag {
+pub fn list_tag_id(data: *const u8) -> TagID {
     unsafe { *data.cast() }
 }
 
@@ -106,9 +106,9 @@ fn list_decrease<O: ByteOrder>(data: &mut VecViewMut<'_, u8>) {
 pub fn list_push_end<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: ()) {
     if list_len::<O>(data.as_ptr()) == 0 {
         cold_path();
-        unsafe { data.as_mut_ptr().write(Tag::End as u8) };
+        unsafe { data.as_mut_ptr().write(TagID::End as u8) };
     }
-    if Tag::End != list_tag_id(data.as_ptr()) {
+    if TagID::End != list_tag_id(data.as_ptr()) {
         cold_path();
         panic!("tag mismatch");
     }
@@ -197,77 +197,77 @@ impl_list_push!(
     list_push_short,
     list_push_short_unchecked,
     byteorder::I16<O>,
-    Tag::Short
+    TagID::Short
 );
 impl_list_push!(
     flat,
     list_push_int,
     list_push_int_unchecked,
     byteorder::I32<O>,
-    Tag::Int
+    TagID::Int
 );
 impl_list_push!(
     flat,
     list_push_long,
     list_push_long_unchecked,
     byteorder::I64<O>,
-    Tag::Long
+    TagID::Long
 );
 impl_list_push!(
     flat,
     list_push_float,
     list_push_float_unchecked,
     byteorder::F32<O>,
-    Tag::Float
+    TagID::Float
 );
 impl_list_push!(
     flat,
     list_push_double,
     list_push_double_unchecked,
     byteorder::F64<O>,
-    Tag::Double
+    TagID::Double
 );
 impl_list_push!(
     nested,
     list_push_byte_array,
     list_push_byte_array_unchecked,
     VecViewOwn<i8>,
-    Tag::ByteArray
+    TagID::ByteArray
 );
 impl_list_push!(
     nested,
     list_push_string,
     list_push_string_unchecked,
     StringViewOwn,
-    Tag::String
+    TagID::String
 );
 impl_list_push!(
     nested,
     list_push_list,
     list_push_list_unchecked,
     OwnedList<O>,
-    Tag::List
+    TagID::List
 );
 impl_list_push!(
     nested,
     list_push_compound,
     list_push_compound_unchecked,
     OwnedCompound<O>,
-    Tag::Compound
+    TagID::Compound
 );
 impl_list_push!(
     nested,
     list_push_int_array,
     list_push_int_array_unchecked,
     VecViewOwn<byteorder::I32<O>>,
-    Tag::IntArray
+    TagID::IntArray
 );
 impl_list_push!(
     nested,
     list_push_long_array,
     list_push_long_array_unchecked,
     VecViewOwn<byteorder::I64<O>>,
-    Tag::LongArray
+    TagID::LongArray
 );
 
 pub fn list_push_value<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, value: OwnedValue<O>) {
@@ -298,9 +298,9 @@ pub unsafe fn list_push_value_unchecked<O: ByteOrder>(
 pub fn list_insert_end<O: ByteOrder>(data: &mut VecViewMut<'_, u8>, index: usize, value: ()) {
     if list_len::<O>(data.as_ptr()) == 0 {
         cold_path();
-        unsafe { data.as_mut_ptr().write(Tag::End as u8) };
+        unsafe { data.as_mut_ptr().write(TagID::End as u8) };
     }
-    if Tag::End != list_tag_id(data.as_ptr()) {
+    if TagID::End != list_tag_id(data.as_ptr()) {
         cold_path();
         panic!("tag mismatch");
     }
@@ -430,77 +430,77 @@ impl_list_insert!(
     list_insert_short,
     list_insert_short_unchecked,
     byteorder::I16<O>,
-    Tag::Short
+    TagID::Short
 );
 impl_list_insert!(
     flat,
     list_insert_int,
     list_insert_int_unchecked,
     byteorder::I32<O>,
-    Tag::Int
+    TagID::Int
 );
 impl_list_insert!(
     flat,
     list_insert_long,
     list_insert_long_unchecked,
     byteorder::I64<O>,
-    Tag::Long
+    TagID::Long
 );
 impl_list_insert!(
     flat,
     list_insert_float,
     list_insert_float_unchecked,
     byteorder::F32<O>,
-    Tag::Float
+    TagID::Float
 );
 impl_list_insert!(
     flat,
     list_insert_double,
     list_insert_double_unchecked,
     byteorder::F64<O>,
-    Tag::Double
+    TagID::Double
 );
 impl_list_insert!(
     nested,
     list_insert_byte_array,
     list_insert_byte_array_unchecked,
     VecViewOwn<i8>,
-    Tag::ByteArray
+    TagID::ByteArray
 );
 impl_list_insert!(
     nested,
     list_insert_string,
     list_insert_string_unchecked,
     StringViewOwn,
-    Tag::String
+    TagID::String
 );
 impl_list_insert!(
     nested,
     list_insert_list,
     list_insert_list_unchecked,
     OwnedList<O>,
-    Tag::List
+    TagID::List
 );
 impl_list_insert!(
     nested,
     list_insert_compound,
     list_insert_compound_unchecked,
     OwnedCompound<O>,
-    Tag::Compound
+    TagID::Compound
 );
 impl_list_insert!(
     nested,
     list_insert_int_array,
     list_insert_int_array_unchecked,
     VecViewOwn<byteorder::I32<O>>,
-    Tag::IntArray
+    TagID::IntArray
 );
 impl_list_insert!(
     nested,
     list_insert_long_array,
     list_insert_long_array_unchecked,
     VecViewOwn<byteorder::I64<O>>,
-    Tag::LongArray
+    TagID::LongArray
 );
 
 pub fn list_insert_value<O: ByteOrder>(
@@ -586,7 +586,7 @@ pub fn compound_get<'s, O: ByteOrder>(data: *const u8, key: &str) -> Option<Immu
             let tag_id = *ptr.cast();
             ptr = ptr.add(1);
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 return None;
             }
@@ -623,7 +623,7 @@ pub fn compound_get_mut<'s, O: ByteOrder>(data: *mut u8, key: &str) -> Option<Mu
             let tag_id = *ptr.cast();
             ptr = ptr.add(1);
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 return None;
             }
@@ -741,36 +741,36 @@ macro_rules! impl_compound_insert {
 }
 
 impl_compound_insert!();
-impl_compound_insert!(flat, compound_insert_short, byteorder::I16<O>, Tag::Short);
-impl_compound_insert!(flat, compound_insert_int, byteorder::I32<O>, Tag::Int);
-impl_compound_insert!(flat, compound_insert_long, byteorder::I64<O>, Tag::Long);
-impl_compound_insert!(flat, compound_insert_float, byteorder::F32<O>, Tag::Float);
-impl_compound_insert!(flat, compound_insert_double, byteorder::F64<O>, Tag::Double);
+impl_compound_insert!(flat, compound_insert_short, byteorder::I16<O>, TagID::Short);
+impl_compound_insert!(flat, compound_insert_int, byteorder::I32<O>, TagID::Int);
+impl_compound_insert!(flat, compound_insert_long, byteorder::I64<O>, TagID::Long);
+impl_compound_insert!(flat, compound_insert_float, byteorder::F32<O>, TagID::Float);
+impl_compound_insert!(flat, compound_insert_double, byteorder::F64<O>, TagID::Double);
 impl_compound_insert!(
     nested,
     compound_insert_byte_array,
     VecViewOwn<i8>,
-    Tag::ByteArray
+    TagID::ByteArray
 );
-impl_compound_insert!(nested, compound_insert_string, StringViewOwn, Tag::String);
-impl_compound_insert!(nested, compound_insert_list, OwnedList<O>, Tag::List);
+impl_compound_insert!(nested, compound_insert_string, StringViewOwn, TagID::String);
+impl_compound_insert!(nested, compound_insert_list, OwnedList<O>, TagID::List);
 impl_compound_insert!(
     nested,
     compound_insert_compound,
     OwnedCompound<O>,
-    Tag::Compound
+    TagID::Compound
 );
 impl_compound_insert!(
     nested,
     compound_insert_int_array,
     VecViewOwn<byteorder::I32<O>>,
-    Tag::IntArray
+    TagID::IntArray
 );
 impl_compound_insert!(
     nested,
     compound_insert_long_array,
     VecViewOwn<byteorder::I64<O>>,
-    Tag::LongArray
+    TagID::LongArray
 );
 
 pub fn compound_insert_value<O: ByteOrder>(
@@ -819,7 +819,7 @@ pub fn compound_remove<O: ByteOrder>(
             let tag_id = *ptr.cast();
             ptr = ptr.add(1);
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 return None;
             }

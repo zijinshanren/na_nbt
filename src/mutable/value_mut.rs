@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
-    OwnedValue, Result, ScopedReadableValue as _, Tag,
+    OwnedValue, Result, ScopedReadableValue as _, TagID,
     index::Index,
     mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter, MutableCompoundIter, MutableListIter},
@@ -57,7 +57,7 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
     /// # Safety
     ///
     /// .
-    pub unsafe fn read(tag_id: Tag, data: *mut u8) -> Self {
+    pub unsafe fn read(tag_id: TagID, data: *mut u8) -> Self {
         unsafe {
             macro_rules! get {
                 ($t:tt, $l:tt) => {{
@@ -81,19 +81,19 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
             }
 
             match tag_id {
-                Tag::End => MutableValue::End,
-                Tag::Byte => MutableValue::Byte(&mut *data.cast()),
-                Tag::Short => MutableValue::Short(&mut *data.cast()),
-                Tag::Int => MutableValue::Int(&mut *data.cast()),
-                Tag::Long => MutableValue::Long(&mut *data.cast()),
-                Tag::Float => MutableValue::Float(&mut *data.cast()),
-                Tag::Double => MutableValue::Double(&mut *data.cast()),
-                Tag::ByteArray => get!(ByteArray, VecViewMut),
-                Tag::String => get!(String, StringViewMut),
-                Tag::List => get_composite!(List, MutableList),
-                Tag::Compound => get_composite!(Compound, MutableCompound),
-                Tag::IntArray => get!(IntArray, VecViewMut),
-                Tag::LongArray => get!(LongArray, VecViewMut),
+                TagID::End => MutableValue::End,
+                TagID::Byte => MutableValue::Byte(&mut *data.cast()),
+                TagID::Short => MutableValue::Short(&mut *data.cast()),
+                TagID::Int => MutableValue::Int(&mut *data.cast()),
+                TagID::Long => MutableValue::Long(&mut *data.cast()),
+                TagID::Float => MutableValue::Float(&mut *data.cast()),
+                TagID::Double => MutableValue::Double(&mut *data.cast()),
+                TagID::ByteArray => get!(ByteArray, VecViewMut),
+                TagID::String => get!(String, StringViewMut),
+                TagID::List => get_composite!(List, MutableList),
+                TagID::Compound => get_composite!(Compound, MutableCompound),
+                TagID::IntArray => get!(IntArray, VecViewMut),
+                TagID::LongArray => get!(LongArray, VecViewMut),
             }
         }
     }
@@ -101,21 +101,21 @@ impl<'s, O: ByteOrder> MutableValue<'s, O> {
 
 impl<'s, O: ByteOrder> MutableValue<'s, O> {
     #[inline]
-    pub fn tag_id(&self) -> Tag {
+    pub fn tag_id(&self) -> TagID {
         match self {
-            MutableValue::End => Tag::End,
-            MutableValue::Byte(_) => Tag::Byte,
-            MutableValue::Short(_) => Tag::Short,
-            MutableValue::Int(_) => Tag::Int,
-            MutableValue::Long(_) => Tag::Long,
-            MutableValue::Float(_) => Tag::Float,
-            MutableValue::Double(_) => Tag::Double,
-            MutableValue::ByteArray(_) => Tag::ByteArray,
-            MutableValue::String(_) => Tag::String,
-            MutableValue::List(_) => Tag::List,
-            MutableValue::Compound(_) => Tag::Compound,
-            MutableValue::IntArray(_) => Tag::IntArray,
-            MutableValue::LongArray(_) => Tag::LongArray,
+            MutableValue::End => TagID::End,
+            MutableValue::Byte(_) => TagID::Byte,
+            MutableValue::Short(_) => TagID::Short,
+            MutableValue::Int(_) => TagID::Int,
+            MutableValue::Long(_) => TagID::Long,
+            MutableValue::Float(_) => TagID::Float,
+            MutableValue::Double(_) => TagID::Double,
+            MutableValue::ByteArray(_) => TagID::ByteArray,
+            MutableValue::String(_) => TagID::String,
+            MutableValue::List(_) => TagID::List,
+            MutableValue::Compound(_) => TagID::Compound,
+            MutableValue::IntArray(_) => TagID::IntArray,
+            MutableValue::LongArray(_) => TagID::LongArray,
         }
     }
 
@@ -649,7 +649,7 @@ impl<'s, O: ByteOrder> IntoIterator for MutableList<'s, O> {
 
 impl<'s, O: ByteOrder> MutableList<'s, O> {
     #[inline]
-    pub fn tag_id(&self) -> Tag {
+    pub fn tag_id(&self) -> TagID {
         list_tag_id(self.data.as_ptr())
     }
 

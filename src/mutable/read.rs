@@ -6,7 +6,7 @@ use std::{
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Error, OwnedCompound, OwnedList, OwnedValue, Result, Tag, cold_path,
+    ByteOrder, Error, OwnedCompound, OwnedList, OwnedValue, Result, TagID, cold_path,
     mutable::util::{SIZE_DYN, tag_size},
     view::{StringViewOwn, VecViewOwn},
 };
@@ -158,10 +158,10 @@ impl<O: ByteOrder> Drop for CompoundBuildGuard<O> {
             let end = ptr.add(self.data.len());
 
             while ptr < end {
-                let tag_id = *ptr.cast::<Tag>();
+                let tag_id = *ptr.cast::<TagID>();
                 ptr = ptr.add(1);
 
-                if tag_id == Tag::End {
+                if tag_id == TagID::End {
                     break;
                 }
 
@@ -169,22 +169,22 @@ impl<O: ByteOrder> Drop for CompoundBuildGuard<O> {
                 ptr = ptr.add(2 + name_len as usize);
 
                 match tag_id {
-                    Tag::ByteArray => {
+                    TagID::ByteArray => {
                         VecViewOwn::<i8>::read(ptr);
                     }
-                    Tag::String => {
+                    TagID::String => {
                         StringViewOwn::read(ptr);
                     }
-                    Tag::List => {
+                    TagID::List => {
                         OwnedList::<O>::read(ptr);
                     }
-                    Tag::Compound => {
+                    TagID::Compound => {
                         OwnedCompound::<O>::read(ptr);
                     }
-                    Tag::IntArray => {
+                    TagID::IntArray => {
                         VecViewOwn::<byteorder::I32<O>>::read(ptr);
                     }
-                    Tag::LongArray => {
+                    TagID::LongArray => {
                         VecViewOwn::<byteorder::I64<O>>::read(ptr);
                     }
                     _ => {}
@@ -252,7 +252,7 @@ unsafe fn read_compound<O: ByteOrder>(
             *current_pos = current_pos.add(name_len);
 
             if tag_id <= 6 {
-                let size = tag_size(Tag::from_u8_unchecked(tag_id));
+                let size = tag_size(TagID::from_u8_unchecked(tag_id));
                 check_bounds!(size);
                 *current_pos = current_pos.add(size);
             } else {
@@ -336,7 +336,7 @@ unsafe fn read_list<O: ByteOrder>(
         let len = byteorder::U32::<O>::from_bytes(*current_pos.cast()).get() as usize;
         *current_pos = current_pos.add(4);
         if tag_id <= 6 {
-            let size = tag_size(Tag::from_u8_unchecked(tag_id));
+            let size = tag_size(TagID::from_u8_unchecked(tag_id));
             check_bounds!(len * size);
             let value = slice::from_raw_parts((*current_pos).sub(1 + 4).cast(), len * size + 1 + 4);
             *current_pos = current_pos.add(len * size);

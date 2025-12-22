@@ -1,4 +1,4 @@
-use na_nbt::{Tag, read_borrowed};
+use na_nbt::{TagID, read_borrowed};
 use std::io::Cursor;
 use zerocopy::byteorder::{BigEndian, LittleEndian};
 
@@ -30,7 +30,7 @@ where
 #[test]
 fn test_write_list_fallback_primitives() {
     // List of Short
-    let data = create_list_nbt(Tag::Short as u8, 2, |buf| {
+    let data = create_list_nbt(TagID::Short as u8, 2, |buf| {
         buf.extend_from_slice(&0x1234u16.to_be_bytes());
         buf.extend_from_slice(&0x5678u16.to_be_bytes());
     });
@@ -48,7 +48,7 @@ fn test_write_list_fallback_primitives() {
     assert_eq!(&written[10..12], &[0x78, 0x56]);
 
     // List of Long
-    let data = create_list_nbt(Tag::Long as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::Long as u8, 1, |buf| {
         buf.extend_from_slice(&0x1122334455667788u64.to_be_bytes());
     });
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
@@ -61,7 +61,7 @@ fn test_write_list_fallback_primitives() {
 
     // List of Float
     let val_f = 1.234f32;
-    let data = create_list_nbt(Tag::Float as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::Float as u8, 1, |buf| {
         buf.extend_from_slice(&val_f.to_be_bytes());
     });
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
@@ -73,7 +73,7 @@ fn test_write_list_fallback_primitives() {
 
     // List of Double
     let val_d = 123.456f64;
-    let data = create_list_nbt(Tag::Double as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::Double as u8, 1, |buf| {
         buf.extend_from_slice(&val_d.to_be_bytes());
     });
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
@@ -88,7 +88,7 @@ fn test_write_list_fallback_complex() {
     // List of Strings
     let s1 = "Hello";
     let s2 = "World";
-    let data = create_list_nbt(Tag::String as u8, 2, |buf| {
+    let data = create_list_nbt(TagID::String as u8, 2, |buf| {
         buf.extend_from_slice(&(s1.len() as u16).to_be_bytes());
         buf.extend_from_slice(s1.as_bytes());
         buf.extend_from_slice(&(s2.len() as u16).to_be_bytes());
@@ -116,9 +116,9 @@ fn test_write_list_fallback_complex() {
     assert_eq!(&written[offset..offset + s2.len()], s2.as_bytes());
 
     // List of Lists (List<List<Int>>)
-    let data = create_list_nbt(Tag::List as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::List as u8, 1, |buf| {
         // Inner list header: Tag::Int, Count 1
-        buf.push(Tag::Int as u8);
+        buf.push(TagID::Int as u8);
         buf.extend_from_slice(&1u32.to_be_bytes());
         // Inner list data
         buf.extend_from_slice(&0x12345678u32.to_be_bytes());
@@ -130,7 +130,7 @@ fn test_write_list_fallback_complex() {
     // Outer list header (8 bytes)
     let offset = 8;
     // Inner list: Tag Int (1 byte), Count (4 bytes LE)
-    assert_eq!(written[offset], Tag::Int as u8);
+    assert_eq!(written[offset], TagID::Int as u8);
     assert_eq!(&written[offset + 1..offset + 5], &1u32.to_le_bytes());
     // Inner list data: Int (4 bytes LE)
     assert_eq!(
@@ -139,9 +139,9 @@ fn test_write_list_fallback_complex() {
     );
 
     // List of Compounds
-    let data = create_list_nbt(Tag::Compound as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::Compound as u8, 1, |buf| {
         // Compound: Int 'a' = 1
-        buf.push(Tag::Int as u8);
+        buf.push(TagID::Int as u8);
         buf.extend_from_slice(&1u16.to_be_bytes()); // name len
         buf.push(b'a'); // name
         buf.extend_from_slice(&1u32.to_be_bytes()); // val
@@ -153,7 +153,7 @@ fn test_write_list_fallback_complex() {
 
     let offset = 8;
     // Compound data
-    assert_eq!(written[offset], Tag::Int as u8);
+    assert_eq!(written[offset], TagID::Int as u8);
     assert_eq!(&written[offset + 1..offset + 3], &1u16.to_le_bytes()); // name len LE
     assert_eq!(written[offset + 3], b'a');
     assert_eq!(&written[offset + 4..offset + 8], &1u32.to_le_bytes()); // val LE
@@ -164,7 +164,7 @@ fn test_write_list_fallback_complex() {
 fn test_write_list_fallback_arrays() {
     // List of ByteArray
     let b1 = vec![1, 2, 3];
-    let data = create_list_nbt(Tag::ByteArray as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::ByteArray as u8, 1, |buf| {
         buf.extend_from_slice(&(b1.len() as u32).to_be_bytes());
         buf.extend_from_slice(&b1);
     });
@@ -181,7 +181,7 @@ fn test_write_list_fallback_arrays() {
 
     // List of IntArray
     let i1 = vec![0x11223344u32];
-    let data = create_list_nbt(Tag::IntArray as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::IntArray as u8, 1, |buf| {
         buf.extend_from_slice(&(i1.len() as u32).to_be_bytes());
         for i in &i1 {
             buf.extend_from_slice(&i.to_be_bytes());
@@ -200,7 +200,7 @@ fn test_write_list_fallback_arrays() {
 
     // List of LongArray
     let l1 = vec![0x1122334455667788u64];
-    let data = create_list_nbt(Tag::LongArray as u8, 1, |buf| {
+    let data = create_list_nbt(TagID::LongArray as u8, 1, |buf| {
         buf.extend_from_slice(&(l1.len() as u32).to_be_bytes());
         for l in &l1 {
             buf.extend_from_slice(&l.to_be_bytes());
@@ -222,78 +222,78 @@ fn test_write_list_fallback_arrays() {
 fn test_write_compound_fallback_all_types() {
     let data = create_compound_nbt(|buf| {
         // Byte
-        buf.push(Tag::Byte as u8);
+        buf.push(TagID::Byte as u8);
         buf.extend_from_slice(&1u16.to_be_bytes());
         buf.push(b'b');
         buf.push(1);
 
         // Short
-        buf.push(Tag::Short as u8);
+        buf.push(TagID::Short as u8);
         buf.extend_from_slice(&1u16.to_be_bytes());
         buf.push(b's');
         buf.extend_from_slice(&0x1234u16.to_be_bytes());
 
         // Int
-        buf.push(Tag::Int as u8);
+        buf.push(TagID::Int as u8);
         buf.extend_from_slice(&1u16.to_be_bytes());
         buf.push(b'i');
         buf.extend_from_slice(&0x12345678u32.to_be_bytes());
 
         // Long
-        buf.push(Tag::Long as u8);
+        buf.push(TagID::Long as u8);
         buf.extend_from_slice(&1u16.to_be_bytes());
         buf.push(b'l');
         buf.extend_from_slice(&0x1122334455667788u64.to_be_bytes());
 
         // Float
-        buf.push(Tag::Float as u8);
+        buf.push(TagID::Float as u8);
         buf.extend_from_slice(&1u16.to_be_bytes());
         buf.push(b'f');
         buf.extend_from_slice(&1.5f32.to_be_bytes());
 
         // Double
-        buf.push(Tag::Double as u8);
+        buf.push(TagID::Double as u8);
         buf.extend_from_slice(&1u16.to_be_bytes());
         buf.push(b'd');
         buf.extend_from_slice(&1.5f64.to_be_bytes());
 
         // ByteArray
-        buf.push(Tag::ByteArray as u8);
+        buf.push(TagID::ByteArray as u8);
         buf.extend_from_slice(&2u16.to_be_bytes());
         buf.extend_from_slice(b"ba");
         buf.extend_from_slice(&2u32.to_be_bytes());
         buf.extend_from_slice(&[1, 2]);
 
         // String
-        buf.push(Tag::String as u8);
+        buf.push(TagID::String as u8);
         buf.extend_from_slice(&2u16.to_be_bytes());
         buf.extend_from_slice(b"st");
         buf.extend_from_slice(&3u16.to_be_bytes());
         buf.extend_from_slice(b"val");
 
         // List (of bytes)
-        buf.push(Tag::List as u8);
+        buf.push(TagID::List as u8);
         buf.extend_from_slice(&2u16.to_be_bytes());
         buf.extend_from_slice(b"li");
-        buf.push(Tag::Byte as u8);
+        buf.push(TagID::Byte as u8);
         buf.extend_from_slice(&1u32.to_be_bytes());
         buf.push(10);
 
         // Compound
-        buf.push(Tag::Compound as u8);
+        buf.push(TagID::Compound as u8);
         buf.extend_from_slice(&2u16.to_be_bytes());
         buf.extend_from_slice(b"co");
-        buf.push(Tag::End as u8); // Empty compound
+        buf.push(TagID::End as u8); // Empty compound
 
         // IntArray
-        buf.push(Tag::IntArray as u8);
+        buf.push(TagID::IntArray as u8);
         buf.extend_from_slice(&2u16.to_be_bytes());
         buf.extend_from_slice(b"ia");
         buf.extend_from_slice(&1u32.to_be_bytes());
         buf.extend_from_slice(&0x12345678u32.to_be_bytes());
 
         // LongArray
-        buf.push(Tag::LongArray as u8);
+        buf.push(TagID::LongArray as u8);
         buf.extend_from_slice(&2u16.to_be_bytes());
         buf.extend_from_slice(b"la");
         buf.extend_from_slice(&1u32.to_be_bytes());

@@ -6,7 +6,7 @@ use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, IntoOwnedValue, MutableCompound,
     MutableList, MutableValue, OwnedValue, ReadableConfig, Result, ScopedReadableCompound,
     ScopedReadableList, ScopedReadableValue, ScopedWritableCompound, ScopedWritableList,
-    ScopedWritableValue, Tag, ValueMut, ValueMutScoped, ValueScoped, WritableCompound,
+    ScopedWritableValue, TagID, ValueMut, ValueMutScoped, ValueScoped, WritableCompound,
     WritableConfig, WritableList, WritableValue,
     index::Index,
     mutable::{
@@ -28,7 +28,7 @@ impl<'doc, O: ByteOrder> ScopedReadableValue<'doc> for MutableValue<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 
@@ -566,7 +566,7 @@ impl<'doc, O: ByteOrder> ScopedReadableList<'doc> for MutableList<'doc, O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 

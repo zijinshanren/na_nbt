@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, ImmutableValue, IntoOwnedValue,
-    MutableCompound, MutableList, MutableValue, Result, ScopedReadableValue as _, Tag, cold_path,
+    MutableCompound, MutableList, MutableValue, Result, ScopedReadableValue as _, TagID, cold_path,
     index::Index,
     mutable::{
         iter::{
@@ -359,22 +359,22 @@ impl<O: ByteOrder> OwnedValue<O> {
         }
     }
 
-    pub(crate) unsafe fn read(tag_id: Tag, src: *mut u8) -> Self {
+    pub(crate) unsafe fn read(tag_id: TagID, src: *mut u8) -> Self {
         unsafe {
             match tag_id {
-                Tag::End => OwnedValue::End,
-                Tag::Byte => OwnedValue::Byte(ptr::read(src.cast())),
-                Tag::Short => OwnedValue::Short(ptr::read(src.cast())),
-                Tag::Int => OwnedValue::Int(ptr::read(src.cast())),
-                Tag::Long => OwnedValue::Long(ptr::read(src.cast())),
-                Tag::Float => OwnedValue::Float(ptr::read(src.cast())),
-                Tag::Double => OwnedValue::Double(ptr::read(src.cast())),
-                Tag::ByteArray => OwnedValue::ByteArray(VecViewOwn::read(src.cast())),
-                Tag::String => OwnedValue::String(StringViewOwn::read(src.cast())),
-                Tag::List => OwnedValue::List(OwnedList::read(src.cast())),
-                Tag::Compound => OwnedValue::Compound(OwnedCompound::read(src.cast())),
-                Tag::IntArray => OwnedValue::IntArray(VecViewOwn::read(src.cast())),
-                Tag::LongArray => OwnedValue::LongArray(VecViewOwn::read(src.cast())),
+                TagID::End => OwnedValue::End,
+                TagID::Byte => OwnedValue::Byte(ptr::read(src.cast())),
+                TagID::Short => OwnedValue::Short(ptr::read(src.cast())),
+                TagID::Int => OwnedValue::Int(ptr::read(src.cast())),
+                TagID::Long => OwnedValue::Long(ptr::read(src.cast())),
+                TagID::Float => OwnedValue::Float(ptr::read(src.cast())),
+                TagID::Double => OwnedValue::Double(ptr::read(src.cast())),
+                TagID::ByteArray => OwnedValue::ByteArray(VecViewOwn::read(src.cast())),
+                TagID::String => OwnedValue::String(StringViewOwn::read(src.cast())),
+                TagID::List => OwnedValue::List(OwnedList::read(src.cast())),
+                TagID::Compound => OwnedValue::Compound(OwnedCompound::read(src.cast())),
+                TagID::IntArray => OwnedValue::IntArray(VecViewOwn::read(src.cast())),
+                TagID::LongArray => OwnedValue::LongArray(VecViewOwn::read(src.cast())),
             }
         }
     }
@@ -382,8 +382,8 @@ impl<O: ByteOrder> OwnedValue<O> {
 
 impl<O: ByteOrder> OwnedValue<O> {
     #[inline]
-    pub fn tag_id(&self) -> Tag {
-        unsafe { *(self as *const Self as *const Tag) }
+    pub fn tag_id(&self) -> TagID {
+        unsafe { *(self as *const Self as *const TagID) }
     }
 
     #[inline]
@@ -938,7 +938,7 @@ impl<O: ByteOrder> Drop for OwnedList<O> {
         unsafe {
             let mut ptr = self.data.as_mut_ptr();
 
-            let tag_id = *ptr.cast::<Tag>();
+            let tag_id = *ptr.cast::<TagID>();
             ptr = ptr.add(1);
 
             if tag_id.is_primitive() {
@@ -949,37 +949,37 @@ impl<O: ByteOrder> Drop for OwnedList<O> {
             ptr = ptr.add(4);
 
             match tag_id {
-                Tag::ByteArray => {
+                TagID::ByteArray => {
                     for _ in 0..len {
                         VecViewOwn::<i8>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::String => {
+                TagID::String => {
                     for _ in 0..len {
                         StringViewOwn::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::List => {
+                TagID::List => {
                     for _ in 0..len {
                         OwnedList::<O>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::Compound => {
+                TagID::Compound => {
                     for _ in 0..len {
                         OwnedCompound::<O>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::IntArray => {
+                TagID::IntArray => {
                     for _ in 0..len {
                         VecViewOwn::<byteorder::I32<O>>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
                     }
                 }
-                Tag::LongArray => {
+                TagID::LongArray => {
                     for _ in 0..len {
                         VecViewOwn::<byteorder::I64<O>>::read(ptr);
                         ptr = ptr.add(tag_size(tag_id));
@@ -1015,7 +1015,7 @@ impl<O: ByteOrder> IntoIterator for OwnedList<O> {
 
 impl<O: ByteOrder> OwnedList<O> {
     #[inline]
-    pub fn tag_id(&self) -> Tag {
+    pub fn tag_id(&self) -> TagID {
         list_tag_id(self.data.as_ptr())
     }
 
@@ -1185,7 +1185,7 @@ impl<O: ByteOrder> Drop for OwnedCompound<O> {
                 let tag_id = *ptr.cast();
                 ptr = ptr.add(1);
 
-                if tag_id == Tag::End {
+                if tag_id == TagID::End {
                     cold_path();
                     debug_assert!(
                         ptr.byte_offset_from_unsigned(self.data.as_mut_ptr()) == self.data.len()
@@ -1199,22 +1199,22 @@ impl<O: ByteOrder> Drop for OwnedCompound<O> {
                 ptr = ptr.add(name_len as usize);
 
                 match tag_id {
-                    Tag::ByteArray => {
+                    TagID::ByteArray => {
                         VecViewOwn::<i8>::read(ptr);
                     }
-                    Tag::String => {
+                    TagID::String => {
                         StringViewOwn::read(ptr);
                     }
-                    Tag::List => {
+                    TagID::List => {
                         OwnedList::<O>::read(ptr);
                     }
-                    Tag::Compound => {
+                    TagID::Compound => {
                         OwnedCompound::<O>::read(ptr);
                     }
-                    Tag::IntArray => {
+                    TagID::IntArray => {
                         VecViewOwn::<byteorder::I32<O>>::read(ptr);
                     }
-                    Tag::LongArray => {
+                    TagID::LongArray => {
                         VecViewOwn::<byteorder::I64<O>>::read(ptr);
                     }
                     _ => (),

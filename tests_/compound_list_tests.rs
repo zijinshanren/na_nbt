@@ -306,21 +306,21 @@ fn test_list_indexing() {
 
 #[test]
 fn test_list_tag_id() {
-    use na_nbt::Tag;
+    use na_nbt::TagID;
 
     let data = create_byte_list_nbt_be(&[1, 2, 3]);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
 
     let list = root.as_list().unwrap();
-    assert_eq!(list.tag_id(), Tag::Byte);
+    assert_eq!(list.tag_id(), TagID::Byte);
 
     let data = create_int_list_nbt_be(&[1, 2, 3]);
     let doc = read_borrowed::<BigEndian>(&data).unwrap();
     let root = doc.root();
 
     let list = root.as_list().unwrap();
-    assert_eq!(list.tag_id(), Tag::Int);
+    assert_eq!(list.tag_id(), TagID::Int);
 }
 
 #[test]

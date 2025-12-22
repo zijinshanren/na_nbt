@@ -1,7 +1,7 @@
 //! Tests for ScopedReadableValue trait implementations - targeting trait_impl.rs and trait_impl_own.rs
 
 use na_nbt::{
-    OwnedValue, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, Tag,
+    OwnedValue, ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, TagID,
     read_borrowed, read_owned,
 };
 use zerocopy::byteorder::BigEndian as BE;
@@ -110,7 +110,7 @@ fn test_immutable_scoped_tag_id() {
     let data = create_byte_nbt(42);
     let doc = read_borrowed::<BE>(&data).unwrap();
     let root = doc.root();
-    assert_eq!(ScopedReadableValue::tag_id(&root), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&root), TagID::Byte);
 }
 
 #[test]
@@ -257,7 +257,7 @@ fn test_immutable_scoped_get_scoped_str() {
 fn test_owned_scoped_tag_id() {
     let data = create_byte_nbt(42);
     let owned = read_owned::<BE, BE>(&data).unwrap();
-    assert_eq!(ScopedReadableValue::tag_id(&owned), Tag::Byte);
+    assert_eq!(ScopedReadableValue::tag_id(&owned), TagID::Byte);
 }
 
 #[test]
@@ -480,7 +480,7 @@ fn test_immutable_scoped_list_methods() {
 
     assert_eq!(list.len(), 3);
     assert!(!list.is_empty());
-    assert_eq!(list.tag_id(), Tag::Int);
+    assert_eq!(list.tag_id(), TagID::Int);
 
     let v0 = list.get(0).unwrap();
     assert_eq!(v0.as_int(), Some(1));
@@ -510,7 +510,7 @@ fn test_owned_scoped_list_methods() {
 
     assert_eq!(list.len(), 3);
     assert!(!list.is_empty());
-    assert_eq!(list.tag_id(), Tag::Int);
+    assert_eq!(list.tag_id(), TagID::Int);
 
     let v0 = list.get(0).unwrap();
     assert_eq!(v0.as_int(), Some(1));

@@ -1,4 +1,4 @@
-use na_nbt::Tag;
+use na_nbt::TagID;
 use na_nbt::ser::to_vec;
 use serde::Serialize;
 use std::{collections::HashMap, f32, f64};
@@ -74,7 +74,7 @@ fn test_root_header_format() {
     let result = to_vec::<BigEndian>(&42i8).unwrap();
     
     // First byte is tag_id (Byte = 1)
-    assert_eq!(result[0], Tag::Byte as u8);
+    assert_eq!(result[0], TagID::Byte as u8);
     // Next 2 bytes are name length (0 for empty name)
     assert_eq!(read_be_u16(&result[1..3]), 0);
     // Payload starts at byte 3
@@ -85,40 +85,40 @@ fn test_root_header_format() {
 fn test_serialize_primitives() {
     // Test i8 (Byte)
     let result = to_vec::<BigEndian>(&42i8).unwrap();
-    assert_eq!(root_tag(&result), Tag::Byte as u8);
+    assert_eq!(root_tag(&result), TagID::Byte as u8);
     assert_eq!(payload(&result), &[42u8]);
 
     // Test bool (serialized as i8)
     let result = to_vec::<BigEndian>(&true).unwrap();
-    assert_eq!(root_tag(&result), Tag::Byte as u8);
+    assert_eq!(root_tag(&result), TagID::Byte as u8);
     assert_eq!(payload(&result), &[1u8]);
     let result = to_vec::<BigEndian>(&false).unwrap();
     assert_eq!(payload(&result), &[0u8]);
 
     // Test i16 (Short)
     let result = to_vec::<BigEndian>(&0x1234i16).unwrap();
-    assert_eq!(root_tag(&result), Tag::Short as u8);
+    assert_eq!(root_tag(&result), TagID::Short as u8);
     assert_eq!(payload(&result), &[0x12, 0x34]);
 
     // Test i32 (Int)
     let result = to_vec::<BigEndian>(&0x12345678i32).unwrap();
-    assert_eq!(root_tag(&result), Tag::Int as u8);
+    assert_eq!(root_tag(&result), TagID::Int as u8);
     assert_eq!(payload(&result), &[0x12, 0x34, 0x56, 0x78]);
 
     // Test i64 (Long)
     let result = to_vec::<BigEndian>(&0x123456789ABCDEFi64).unwrap();
-    assert_eq!(root_tag(&result), Tag::Long as u8);
+    assert_eq!(root_tag(&result), TagID::Long as u8);
     assert_eq!(read_be_i64(payload(&result)), 0x123456789ABCDEFi64);
 
     // Test f32 (Float)
     let result = to_vec::<BigEndian>(&f32::consts::PI).unwrap();
-    assert_eq!(root_tag(&result), Tag::Float as u8);
+    assert_eq!(root_tag(&result), TagID::Float as u8);
     assert_eq!(payload(&result).len(), 4);
     assert!((read_be_f32(payload(&result)) - f32::consts::PI).abs() < 0.001);
 
     // Test f64 (Double)
     let result = to_vec::<BigEndian>(&f64::consts::PI).unwrap();
-    assert_eq!(root_tag(&result), Tag::Double as u8);
+    assert_eq!(root_tag(&result), TagID::Double as u8);
     assert_eq!(payload(&result).len(), 8);
     assert!((read_be_f64(payload(&result)) - f64::consts::PI).abs() < 0.0000001);
 }
@@ -127,22 +127,22 @@ fn test_serialize_primitives() {
 fn test_serialize_unsigned_as_signed() {
     // u8 serializes as i8
     let result = to_vec::<BigEndian>(&255u8).unwrap();
-    assert_eq!(root_tag(&result), Tag::Byte as u8);
+    assert_eq!(root_tag(&result), TagID::Byte as u8);
     assert_eq!(payload(&result), &[255u8]); // -1 as i8
 
     // u16 serializes as i16
     let result = to_vec::<BigEndian>(&0xFFFFu16).unwrap();
-    assert_eq!(root_tag(&result), Tag::Short as u8);
+    assert_eq!(root_tag(&result), TagID::Short as u8);
     assert_eq!(read_be_i16(payload(&result)), -1i16);
 
     // u32 serializes as i32
     let result = to_vec::<BigEndian>(&0xFFFFFFFFu32).unwrap();
-    assert_eq!(root_tag(&result), Tag::Int as u8);
+    assert_eq!(root_tag(&result), TagID::Int as u8);
     assert_eq!(read_be_i32(payload(&result)), -1i32);
 
     // u64 serializes as i64
     let result = to_vec::<BigEndian>(&0xFFFFFFFFFFFFFFFFu64).unwrap();
-    assert_eq!(root_tag(&result), Tag::Long as u8);
+    assert_eq!(root_tag(&result), TagID::Long as u8);
     assert_eq!(read_be_i64(payload(&result)), -1i64);
 }
 
@@ -150,7 +150,7 @@ fn test_serialize_unsigned_as_signed() {
 fn test_serialize_string_with_length_prefix() {
     // String serialization should include length prefix
     let result = to_vec::<BigEndian>(&"Hello").unwrap();
-    assert_eq!(root_tag(&result), Tag::String as u8);
+    assert_eq!(root_tag(&result), TagID::String as u8);
 
     let p = payload(&result);
     // First 2 bytes of payload should be string length (5)
@@ -169,7 +169,7 @@ fn test_serialize_string_with_length_prefix() {
 fn test_serialize_string_with_unicode() {
     // Test with unicode characters (will be MUTF-8 encoded)
     let result = to_vec::<BigEndian>(&"你好").unwrap();
-    assert_eq!(root_tag(&result), Tag::String as u8);
+    assert_eq!(root_tag(&result), TagID::String as u8);
 
     let p = payload(&result);
     // Length should be encoded length, not char count
@@ -182,7 +182,7 @@ fn test_serialize_string_with_unicode() {
 fn test_serialize_bytes_as_byte_array() {
     let bytes = ByteVec(vec![1, 2, 3, 4, 5]);
     let result = to_vec::<BigEndian>(&bytes).unwrap();
-    assert_eq!(root_tag(&result), Tag::ByteArray as u8);
+    assert_eq!(root_tag(&result), TagID::ByteArray as u8);
 
     let p = payload(&result);
     // First 4 bytes should be length (5)
@@ -195,16 +195,16 @@ fn test_serialize_bytes_as_byte_array() {
 fn test_serialize_unit() {
     // Unit serializes as empty compound with End tag
     let result = to_vec::<BigEndian>(&()).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
-    assert_eq!(payload(&result), &[Tag::End as u8]);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
+    assert_eq!(payload(&result), &[TagID::End as u8]);
 }
 
 #[test]
 fn test_serialize_none_as_unit() {
     let opt: Option<i32> = None;
     let result = to_vec::<BigEndian>(&opt).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
-    assert_eq!(payload(&result), &[Tag::End as u8]);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
+    assert_eq!(payload(&result), &[TagID::End as u8]);
 }
 
 #[test]
@@ -212,14 +212,14 @@ fn test_serialize_some() {
     let opt: Option<i32> = Some(42);
     let result = to_vec::<BigEndian>(&opt).unwrap();
     // Some is serialized as a compound with single unnamed field
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
     let p = payload(&result);
     // Structure: [field_tag, name_len(2 bytes, 0), value, End]
-    assert_eq!(p[0], Tag::Int as u8); // field tag
+    assert_eq!(p[0], TagID::Int as u8); // field tag
     assert_eq!(p[1], 0); // name len hi
     assert_eq!(p[2], 0); // name len lo
     assert_eq!(read_be_i32(&p[3..7]), 42); // value
-    assert_eq!(p[7], Tag::End as u8); // end of compound
+    assert_eq!(p[7], TagID::End as u8); // end of compound
 }
 
 #[test]
@@ -236,11 +236,11 @@ fn test_serialize_struct() {
     };
 
     let result = to_vec::<BigEndian>(&player).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     // Should start with field entries and end with End tag
     assert!(!result.is_empty());
-    assert_eq!(*result.last().unwrap(), Tag::End as u8);
+    assert_eq!(*result.last().unwrap(), TagID::End as u8);
 
     // Should contain field names
     assert!(result.windows(6).any(|w| w == b"health"));
@@ -266,12 +266,12 @@ fn test_serialize_nested_struct() {
     };
 
     let result = to_vec::<BigEndian>(&outer).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     // Should have End tags for both compounds
     assert!(!result.is_empty());
     // Count End tags
-    let end_count = result.iter().filter(|&&b| b == Tag::End as u8).count();
+    let end_count = result.iter().filter(|&&b| b == TagID::End as u8).count();
     assert!(
         end_count >= 2,
         "Should have at least 2 End tags for nested compounds"
@@ -282,11 +282,11 @@ fn test_serialize_nested_struct() {
 fn test_serialize_vec_as_list() {
     let vec = vec![1i32, 2i32, 3i32];
     let result = to_vec::<BigEndian>(&vec).unwrap();
-    assert_eq!(root_tag(&result), Tag::List as u8);
+    assert_eq!(root_tag(&result), TagID::List as u8);
 
     let p = payload(&result);
     // List structure: element_type (1 byte) + length (4 bytes) + elements
-    assert_eq!(p[0], Tag::Int as u8); // Element type matches the vec content type
+    assert_eq!(p[0], TagID::Int as u8); // Element type matches the vec content type
     assert_eq!(read_be_u32(&p[1..5]), 3); // 3 elements
 }
 
@@ -294,11 +294,11 @@ fn test_serialize_vec_as_list() {
 fn test_serialize_tuple() {
     let tuple = (1i32, 2i32, 3i32);
     let result = to_vec::<BigEndian>(&tuple).unwrap();
-    assert_eq!(root_tag(&result), Tag::List as u8);
+    assert_eq!(root_tag(&result), TagID::List as u8);
 
     let p = payload(&result);
     // Should have list header
-    assert_eq!(p[0], Tag::Compound as u8);
+    assert_eq!(p[0], TagID::Compound as u8);
     assert_eq!(read_be_u32(&p[1..5]), 3);
 }
 
@@ -310,7 +310,7 @@ fn test_serialize_tuple_struct() {
     let point = Point(1, 2, 3);
     let result = to_vec::<BigEndian>(&point).unwrap();
     // Note: tuple_struct now serializes differently (user reverted the change)
-    assert_eq!(root_tag(&result), Tag::List as u8);
+    assert_eq!(root_tag(&result), TagID::List as u8);
 }
 
 #[test]
@@ -320,10 +320,10 @@ fn test_serialize_hashmap() {
     map.insert("key2".to_string(), 20);
 
     let result = to_vec::<BigEndian>(&map).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     // Should end with End tag
-    assert_eq!(*result.last().unwrap(), Tag::End as u8);
+    assert_eq!(*result.last().unwrap(), TagID::End as u8);
 
     // Should contain field names
     assert!(result.windows(4).any(|w| w == b"key1"));
@@ -336,9 +336,9 @@ fn test_serialize_map_with_str_key() {
     map.insert("hello", 42);
 
     let result = to_vec::<BigEndian>(&map).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
     assert!(!result.is_empty());
-    assert_eq!(*result.last().unwrap(), Tag::End as u8);
+    assert_eq!(*result.last().unwrap(), TagID::End as u8);
 }
 
 #[test]
@@ -361,7 +361,7 @@ fn test_serialize_enum_unit_variant() {
 
     // Unit variants serialize as their index (u32 -> Int tag)
     let result = to_vec::<BigEndian>(&Status::Active).unwrap();
-    assert_eq!(root_tag(&result), Tag::Int as u8);
+    assert_eq!(root_tag(&result), TagID::Int as u8);
     assert_eq!(read_be_u32(payload(&result)), 0);
 
     let result = to_vec::<BigEndian>(&Status::Inactive).unwrap();
@@ -380,14 +380,14 @@ fn test_serialize_enum_newtype_variant() {
     }
 
     let result = to_vec::<BigEndian>(&Data::Int(42)).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
     // Should be a compound with variant name as key, ending with End tag
-    assert_eq!(*result.last().unwrap(), Tag::End as u8);
+    assert_eq!(*result.last().unwrap(), TagID::End as u8);
     assert!(result.windows(3).any(|w| w == b"Int"));
 
     let result = to_vec::<BigEndian>(&Data::Text("hello".to_string())).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
-    assert_eq!(*result.last().unwrap(), Tag::End as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
+    assert_eq!(*result.last().unwrap(), TagID::End as u8);
     assert!(result.windows(4).any(|w| w == b"Text"));
 }
 
@@ -402,9 +402,9 @@ fn test_serialize_enum_tuple_variant() {
 
     let result = to_vec::<BigEndian>(&Coord::Point2D(1, 2)).unwrap();
     // Tuple variants serialize as Compound { variant: List[Compound] }
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
     // Should contain variant name and end with End tag
-    assert_eq!(*result.last().unwrap(), Tag::End as u8);
+    assert_eq!(*result.last().unwrap(), TagID::End as u8);
     assert!(result.windows(7).any(|w| w == b"Point2D"));
 }
 
@@ -422,10 +422,10 @@ fn test_serialize_enum_struct_variant() {
         health: 100,
     })
     .unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     // Should have nested compounds and end with two End tags
-    let end_count = result.iter().filter(|&&b| b == Tag::End as u8).count();
+    let end_count = result.iter().filter(|&&b| b == TagID::End as u8).count();
     assert!(end_count >= 2, "Should have End tags for nested compounds");
     assert!(result.windows(6).any(|w| w == b"Player"));
 }
@@ -436,7 +436,7 @@ fn test_serialize_newtype_struct() {
     struct Wrapper(i32);
 
     let result = to_vec::<BigEndian>(&Wrapper(42)).unwrap();
-    assert_eq!(root_tag(&result), Tag::Int as u8);
+    assert_eq!(root_tag(&result), TagID::Int as u8);
     // Newtype struct should serialize as the inner value
     assert_eq!(payload(&result), &[0x00, 0x00, 0x00, 42]);
 }
@@ -447,16 +447,16 @@ fn test_serialize_unit_struct() {
     struct Empty;
 
     let result = to_vec::<BigEndian>(&Empty).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
     // Should be an empty compound with End tag
-    assert_eq!(payload(&result), &[Tag::End as u8]);
+    assert_eq!(payload(&result), &[TagID::End as u8]);
 }
 
 #[test]
 fn test_serialize_little_endian() {
     // Test that little endian serialization works
     let result = to_vec::<LittleEndian>(&0x12345678i32).unwrap();
-    assert_eq!(result[0], Tag::Int as u8);
+    assert_eq!(result[0], TagID::Int as u8);
     // Name length in little endian (0)
     assert_eq!(result[1], 0);
     assert_eq!(result[2], 0);
@@ -464,7 +464,7 @@ fn test_serialize_little_endian() {
     assert_eq!(&result[3..], &[0x78, 0x56, 0x34, 0x12]);
 
     let result = to_vec::<LittleEndian>(&0x1234i16).unwrap();
-    assert_eq!(result[0], Tag::Short as u8);
+    assert_eq!(result[0], TagID::Short as u8);
     assert_eq!(&result[3..], &[0x34, 0x12]);
 }
 
@@ -472,7 +472,7 @@ fn test_serialize_little_endian() {
 fn test_serialize_char_as_int() {
     // Char is serialized as u32 (Int tag)
     let result = to_vec::<BigEndian>(&'A').unwrap();
-    assert_eq!(root_tag(&result), Tag::Int as u8);
+    assert_eq!(root_tag(&result), TagID::Int as u8);
     assert_eq!(payload(&result).len(), 4);
     assert_eq!(read_be_u32(payload(&result)), 65);
 }
@@ -481,11 +481,11 @@ fn test_serialize_char_as_int() {
 fn test_serialize_empty_vec() {
     let empty: Vec<i32> = vec![];
     let result = to_vec::<BigEndian>(&empty).unwrap();
-    assert_eq!(root_tag(&result), Tag::List as u8);
+    assert_eq!(root_tag(&result), TagID::List as u8);
 
     let p = payload(&result);
     // Empty list has element type End (no elements serialized to determine type)
-    assert_eq!(p[0], Tag::End as u8);
+    assert_eq!(p[0], TagID::End as u8);
     assert_eq!(read_be_u32(&p[1..5]), 0);
 }
 
@@ -493,10 +493,10 @@ fn test_serialize_empty_vec() {
 fn test_serialize_empty_hashmap() {
     let empty: HashMap<String, i32> = HashMap::new();
     let result = to_vec::<BigEndian>(&empty).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     // Empty compound should just be End tag
-    assert_eq!(payload(&result), &[Tag::End as u8]);
+    assert_eq!(payload(&result), &[TagID::End as u8]);
 }
 
 #[test]
@@ -529,7 +529,7 @@ fn test_serialize_complex_nested_structure() {
     };
 
     let result = to_vec::<BigEndian>(&inventory).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
     assert!(!result.is_empty());
 
     // Verify structure contains expected strings
@@ -543,7 +543,7 @@ fn test_serialize_array_types() {
     // Vec<u8> with our ByteVec wrapper should become ByteArray
     let bytes = ByteVec(vec![1u8, 2, 3, 4, 5]);
     let result = to_vec::<BigEndian>(&bytes).unwrap();
-    assert_eq!(root_tag(&result), Tag::ByteArray as u8);
+    assert_eq!(root_tag(&result), TagID::ByteArray as u8);
 
     let p = payload(&result);
     // ByteArray: length (4 bytes) + data
@@ -556,7 +556,7 @@ fn test_serialize_special_utf8() {
     // Test null character (should be encoded as modified UTF-8)
     let s = "hello\0world";
     let result = to_vec::<BigEndian>(&s).unwrap();
-    assert_eq!(root_tag(&result), Tag::String as u8);
+    assert_eq!(root_tag(&result), TagID::String as u8);
 
     let p = payload(&result);
     // Length prefix should be present
@@ -579,7 +579,7 @@ fn test_serialize_u128() {
 
     let value: u128 = 0x0123456789ABCDEF_FEDCBA9876543210;
     let result = to_vec::<BigEndian>(&value).unwrap();
-    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+    assert_eq!(root_tag(&result), TagID::IntArray as u8);
 
     let p = payload(&result);
     // IntArray header: length (4 bytes) = 4 elements
@@ -608,7 +608,7 @@ fn test_serialize_i128_positive() {
 
     let value: i128 = 0x0123456789ABCDEF_FEDCBA9876543210;
     let result = to_vec::<BigEndian>(&value).unwrap();
-    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+    assert_eq!(root_tag(&result), TagID::IntArray as u8);
 
     // Roundtrip test
     let deserialized: i128 = from_slice_be(&result).unwrap();
@@ -622,7 +622,7 @@ fn test_serialize_i128_negative() {
 
     let value: i128 = -1;
     let result = to_vec::<BigEndian>(&value).unwrap();
-    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+    assert_eq!(root_tag(&result), TagID::IntArray as u8);
 
     let p = payload(&result);
     // All bits should be 1 for -1
@@ -643,7 +643,7 @@ fn test_serialize_u128_zero() {
 
     let value: u128 = 0;
     let result = to_vec::<BigEndian>(&value).unwrap();
-    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+    assert_eq!(root_tag(&result), TagID::IntArray as u8);
 
     let p = payload(&result);
     assert_eq!(read_be_u32(&p[4..8]), 0);
@@ -663,7 +663,7 @@ fn test_serialize_u128_max() {
 
     let value: u128 = u128::MAX;
     let result = to_vec::<BigEndian>(&value).unwrap();
-    assert_eq!(root_tag(&result), Tag::IntArray as u8);
+    assert_eq!(root_tag(&result), TagID::IntArray as u8);
 
     let p = payload(&result);
     assert_eq!(read_be_u32(&p[4..8]), 0xFFFFFFFF);
@@ -710,7 +710,7 @@ fn test_map_serialize_key_value_separated() {
     map.insert("gamma".to_string(), 3);
 
     let result = to_vec::<BigEndian>(&map).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     // Roundtrip test
     let deserialized: BTreeMap<String, i32> = from_slice_be(&result).unwrap();
@@ -728,7 +728,7 @@ fn test_map_serialize_key_value_with_various_value_types() {
     string_map.insert("key2".to_string(), "value2".to_string());
 
     let result = to_vec::<BigEndian>(&string_map).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     let deserialized: BTreeMap<String, String> = from_slice_be(&result).unwrap();
     assert_eq!(deserialized, string_map);
@@ -748,7 +748,7 @@ fn test_map_serialize_key_value_nested() {
     outer.insert("position".to_string(), inner);
 
     let result = to_vec::<BigEndian>(&outer).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     let deserialized: BTreeMap<String, BTreeMap<String, i32>> = from_slice_be(&result).unwrap();
     assert_eq!(deserialized, outer);
@@ -764,7 +764,7 @@ fn test_map_serialize_key_value_with_list_values() {
     map.insert("empty".to_string(), vec![]);
 
     let result = to_vec::<BigEndian>(&map).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     let deserialized: BTreeMap<String, Vec<i32>> = from_slice_be(&result).unwrap();
     assert_eq!(deserialized, map);
@@ -778,11 +778,11 @@ fn test_map_serialize_key_value_empty() {
     let map: BTreeMap<String, i32> = BTreeMap::new();
 
     let result = to_vec::<BigEndian>(&map).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     // Empty compound should just have end tag
     let p = payload(&result);
-    assert_eq!(p[0], Tag::End as u8);
+    assert_eq!(p[0], TagID::End as u8);
 
     let deserialized: BTreeMap<String, i32> = from_slice_be(&result).unwrap();
     assert_eq!(deserialized, map);
@@ -798,7 +798,7 @@ fn test_hashmap_serialize_key_value() {
     map.insert("e".to_string(), std::f64::consts::E);
 
     let result = to_vec::<BigEndian>(&map).unwrap();
-    assert_eq!(root_tag(&result), Tag::Compound as u8);
+    assert_eq!(root_tag(&result), TagID::Compound as u8);
 
     let deserialized: HashMap<String, f64> = from_slice_be(&result).unwrap();
     assert_eq!(deserialized, map);

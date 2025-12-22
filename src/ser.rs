@@ -124,7 +124,7 @@ use std::{io::Write, marker::PhantomData, ptr};
 use serde::{Serialize, ser};
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, Error, Result, Tag, cold_path};
+use crate::{ByteOrder, Error, Result, TagID, cold_path};
 
 /// Internal mode for tracking array serialization.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -184,7 +184,7 @@ impl<O: ByteOrder> Serializer<O> {
             let old_len = self.vec.len();
             self.vec.reserve(5);
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
-            ptr::write(write_ptr, Tag::Compound as u8);
+            ptr::write(write_ptr, TagID::Compound as u8);
             ptr::write(
                 write_ptr.add(1).cast(),
                 byteorder::U32::<O>::new(len as u32).to_bytes(),
@@ -207,7 +207,7 @@ impl<O: ByteOrder> Serializer<O> {
             self.vec.set_len(old_len + 3);
             let tag_id = value.serialize(&mut *self)?;
             *self.vec.get_unchecked_mut(old_len) = tag_id as u8;
-            self.vec.push(Tag::End as u8);
+            self.vec.push(TagID::End as u8);
         }
         Ok(())
     }
@@ -246,7 +246,7 @@ pub fn to_vec<O: ByteOrder>(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>
         array_mode: ArrayMode::None,
     };
     let tag_id = value.serialize(&mut serializer)?;
-    if tag_id == Tag::End {
+    if tag_id == TagID::End {
         cold_path();
         return Ok(vec![0]);
     }
@@ -303,7 +303,7 @@ pub fn to_writer_le(writer: &mut impl Write, value: &(impl ?Sized + Serialize)) 
 }
 
 impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     type SerializeSeq = ListSerializer<'a, O>;
@@ -317,34 +317,34 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     #[inline]
     fn serialize_bool(self, v: bool) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec.push(v as u8);
-        Ok(Tag::Byte)
+        Ok(TagID::Byte)
     }
 
     #[inline]
     fn serialize_i8(self, v: i8) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec.push(v as u8);
-        Ok(Tag::Byte)
+        Ok(TagID::Byte)
     }
 
     #[inline]
     fn serialize_i16(self, v: i16) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec
             .extend_from_slice(&byteorder::I16::<O>::new(v).to_bytes());
-        Ok(Tag::Short)
+        Ok(TagID::Short)
     }
 
     #[inline]
     fn serialize_i32(self, v: i32) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec
             .extend_from_slice(&byteorder::I32::<O>::new(v).to_bytes());
-        Ok(Tag::Int)
+        Ok(TagID::Int)
     }
 
     #[inline]
     fn serialize_i64(self, v: i64) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec
             .extend_from_slice(&byteorder::I64::<O>::new(v).to_bytes());
-        Ok(Tag::Long)
+        Ok(TagID::Long)
     }
 
     #[cfg(feature = "i128")]
@@ -356,7 +356,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     #[inline]
     fn serialize_u8(self, v: u8) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec.push(v);
-        Ok(Tag::Byte)
+        Ok(TagID::Byte)
     }
 
     #[inline]
@@ -404,21 +404,21 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             );
             self.vec.set_len(old_len + 4 + 4 * 4);
         }
-        Ok(Tag::IntArray)
+        Ok(TagID::IntArray)
     }
 
     #[inline]
     fn serialize_f32(self, v: f32) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec
             .extend_from_slice(&byteorder::F32::<O>::new(v).to_bytes());
-        Ok(Tag::Float)
+        Ok(TagID::Float)
     }
 
     #[inline]
     fn serialize_f64(self, v: f64) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec
             .extend_from_slice(&byteorder::F64::<O>::new(v).to_bytes());
-        Ok(Tag::Double)
+        Ok(TagID::Double)
     }
 
     #[inline]
@@ -441,7 +441,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             ptr::copy_nonoverlapping(encoded.as_ptr(), write_ptr.add(2), len);
             self.vec.set_len(old_len + 2 + len);
         }
-        Ok(Tag::String)
+        Ok(TagID::String)
     }
 
     #[inline]
@@ -458,7 +458,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             ptr::copy_nonoverlapping(v.as_ptr(), write_ptr.add(4), len);
             self.vec.set_len(old_len + 4 + len);
         }
-        Ok(Tag::ByteArray)
+        Ok(TagID::ByteArray)
     }
 
     #[inline]
@@ -479,15 +479,15 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             self.vec.set_len(old_len + 1 + 2);
             let tag_id = value.serialize(&mut *self)?;
             *self.vec.get_unchecked_mut(old_len) = tag_id as u8;
-            self.vec.push(Tag::End as u8);
+            self.vec.push(TagID::End as u8);
         }
-        Ok(Tag::Compound)
+        Ok(TagID::Compound)
     }
 
     #[inline]
     fn serialize_unit(self) -> std::result::Result<Self::Ok, Self::Error> {
-        self.vec.push(Tag::End as u8);
-        Ok(Tag::Compound)
+        self.vec.push(TagID::End as u8);
+        Ok(TagID::Compound)
     }
 
     #[inline]
@@ -546,9 +546,9 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     {
         unsafe {
             self.write_compound_item(variant, value)?;
-            self.vec.push(Tag::End as u8);
+            self.vec.push(TagID::End as u8);
         }
-        Ok(Tag::Compound)
+        Ok(TagID::Compound)
     }
 
     #[inline]
@@ -574,7 +574,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
                 Ok(ListSerializer {
                     start_pos: old_len,
                     len: None,
-                    tag_id: Tag::End,
+                    tag_id: TagID::End,
                     serializer: &mut *self,
                 })
             }
@@ -585,7 +585,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             Ok(ListSerializer {
                 start_pos: old_len,
                 len: Some(0),
-                tag_id: Tag::End,
+                tag_id: TagID::End,
                 serializer: &mut *self,
             })
         }
@@ -650,7 +650,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             self.vec.reserve(1 + 2 + name_len + 1 + 4);
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
             // tag_id list
-            ptr::write(write_ptr, Tag::List as u8);
+            ptr::write(write_ptr, TagID::List as u8);
             // name_len
             ptr::write(
                 write_ptr.add(1).cast(),
@@ -659,7 +659,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             // name
             ptr::copy_nonoverlapping(encoded.as_ptr(), write_ptr.add(3), name_len);
             // list element tag
-            ptr::write(write_ptr.add(3 + name_len), Tag::Compound as u8);
+            ptr::write(write_ptr.add(3 + name_len), TagID::Compound as u8);
             // list length
             ptr::write(
                 write_ptr.add(3 + name_len + 1).cast(),
@@ -714,7 +714,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             self.vec.reserve(1 + 2 + name_len);
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
             // tag_id compound
-            ptr::write(write_ptr, Tag::Compound as u8);
+            ptr::write(write_ptr, TagID::Compound as u8);
             // name_len
             ptr::write(
                 write_ptr.add(1).cast(),
@@ -732,12 +732,12 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
 pub struct ListSerializer<'a, O: ByteOrder> {
     start_pos: usize,
     len: Option<u32>,
-    tag_id: Tag,
+    tag_id: TagID,
     serializer: &'a mut Serializer<O>,
 }
 
 impl<'a, O: ByteOrder> ser::SerializeSeq for ListSerializer<'a, O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     fn serialize_element<T>(&mut self, value: &T) -> std::result::Result<(), Self::Error>
@@ -749,7 +749,7 @@ impl<'a, O: ByteOrder> ser::SerializeSeq for ListSerializer<'a, O> {
             assert!(len < u32::MAX, "list length too long");
             self.len = Some(len + 1);
         }
-        if self.tag_id == Tag::End {
+        if self.tag_id == TagID::End {
             cold_path();
             self.tag_id = tag_id;
         } else if self.tag_id != tag_id {
@@ -772,12 +772,12 @@ impl<'a, O: ByteOrder> ser::SerializeSeq for ListSerializer<'a, O> {
                 );
             }
         }
-        Ok(Tag::List)
+        Ok(TagID::List)
     }
 }
 
 impl<O: ByteOrder> ser::SerializeSeq for &mut Serializer<O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     #[inline]
@@ -790,12 +790,12 @@ impl<O: ByteOrder> ser::SerializeSeq for &mut Serializer<O> {
 
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
-        Ok(Tag::List)
+        Ok(TagID::List)
     }
 }
 
 impl<O: ByteOrder> ser::SerializeTuple for &mut Serializer<O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     #[inline]
@@ -816,15 +816,15 @@ impl<O: ByteOrder> ser::SerializeTuple for &mut Serializer<O> {
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
         match self.array_mode {
-            ArrayMode::IntArray => Ok(Tag::IntArray),
-            ArrayMode::LongArray => Ok(Tag::LongArray),
-            ArrayMode::None => Ok(Tag::List),
+            ArrayMode::IntArray => Ok(TagID::IntArray),
+            ArrayMode::LongArray => Ok(TagID::LongArray),
+            ArrayMode::None => Ok(TagID::List),
         }
     }
 }
 
 impl<O: ByteOrder> ser::SerializeTupleStruct for &mut Serializer<O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     #[inline]
@@ -837,12 +837,12 @@ impl<O: ByteOrder> ser::SerializeTupleStruct for &mut Serializer<O> {
 
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
-        Ok(Tag::List)
+        Ok(TagID::List)
     }
 }
 
 impl<O: ByteOrder> ser::SerializeTupleVariant for &mut Serializer<O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     #[inline]
@@ -855,8 +855,8 @@ impl<O: ByteOrder> ser::SerializeTupleVariant for &mut Serializer<O> {
 
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
-        self.vec.push(Tag::End as u8);
-        Ok(Tag::Compound)
+        self.vec.push(TagID::End as u8);
+        Ok(TagID::Compound)
     }
 }
 
@@ -1118,7 +1118,7 @@ pub struct MapSerializer<'a, O: ByteOrder> {
 }
 
 impl<'a, O: ByteOrder> ser::SerializeMap for MapSerializer<'a, O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     fn serialize_key<T>(&mut self, key: &T) -> std::result::Result<(), Self::Error>
@@ -1188,13 +1188,13 @@ impl<'a, O: ByteOrder> ser::SerializeMap for MapSerializer<'a, O> {
     }
 
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
-        self.serializer.vec.push(Tag::End as u8);
-        Ok(Tag::Compound)
+        self.serializer.vec.push(TagID::End as u8);
+        Ok(TagID::Compound)
     }
 }
 
 impl<O: ByteOrder> ser::SerializeStruct for &mut Serializer<O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     #[inline]
@@ -1211,13 +1211,13 @@ impl<O: ByteOrder> ser::SerializeStruct for &mut Serializer<O> {
 
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
-        self.vec.push(Tag::End as u8);
-        Ok(Tag::Compound)
+        self.vec.push(TagID::End as u8);
+        Ok(TagID::Compound)
     }
 }
 
 impl<O: ByteOrder> ser::SerializeStructVariant for &mut Serializer<O> {
-    type Ok = Tag;
+    type Ok = TagID;
     type Error = Error;
 
     #[inline]
@@ -1235,7 +1235,7 @@ impl<O: ByteOrder> ser::SerializeStructVariant for &mut Serializer<O> {
     #[inline]
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
         self.vec
-            .extend_from_slice(&[Tag::End as u8, Tag::End as u8]);
-        Ok(Tag::Compound)
+            .extend_from_slice(&[TagID::End as u8, TagID::End as u8]);
+        Ok(TagID::Compound)
     }
 }

@@ -6,7 +6,7 @@ use crate::{
     ByteOrder, ImmutableCompound, ImmutableList, ImmutableString, IntoOwnedValue, MutableCompound,
     MutableList, OwnedCompound, OwnedList, OwnedValue, ReadableConfig, Result,
     ScopedReadableCompound, ScopedReadableList, ScopedReadableValue, ScopedWritableCompound,
-    ScopedWritableList, ScopedWritableValue, Tag, ValueMutScoped, ValueScoped, WritableConfig,
+    ScopedWritableList, ScopedWritableValue, TagID, ValueMutScoped, ValueScoped, WritableConfig,
     index::Index,
     mutable::trait_impl::Config,
     view::{StringViewMut, VecViewMut},
@@ -16,7 +16,7 @@ impl<O: ByteOrder> ScopedReadableValue<'static> for OwnedValue<O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 
@@ -476,7 +476,7 @@ impl<O: ByteOrder> ScopedReadableList<'static> for OwnedList<O> {
     type Config = Config<O>;
 
     #[inline]
-    fn tag_id(&self) -> Tag {
+    fn tag_id(&self) -> TagID {
         self.tag_id()
     }
 

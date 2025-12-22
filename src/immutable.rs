@@ -50,7 +50,7 @@ use std::{any::TypeId, io::Write, ptr};
 use bytes::Bytes;
 use zerocopy::{IntoBytes, byteorder};
 
-use crate::{ByteOrder, Error, Result, Tag, cold_path};
+use crate::{ByteOrder, Error, Result, TagID, cold_path};
 
 mod mark;
 mod read;
@@ -177,7 +177,7 @@ impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
     pub fn root<'doc>(&'doc self) -> BorrowedValue<'doc, O> {
         let root_tag = unsafe { *self.source.cast() };
 
-        if root_tag == Tag::End {
+        if root_tag == TagID::End {
             cold_path();
             return BorrowedValue::End;
         }
@@ -306,9 +306,9 @@ mod shared {
         /// Returns the root value of the document.
         #[inline]
         pub fn root<O: ByteOrder>(self: Arc<Self>) -> SharedValue<O> {
-            let root_tag = unsafe { Tag::from_u8_unchecked(*self.source.get_unchecked(0)) };
+            let root_tag = unsafe { TagID::from_u8_unchecked(*self.source.get_unchecked(0)) };
 
-            if root_tag == Tag::End {
+            if root_tag == TagID::End {
                 cold_path();
                 return SharedValue::End;
             }
@@ -341,14 +341,14 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
             value::ReadonlyValue::Byte(value) => {
                 let mut buf = Vec::<u8>::with_capacity(4);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Byte as u8, 0u8, 0u8, *value as u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Byte as u8, 0u8, 0u8, *value as u8]);
                 buf.set_len(4);
                 Ok(buf)
             }
             value::ReadonlyValue::Short(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 2);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Short as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Short as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::I16::<TARGET>::new(*value).to_bytes(),
@@ -359,7 +359,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
             value::ReadonlyValue::Int(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Int as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Int as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::I32::<TARGET>::new(*value).to_bytes(),
@@ -370,7 +370,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
             value::ReadonlyValue::Long(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Long as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Long as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::I64::<TARGET>::new(*value).to_bytes(),
@@ -381,7 +381,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
             value::ReadonlyValue::Float(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Float as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Float as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::F32::<TARGET>::new(*value).to_bytes(),
@@ -392,7 +392,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
             value::ReadonlyValue::Double(value) => {
                 let mut buf = Vec::<u8>::with_capacity(1 + 2 + 8);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Double as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Double as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(3).cast(),
                     byteorder::F64::<TARGET>::new(*value).to_bytes(),
@@ -405,7 +405,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 let len = value.data.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + 4 + len);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::ByteArray as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::ByteArray as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
                     byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
@@ -419,7 +419,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 let len = value.data.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + 2 + len);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::String as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::String as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
                     byteorder::U16::<TARGET>::new(len as u16).to_bytes(),
@@ -433,7 +433,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 let payload_len = payload.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::List as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
                 ptr::copy_nonoverlapping(payload.as_ptr(), buf_ptr.add(3), payload_len);
                 if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
                     let size_written =
@@ -448,7 +448,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 let payload_len = payload.len();
                 let mut buf = Vec::<u8>::with_capacity(3 + payload_len);
                 let buf_ptr = buf.as_mut_ptr();
-                ptr::write(buf_ptr.cast(), [Tag::Compound as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
                 ptr::copy_nonoverlapping(payload.as_ptr(), buf_ptr.add(3), payload_len);
                 if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
                     let size_written =
@@ -465,7 +465,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 let mut buf = Vec::<u8>::with_capacity(3 + 4 + len_bytes);
                 let mut buf_ptr = buf.as_mut_ptr();
                 // head
-                ptr::write(buf_ptr.cast(), [Tag::IntArray as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::IntArray as u8, 0u8, 0u8]);
                 // length
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
@@ -494,7 +494,7 @@ pub(crate) fn write_value_to_vec<'s, D: value::Document, SOURCE: ByteOrder, TARG
                 let mut buf = Vec::<u8>::with_capacity(3 + 4 + len_bytes);
                 let mut buf_ptr = buf.as_mut_ptr();
                 // head
-                ptr::write(buf_ptr.cast(), [Tag::LongArray as u8, 0u8, 0u8]);
+                ptr::write(buf_ptr.cast(), [TagID::LongArray as u8, 0u8, 0u8]);
                 // length
                 ptr::write(
                     buf_ptr.add(1 + 2).cast(),
@@ -533,11 +533,11 @@ pub(crate) fn write_value_to_writer<
         match value {
             value::ReadonlyValue::End => writer.write_all(&[0]).map_err(Error::IO),
             value::ReadonlyValue::Byte(value) => writer
-                .write_all(&[Tag::Byte as u8, 0u8, 0u8, *value as u8])
+                .write_all(&[TagID::Byte as u8, 0u8, 0u8, *value as u8])
                 .map_err(Error::IO),
             value::ReadonlyValue::Short(value) => {
                 let mut buf = [0u8; 1 + 2 + 2];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Short as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Short as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::I16::<TARGET>::new(*value).to_bytes(),
@@ -546,7 +546,7 @@ pub(crate) fn write_value_to_writer<
             }
             value::ReadonlyValue::Int(value) => {
                 let mut buf = [0u8; 1 + 2 + 4];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Int as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Int as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::I32::<TARGET>::new(*value).to_bytes(),
@@ -555,7 +555,7 @@ pub(crate) fn write_value_to_writer<
             }
             value::ReadonlyValue::Long(value) => {
                 let mut buf = [0u8; 1 + 2 + 8];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Long as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Long as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::I64::<TARGET>::new(*value).to_bytes(),
@@ -564,7 +564,7 @@ pub(crate) fn write_value_to_writer<
             }
             value::ReadonlyValue::Float(value) => {
                 let mut buf = [0u8; 1 + 2 + 4];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Float as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Float as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::F32::<TARGET>::new(*value).to_bytes(),
@@ -573,7 +573,7 @@ pub(crate) fn write_value_to_writer<
             }
             value::ReadonlyValue::Double(value) => {
                 let mut buf = [0u8; 1 + 2 + 8];
-                ptr::write(buf.as_mut_ptr().cast(), [Tag::Double as u8, 0u8, 0u8]);
+                ptr::write(buf.as_mut_ptr().cast(), [TagID::Double as u8, 0u8, 0u8]);
                 ptr::write(
                     buf.as_mut_ptr().add(3).cast(),
                     byteorder::F64::<TARGET>::new(*value).to_bytes(),
@@ -584,7 +584,7 @@ pub(crate) fn write_value_to_writer<
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
-                    [Tag::ByteArray as u8, 0u8, 0u8],
+                    [TagID::ByteArray as u8, 0u8, 0u8],
                 );
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),
@@ -595,7 +595,7 @@ pub(crate) fn write_value_to_writer<
             }
             value::ReadonlyValue::String(value) => {
                 let mut buf_head = [0u8; 1 + 2 + 2];
-                ptr::write(buf_head.as_mut_ptr().cast(), [Tag::String as u8, 0u8, 0u8]);
+                ptr::write(buf_head.as_mut_ptr().cast(), [TagID::String as u8, 0u8, 0u8]);
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),
                     byteorder::U16::<TARGET>::new(value.data.len() as u16).to_bytes(),
@@ -605,7 +605,7 @@ pub(crate) fn write_value_to_writer<
             }
             value::ReadonlyValue::List(value) => {
                 writer
-                    .write_all(&[Tag::List as u8, 0u8, 0u8])
+                    .write_all(&[TagID::List as u8, 0u8, 0u8])
                     .map_err(Error::IO)?;
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     writer.write_all(value.data.as_bytes()).map_err(Error::IO)
@@ -620,7 +620,7 @@ pub(crate) fn write_value_to_writer<
             }
             value::ReadonlyValue::Compound(value) => {
                 writer
-                    .write_all(&[Tag::Compound as u8, 0u8, 0u8])
+                    .write_all(&[TagID::Compound as u8, 0u8, 0u8])
                     .map_err(Error::IO)?;
                 if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
                     writer.write_all(value.data.as_bytes()).map_err(Error::IO)
@@ -637,7 +637,7 @@ pub(crate) fn write_value_to_writer<
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
-                    [Tag::IntArray as u8, 0u8, 0u8],
+                    [TagID::IntArray as u8, 0u8, 0u8],
                 );
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),
@@ -659,7 +659,7 @@ pub(crate) fn write_value_to_writer<
                 let mut buf_head = [0u8; 1 + 2 + 4];
                 ptr::write(
                     buf_head.as_mut_ptr().cast(),
-                    [Tag::LongArray as u8, 0u8, 0u8],
+                    [TagID::LongArray as u8, 0u8, 0u8],
                 );
                 ptr::write(
                     buf_head.as_mut_ptr().add(3).cast(),

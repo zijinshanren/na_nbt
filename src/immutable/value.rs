@@ -3,8 +3,12 @@ use std::{borrow::Cow, io::Write, marker::PhantomData, ops::Deref, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, EMPTY_COMPOUND, EMPTY_LIST, Result, Tag, cold_path,
-    immutable::{mark::Mark, typed_list::ReadonlyPrimitiveList, util::tag_size},
+    ByteOrder, EMPTY_COMPOUND, EMPTY_LIST, NBT, NBTExtract, Result, TagByte, TagByteArray,
+    TagCompound, TagDouble, TagEnd, TagFloat, TagID, TagInt, TagIntArray, TagList, TagLong,
+    TagLongArray, TagShort, TagString, cold_path,
+    immutable::{
+        mark::Mark, trait_impl::Config, typed_list::ReadonlyPrimitiveList, util::tag_size,
+    },
     index::Index,
     write_value_to_vec, write_value_to_writer,
 };
@@ -125,7 +129,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     /// - `data` points to valid NBT data for the given tag type
     /// - `mark` points to valid parsing metadata
     /// - The data remains valid for the `'doc` lifetime
-    pub unsafe fn read(tag_id: Tag, data: *const u8, mark: *const Mark, doc: D) -> Self {
+    pub unsafe fn read(tag_id: TagID, data: *const u8, mark: *const Mark, doc: D) -> Self {
         unsafe {
             macro_rules! get {
                 ($t:tt, $l:tt) => {{
@@ -154,237 +158,207 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
             }
 
             match tag_id {
-                Tag::End => ReadonlyValue::End,
-                Tag::Byte => ReadonlyValue::Byte(*data.cast()),
-                Tag::Short => {
+                TagID::End => ReadonlyValue::End,
+                TagID::Byte => ReadonlyValue::Byte(*data.cast()),
+                TagID::Short => {
                     ReadonlyValue::Short(byteorder::I16::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::Int => ReadonlyValue::Int(byteorder::I32::<O>::from_bytes(*data.cast()).get()),
-                Tag::Long => {
+                TagID::Int => {
+                    ReadonlyValue::Int(byteorder::I32::<O>::from_bytes(*data.cast()).get())
+                }
+                TagID::Long => {
                     ReadonlyValue::Long(byteorder::I64::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::Float => {
+                TagID::Float => {
                     ReadonlyValue::Float(byteorder::F32::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::Double => {
+                TagID::Double => {
                     ReadonlyValue::Double(byteorder::F64::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::ByteArray => get!(ByteArray, U32),
-                Tag::String => get!(String, U16),
-                Tag::List => get_composite!(List, ReadonlyList),
-                Tag::Compound => get_composite!(Compound, ReadonlyCompound),
-                Tag::IntArray => get!(IntArray, U32),
-                Tag::LongArray => get!(LongArray, U32),
+                TagID::ByteArray => get!(ByteArray, U32),
+                TagID::String => get!(String, U16),
+                TagID::List => get_composite!(List, ReadonlyList),
+                TagID::Compound => get_composite!(Compound, ReadonlyCompound),
+                TagID::IntArray => get!(IntArray, U32),
+                TagID::LongArray => get!(LongArray, U32),
             }
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagEnd
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::End => Some(()),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagByte
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::Byte(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagShort
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::Short(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagInt
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::Int(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagLong
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::Long(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagFloat
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::Float(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagDouble
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::Double(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagByteArray
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::ByteArray(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagString
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::String(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagList
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::List(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagCompound
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::Compound(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagIntArray
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::IntArray(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> NBTExtract<'doc, Config<O, D>, ReadonlyValue<'doc, O, D>>
+    for TagLongArray
+{
+    fn extract(value: ReadonlyValue<'doc, O, D>) -> Option<Self::Type<'doc, Config<O, D>>> {
+        match value {
+            ReadonlyValue::LongArray(value) => Some(value),
+            _ => None,
         }
     }
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     #[inline]
-    pub fn tag_id(&self) -> Tag {
+    pub fn tag_id(&self) -> TagID {
         match self {
-            ReadonlyValue::End => Tag::End,
-            ReadonlyValue::Byte(_) => Tag::Byte,
-            ReadonlyValue::Short(_) => Tag::Short,
-            ReadonlyValue::Int(_) => Tag::Int,
-            ReadonlyValue::Long(_) => Tag::Long,
-            ReadonlyValue::Float(_) => Tag::Float,
-            ReadonlyValue::Double(_) => Tag::Double,
-            ReadonlyValue::ByteArray(_) => Tag::ByteArray,
-            ReadonlyValue::String(_) => Tag::String,
-            ReadonlyValue::List(_) => Tag::List,
-            ReadonlyValue::Compound(_) => Tag::Compound,
-            ReadonlyValue::IntArray(_) => Tag::IntArray,
-            ReadonlyValue::LongArray(_) => Tag::LongArray,
+            ReadonlyValue::End => TagID::End,
+            ReadonlyValue::Byte(_) => TagID::Byte,
+            ReadonlyValue::Short(_) => TagID::Short,
+            ReadonlyValue::Int(_) => TagID::Int,
+            ReadonlyValue::Long(_) => TagID::Long,
+            ReadonlyValue::Float(_) => TagID::Float,
+            ReadonlyValue::Double(_) => TagID::Double,
+            ReadonlyValue::ByteArray(_) => TagID::ByteArray,
+            ReadonlyValue::String(_) => TagID::String,
+            ReadonlyValue::List(_) => TagID::List,
+            ReadonlyValue::Compound(_) => TagID::Compound,
+            ReadonlyValue::IntArray(_) => TagID::IntArray,
+            ReadonlyValue::LongArray(_) => TagID::LongArray,
         }
     }
 
     #[inline]
-    pub fn as_end(&self) -> Option<()> {
-        match self {
-            ReadonlyValue::End => Some(()),
-            _ => None,
-        }
+    pub fn into<T: NBTExtract<'doc, Config<O, D>, Self>>(
+        self,
+    ) -> Option<T::Type<'doc, Config<O, D>>> {
+        T::extract(self)
     }
 
     #[inline]
-    pub fn is_end(&self) -> bool {
-        matches!(self, ReadonlyValue::End)
-    }
-
-    #[inline]
-    pub fn as_byte(&self) -> Option<i8> {
-        match self {
-            ReadonlyValue::Byte(value) => Some(*value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_byte(&self) -> bool {
-        matches!(self, ReadonlyValue::Byte(_))
-    }
-
-    #[inline]
-    pub fn as_short(&self) -> Option<i16> {
-        match self {
-            ReadonlyValue::Short(value) => Some(*value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_short(&self) -> bool {
-        matches!(self, ReadonlyValue::Short(_))
-    }
-
-    #[inline]
-    pub fn as_int(&self) -> Option<i32> {
-        match self {
-            ReadonlyValue::Int(value) => Some(*value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_int(&self) -> bool {
-        matches!(self, ReadonlyValue::Int(_))
-    }
-
-    #[inline]
-    pub fn as_long(&self) -> Option<i64> {
-        match self {
-            ReadonlyValue::Long(value) => Some(*value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_long(&self) -> bool {
-        matches!(self, ReadonlyValue::Long(_))
-    }
-
-    #[inline]
-    pub fn as_float(&self) -> Option<f32> {
-        match self {
-            ReadonlyValue::Float(value) => Some(*value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_float(&self) -> bool {
-        matches!(self, ReadonlyValue::Float(_))
-    }
-
-    #[inline]
-    pub fn as_double(&self) -> Option<f64> {
-        match self {
-            ReadonlyValue::Double(value) => Some(*value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_double(&self) -> bool {
-        matches!(self, ReadonlyValue::Double(_))
-    }
-
-    #[inline]
-    pub fn as_byte_array<'a>(&'a self) -> Option<&'a ReadonlyArray<'doc, i8, D>>
-    where
-        'doc: 'a,
-    {
-        match self {
-            ReadonlyValue::ByteArray(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_byte_array(&self) -> bool {
-        matches!(self, ReadonlyValue::ByteArray(_))
-    }
-
-    #[inline]
-    pub fn as_string<'a>(&'a self) -> Option<&'a ReadonlyString<'doc, D>>
-    where
-        'doc: 'a,
-    {
-        match self {
-            ReadonlyValue::String(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_string(&self) -> bool {
-        matches!(self, ReadonlyValue::String(_))
-    }
-
-    #[inline]
-    pub fn as_list<'a>(&'a self) -> Option<&'a ReadonlyList<'doc, O, D>>
-    where
-        'doc: 'a,
-    {
-        match self {
-            ReadonlyValue::List(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_list(&self) -> bool {
-        matches!(self, ReadonlyValue::List(_))
-    }
-
-    #[inline]
-    pub fn as_compound<'a>(&'a self) -> Option<&'a ReadonlyCompound<'doc, O, D>>
-    where
-        'doc: 'a,
-    {
-        match self {
-            ReadonlyValue::Compound(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_compound(&self) -> bool {
-        matches!(self, ReadonlyValue::Compound(_))
-    }
-
-    #[inline]
-    pub fn as_int_array<'a>(&'a self) -> Option<&'a ReadonlyArray<'doc, byteorder::I32<O>, D>>
-    where
-        'doc: 'a,
-    {
-        match self {
-            ReadonlyValue::IntArray(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_int_array(&self) -> bool {
-        matches!(self, ReadonlyValue::IntArray(_))
-    }
-
-    #[inline]
-    pub fn as_long_array<'a>(&'a self) -> Option<&'a ReadonlyArray<'doc, byteorder::I64<O>, D>>
-    where
-        'doc: 'a,
-    {
-        match self {
-            ReadonlyValue::LongArray(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn is_long_array(&self) -> bool {
-        matches!(self, ReadonlyValue::LongArray(_))
+    pub fn is<T: NBT>(&self) -> bool {
+        self.tag_id() == T::TAG_ID
     }
 
     #[inline]
@@ -653,7 +627,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     ///
     /// All elements in an NBT list have the same type.
     #[inline]
-    pub fn tag_id(&self) -> Tag {
+    pub fn tag_id(&self) -> TagID {
         unsafe { *self.data.as_ptr().cast() }
     }
 
@@ -719,36 +693,36 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         }
 
         match self.tag_id() {
-            Tag::End => Some(ReadonlyValue::End),
-            Tag::Byte => Some(ReadonlyValue::Byte(unsafe {
+            TagID::End => Some(ReadonlyValue::End),
+            TagID::Byte => Some(ReadonlyValue::Byte(unsafe {
                 *self.data.as_ptr().add(1 + 4 + index).cast()
             })),
-            Tag::Short => Some(ReadonlyValue::Short(unsafe {
+            TagID::Short => Some(ReadonlyValue::Short(unsafe {
                 byteorder::I16::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 2).cast())
                     .get()
             })),
-            Tag::Int => Some(ReadonlyValue::Int(unsafe {
+            TagID::Int => Some(ReadonlyValue::Int(unsafe {
                 byteorder::I32::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 4).cast())
                     .get()
             })),
-            Tag::Long => Some(ReadonlyValue::Long(unsafe {
+            TagID::Long => Some(ReadonlyValue::Long(unsafe {
                 byteorder::I64::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 8).cast())
                     .get()
             })),
-            Tag::Float => Some(ReadonlyValue::Float(unsafe {
+            TagID::Float => Some(ReadonlyValue::Float(unsafe {
                 byteorder::F32::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 4).cast())
                     .get()
             })),
-            Tag::Double => Some(ReadonlyValue::Double(unsafe {
+            TagID::Double => Some(ReadonlyValue::Double(unsafe {
                 byteorder::F64::<O>::from_bytes(*self.data.as_ptr().add(1 + 4 + index * 8).cast())
                     .get()
             })),
-            Tag::ByteArray => get!(ByteArray, U32),
-            Tag::String => get!(String, U16),
-            Tag::List => get_composite!(List, ReadonlyList),
-            Tag::Compound => get_composite!(Compound, ReadonlyCompound),
-            Tag::IntArray => get!(IntArray, U32),
-            Tag::LongArray => get!(LongArray, U32),
+            TagID::ByteArray => get!(ByteArray, U32),
+            TagID::String => get!(String, U16),
+            TagID::List => get_composite!(List, ReadonlyList),
+            TagID::Compound => get_composite!(Compound, ReadonlyCompound),
+            TagID::IntArray => get!(IntArray, U32),
+            TagID::LongArray => get!(LongArray, U32),
         }
     }
 
@@ -766,7 +740,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 
     pub fn as_end_list(&self) -> Option<ReadonlyPrimitiveList<'doc, O, D, (), ()>> {
-        (self.tag_id() == Tag::End).then_some(ReadonlyPrimitiveList {
+        (self.tag_id() == TagID::End).then_some(ReadonlyPrimitiveList {
             data: unsafe {
                 slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
             },
@@ -776,7 +750,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 
     pub fn as_byte_list(&self) -> Option<ReadonlyPrimitiveList<'doc, O, D, i8, i8>> {
-        (self.tag_id() == Tag::Byte).then_some(ReadonlyPrimitiveList {
+        (self.tag_id() == TagID::Byte).then_some(ReadonlyPrimitiveList {
             data: unsafe {
                 slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
             },
@@ -788,7 +762,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     pub fn as_short_list(
         &self,
     ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::I16<O>, i16>> {
-        (self.tag_id() == Tag::Short).then_some(ReadonlyPrimitiveList {
+        (self.tag_id() == TagID::Short).then_some(ReadonlyPrimitiveList {
             data: unsafe {
                 slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
             },
@@ -798,7 +772,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 
     pub fn as_int_list(&self) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::I32<O>, i32>> {
-        (self.tag_id() == Tag::Int).then_some(ReadonlyPrimitiveList {
+        (self.tag_id() == TagID::Int).then_some(ReadonlyPrimitiveList {
             data: unsafe {
                 slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
             },
@@ -810,7 +784,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     pub fn as_long_list(
         &self,
     ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::I64<O>, i64>> {
-        (self.tag_id() == Tag::Long).then_some(ReadonlyPrimitiveList {
+        (self.tag_id() == TagID::Long).then_some(ReadonlyPrimitiveList {
             data: unsafe {
                 slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
             },
@@ -822,7 +796,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     pub fn as_float_list(
         &self,
     ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::F32<O>, f32>> {
-        (self.tag_id() == Tag::Float).then_some(ReadonlyPrimitiveList {
+        (self.tag_id() == TagID::Float).then_some(ReadonlyPrimitiveList {
             data: unsafe {
                 slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
             },
@@ -834,7 +808,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     pub fn as_double_list(
         &self,
     ) -> Option<ReadonlyPrimitiveList<'doc, O, D, byteorder::F64<O>, f64>> {
-        (self.tag_id() == Tag::Double).then_some(ReadonlyPrimitiveList {
+        (self.tag_id() == TagID::Double).then_some(ReadonlyPrimitiveList {
             data: unsafe {
                 slice::from_raw_parts(self.data.as_ptr().add(1 + 4).cast(), self.len())
             },
@@ -849,7 +823,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
 /// This iterator yields [`ReadonlyValue`]s and implements [`ExactSizeIterator`].
 #[derive(Clone)]
 pub struct ReadonlyListIter<'doc, O: ByteOrder, D: Document> {
-    tag_id: Tag,
+    tag_id: TagID,
     remaining: u32,
     data: *const u8,
     mark: *const Mark,
@@ -860,7 +834,7 @@ pub struct ReadonlyListIter<'doc, O: ByteOrder, D: Document> {
 impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyListIter<'doc, O, D> {
     fn default() -> Self {
         Self {
-            tag_id: Tag::End,
+            tag_id: TagID::End,
             remaining: 0,
             data: ptr::null(),
             mark: ptr::null(),
@@ -990,7 +964,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
                 let tag_id = *ptr.cast();
                 ptr = ptr.add(1);
 
-                if tag_id == Tag::End {
+                if tag_id == TagID::End {
                     cold_path();
                     return None;
                 }
@@ -1059,7 +1033,7 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyCompoundIter<'doc, O,
         unsafe {
             let tag_id = *self.data.cast();
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 return None;
             }

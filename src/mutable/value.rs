@@ -3,7 +3,7 @@ use std::{borrow::Cow, io::Write, marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, EMPTY_COMPOUND, EMPTY_LIST, Result, ScopedReadableValue as _, Tag,
+    ByteOrder, EMPTY_COMPOUND, EMPTY_LIST, Result, ScopedReadableValue as _, TagID,
     index::Index,
     mutable::{
         iter::{ImmutableCompoundIter, ImmutableListIter},
@@ -45,7 +45,7 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
     /// # Safety
     ///
     /// .
-    pub unsafe fn read(tag_id: Tag, data: *const u8) -> Self {
+    pub unsafe fn read(tag_id: TagID, data: *const u8) -> Self {
         unsafe {
             macro_rules! get {
                 ($t:tt) => {{
@@ -63,25 +63,25 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
             }
 
             match tag_id {
-                Tag::End => ImmutableValue::End,
-                Tag::Byte => ImmutableValue::Byte(*data.cast()),
-                Tag::Short => {
+                TagID::End => ImmutableValue::End,
+                TagID::Byte => ImmutableValue::Byte(*data.cast()),
+                TagID::Short => {
                     ImmutableValue::Short(byteorder::I16::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::Int => {
+                TagID::Int => {
                     ImmutableValue::Int(byteorder::I32::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::Long => {
+                TagID::Long => {
                     ImmutableValue::Long(byteorder::I64::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::Float => {
+                TagID::Float => {
                     ImmutableValue::Float(byteorder::F32::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::Double => {
+                TagID::Double => {
                     ImmutableValue::Double(byteorder::F64::<O>::from_bytes(*data.cast()).get())
                 }
-                Tag::ByteArray => get!(ByteArray),
-                Tag::String => {
+                TagID::ByteArray => get!(ByteArray),
+                TagID::String => {
                     let addr = usize::from_ne_bytes(*data.cast());
                     let ptr = ptr::with_exposed_provenance::<u8>(addr);
                     let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -89,10 +89,10 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
                         data: slice::from_raw_parts(ptr, len),
                     })
                 }
-                Tag::List => get!(List, ImmutableList),
-                Tag::Compound => get!(Compound, ImmutableCompound),
-                Tag::IntArray => get!(IntArray),
-                Tag::LongArray => get!(LongArray),
+                TagID::List => get!(List, ImmutableList),
+                TagID::Compound => get!(Compound, ImmutableCompound),
+                TagID::IntArray => get!(IntArray),
+                TagID::LongArray => get!(LongArray),
             }
         }
     }
@@ -100,21 +100,21 @@ impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
 
 impl<'s, O: ByteOrder> ImmutableValue<'s, O> {
     #[inline]
-    pub fn tag_id(&self) -> Tag {
+    pub fn tag_id(&self) -> TagID {
         match self {
-            ImmutableValue::End => Tag::End,
-            ImmutableValue::Byte(_) => Tag::Byte,
-            ImmutableValue::Short(_) => Tag::Short,
-            ImmutableValue::Int(_) => Tag::Int,
-            ImmutableValue::Long(_) => Tag::Long,
-            ImmutableValue::Float(_) => Tag::Float,
-            ImmutableValue::Double(_) => Tag::Double,
-            ImmutableValue::ByteArray(_) => Tag::ByteArray,
-            ImmutableValue::String(_) => Tag::String,
-            ImmutableValue::List(_) => Tag::List,
-            ImmutableValue::Compound(_) => Tag::Compound,
-            ImmutableValue::IntArray(_) => Tag::IntArray,
-            ImmutableValue::LongArray(_) => Tag::LongArray,
+            ImmutableValue::End => TagID::End,
+            ImmutableValue::Byte(_) => TagID::Byte,
+            ImmutableValue::Short(_) => TagID::Short,
+            ImmutableValue::Int(_) => TagID::Int,
+            ImmutableValue::Long(_) => TagID::Long,
+            ImmutableValue::Float(_) => TagID::Float,
+            ImmutableValue::Double(_) => TagID::Double,
+            ImmutableValue::ByteArray(_) => TagID::ByteArray,
+            ImmutableValue::String(_) => TagID::String,
+            ImmutableValue::List(_) => TagID::List,
+            ImmutableValue::Compound(_) => TagID::Compound,
+            ImmutableValue::IntArray(_) => TagID::IntArray,
+            ImmutableValue::LongArray(_) => TagID::LongArray,
         }
     }
 
@@ -383,7 +383,7 @@ impl<'s, O: ByteOrder> IntoIterator for ImmutableList<'s, O> {
 
 impl<'s, O: ByteOrder> ImmutableList<'s, O> {
     #[inline]
-    pub fn tag_id(&self) -> Tag {
+    pub fn tag_id(&self) -> TagID {
         list_tag_id(self.data)
     }
 

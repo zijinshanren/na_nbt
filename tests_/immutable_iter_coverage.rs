@@ -1,82 +1,82 @@
-use na_nbt::{Tag, read_borrowed};
+use na_nbt::{TagID, read_borrowed};
 use zerocopy::byteorder::BigEndian;
 
 fn create_all_types_compound() -> Vec<u8> {
     let mut buf = vec![0x0A, 0x00, 0x00];
 
     // Byte
-    buf.push(Tag::Byte as u8);
+    buf.push(TagID::Byte as u8);
     buf.extend_from_slice(&1u16.to_be_bytes());
     buf.push(b'b');
     buf.push(1);
 
     // Short
-    buf.push(Tag::Short as u8);
+    buf.push(TagID::Short as u8);
     buf.extend_from_slice(&1u16.to_be_bytes());
     buf.push(b's');
     buf.extend_from_slice(&2u16.to_be_bytes());
 
     // Int
-    buf.push(Tag::Int as u8);
+    buf.push(TagID::Int as u8);
     buf.extend_from_slice(&1u16.to_be_bytes());
     buf.push(b'i');
     buf.extend_from_slice(&3u32.to_be_bytes());
 
     // Long
-    buf.push(Tag::Long as u8);
+    buf.push(TagID::Long as u8);
     buf.extend_from_slice(&1u16.to_be_bytes());
     buf.push(b'l');
     buf.extend_from_slice(&4u64.to_be_bytes());
 
     // Float
-    buf.push(Tag::Float as u8);
+    buf.push(TagID::Float as u8);
     buf.extend_from_slice(&1u16.to_be_bytes());
     buf.push(b'f');
     buf.extend_from_slice(&5.0f32.to_be_bytes());
 
     // Double
-    buf.push(Tag::Double as u8);
+    buf.push(TagID::Double as u8);
     buf.extend_from_slice(&1u16.to_be_bytes());
     buf.push(b'd');
     buf.extend_from_slice(&6.0f64.to_be_bytes());
 
     // ByteArray
-    buf.push(Tag::ByteArray as u8);
+    buf.push(TagID::ByteArray as u8);
     buf.extend_from_slice(&2u16.to_be_bytes());
     buf.extend_from_slice(b"ba");
     buf.extend_from_slice(&2u32.to_be_bytes());
     buf.extend_from_slice(&[7, 8]);
 
     // String
-    buf.push(Tag::String as u8);
+    buf.push(TagID::String as u8);
     buf.extend_from_slice(&2u16.to_be_bytes());
     buf.extend_from_slice(b"st");
     buf.extend_from_slice(&3u16.to_be_bytes());
     buf.extend_from_slice(b"str");
 
     // List (of bytes)
-    buf.push(Tag::List as u8);
+    buf.push(TagID::List as u8);
     buf.extend_from_slice(&2u16.to_be_bytes());
     buf.extend_from_slice(b"li");
-    buf.push(Tag::Byte as u8);
+    buf.push(TagID::Byte as u8);
     buf.extend_from_slice(&1u32.to_be_bytes());
     buf.push(10);
 
     // Compound
-    buf.push(Tag::Compound as u8);
+    buf.push(TagID::Compound as u8);
     buf.extend_from_slice(&2u16.to_be_bytes());
     buf.extend_from_slice(b"co");
-    buf.push(Tag::End as u8); // Empty compound
+    buf.push(TagID::End as u8); // Empty compound
 
     // IntArray
-    buf.push(Tag::IntArray as u8);
+    buf.push(TagID::IntArray as u8);
     buf.extend_from_slice(&2u16.to_be_bytes());
     buf.extend_from_slice(b"ia");
     buf.extend_from_slice(&1u32.to_be_bytes());
     buf.extend_from_slice(&11u32.to_be_bytes());
 
     // LongArray
-    buf.push(Tag::LongArray as u8);
+    buf.push(TagID::LongArray as u8);
     buf.extend_from_slice(&2u16.to_be_bytes());
     buf.extend_from_slice(b"la");
     buf.extend_from_slice(&1u32.to_be_bytes());
