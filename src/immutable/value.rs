@@ -94,6 +94,11 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
         }
     }
 
+    #[inline]
+    pub fn is<T: NBT>(&self) -> bool {
+        self.tag_id() == T::TAG_ID
+    }
+
     /// Returns a reference to the peek unchecked of this [`ReadonlyValue<O, D>`].
     ///
     /// # Safety
@@ -168,6 +173,11 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
         'doc: 'a,
     {
         self.peek::<T>().cloned()
+    }
+
+    #[inline]
+    fn is<T: NBT>(&self) -> bool {
+        self.is::<T>()
     }
 
     #[inline]

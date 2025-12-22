@@ -146,6 +146,11 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
     }
 
     #[inline]
+    fn is<T: NBT>(&self) -> bool {
+        self.is::<T>()
+    }
+
+    #[inline]
     fn len(&self) -> usize {
         self.len()
     }

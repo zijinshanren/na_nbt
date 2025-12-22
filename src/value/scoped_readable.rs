@@ -18,10 +18,7 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     where
         'doc: 'a;
 
-    #[inline]
-    fn is<T: NBT>(&self) -> bool {
-        self.tag_id() == T::TAG_ID
-    }
+    fn is<T: NBT>(&self) -> bool;
 
     fn to_readable<'a>(&'a self) -> <Self::Config as ReadableConfig>::Value<'a>
     where
@@ -48,10 +45,7 @@ pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
 
     fn tag_id(&self) -> TagID;
 
-    #[inline]
-    fn is<T: NBT>(&self) -> bool {
-        self.tag_id() == T::TAG_ID
-    }
+    fn is<T: NBT>(&self) -> bool;
 
     fn len(&self) -> usize;
 
@@ -89,10 +83,7 @@ pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
 pub trait ScopedReadableTypedList<'doc, T: NBT>: IntoIterator + Send + Sync + Sized {
     type Config: ReadableConfig;
 
-    #[inline(always)]
-    fn tag_id(&self) -> TagID {
-        T::TAG_ID
-    }
+    const TAG_ID: TagID = T::TAG_ID;
 
     fn len(&self) -> usize;
 
