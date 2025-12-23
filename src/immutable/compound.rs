@@ -3,7 +3,7 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, EMPTY_COMPOUND, ImmutableConfig, Mark, Never, ReadableCompound,
+    ByteOrder, Document, EMPTY_COMPOUND, ImmutableConfig, Mark, NBT, Never, ReadableCompound,
     ReadonlyString, ReadonlyValue, ScopedReadableCompound, TagID, cold_path,
 };
 
@@ -45,10 +45,11 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyCompound<'doc, O,
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
-    /// Returns the value associated with the given key, or `None` if not found.
-    ///
-    /// Key lookup uses MUTF-8 encoding internally to match NBT string format.
-    pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
+    #[inline]
+    fn get_impl<F, R>(&self, key: &str, map: F) -> Option<R>
+    where
+        F: FnOnce(TagID, *const u8, *const Mark, &D) -> Option<R>,
+    {
         let name = simd_cesu8::mutf8::encode(key);
         unsafe {
             let mut ptr = self.data.as_ptr();
@@ -69,13 +70,52 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
                 ptr = ptr.add(name_len as usize);
 
                 if name == name_bytes {
-                    return Some(ReadonlyValue::read(tag_id, ptr, mark, &self.doc));
+                    return map(tag_id, ptr, mark, &self.doc);
                 }
 
                 let (data_advance, mark_advance) = ReadonlyValue::<O, D>::size(tag_id, ptr, mark);
                 ptr = ptr.add(data_advance);
                 mark = mark.add(mark_advance);
             }
+        }
+    }
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    pub unsafe fn get_typed_unchecked<T: NBT>(
+        &self,
+        key: &str,
+    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+        unsafe {
+            self.get_impl(key, |_, ptr, mark, doc| {
+                Some(T::read::<O, D>(ptr, mark, doc))
+            })
+        }
+    }
+
+    pub fn get_typed<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+        unsafe {
+            self.get_impl(key, |tag_id, ptr, mark, doc| {
+                if tag_id != T::TAG_ID {
+                    cold_path();
+                    return None;
+                }
+                Some(T::read::<O, D>(ptr, mark, doc))
+            })
+        }
+    }
+
+    /// Returns the value associated with the given key, or `None` if not found.
+    ///
+    /// Key lookup uses MUTF-8 encoding internally to match NBT string format.
+    pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
+        unsafe {
+            self.get_impl(key, |tag_id, ptr, mark, doc| {
+                Some(ReadonlyValue::read(tag_id, ptr, mark, doc))
+            })
         }
     }
 
@@ -119,6 +159,16 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadableCompound<'doc> for ReadonlyCompound<'doc, O, D> {
+    #[inline]
+    unsafe fn get_typed_unchecked<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
+        unsafe { self.get_typed_unchecked::<T>(key) }
+    }
+
+    #[inline]
+    fn get_typed<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_typed::<T>(key)
+    }
+
     #[inline]
     fn get(&self, key: &str) -> Option<<Self::Config as crate::ReadableConfig>::Value<'doc>> {
         self.get(key)

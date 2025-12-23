@@ -30,12 +30,38 @@ pub trait ReadableValue<'doc>:
 
     fn get<I: Index>(&self, index: I) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    // will not check tag id
+    unsafe fn get_typed_unchecked<I: Index, T: NBT>(
+        &self,
+        index: I,
+    ) -> Option<T::Type<'doc, Self::Config>>;
+
+    fn get_typed<I: Index, T: NBT>(&self, index: I) -> Option<T::Type<'doc, Self::Config>>;
+
     fn visit<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R;
 }
 
 pub trait ReadableList<'doc>:
     ScopedReadableList<'doc> + Send + Sync + Sized + Clone + Default
 {
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    // will not check tag id
+    unsafe fn get_typed_unchecked<T: NBT>(
+        &self,
+        index: usize,
+    ) -> Option<T::Type<'doc, Self::Config>>;
+
+    fn get_typed<T: NBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>>;
+
     /// Gets the element at the given index.
     fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
 
@@ -67,6 +93,16 @@ pub trait ReadableTypedList<'doc, T: NBT>:
 pub trait ReadableCompound<'doc>:
     ScopedReadableCompound<'doc> + Send + Sync + Sized + Clone + Default
 {
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    // will not check tag id
+    unsafe fn get_typed_unchecked<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>>;
+
+    fn get_typed<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>>;
+
     /// Gets the value associated with the given key.
     fn get(&self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
 

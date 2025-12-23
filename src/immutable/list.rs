@@ -71,6 +71,51 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         self.len() == 0
     }
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    pub unsafe fn get_typed_unchecked<T: NBT>(
+        &self,
+        index: usize,
+    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+        if index >= self.len() {
+            cold_path();
+            return None;
+        }
+
+        Some(unsafe {
+            T::get_index_unchecked::<O, D>(
+                self.data.as_ptr().add(1 + 4),
+                index,
+                &self.doc,
+                self.mark,
+            )
+        })
+    }
+
+    pub fn get_typed<T: NBT>(&self, index: usize) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+        if index >= self.len() {
+            cold_path();
+            return None;
+        }
+
+        if self.tag_id() != T::TAG_ID {
+            cold_path();
+            return None;
+        }
+
+        Some(unsafe {
+            T::get_index_unchecked::<O, D>(
+                self.data.as_ptr().add(1 + 4),
+                index,
+                &self.doc,
+                self.mark,
+            )
+        })
+    }
+
     /// Returns the element at the given index, or `None` if out of bounds.
     pub fn get(&self, index: usize) -> Option<ReadonlyValue<'doc, O, D>> {
         if index >= self.len() {
@@ -201,6 +246,19 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, O, D> {
+    #[inline]
+    unsafe fn get_typed_unchecked<T: NBT>(
+        &self,
+        index: usize,
+    ) -> Option<T::Type<'doc, Self::Config>> {
+        unsafe { self.get_typed_unchecked::<T>(index) }
+    }
+
+    #[inline]
+    fn get_typed<T: NBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_typed::<T>(index)
+    }
+
     #[inline]
     fn get(&self, index: usize) -> Option<<Self::Config as crate::ReadableConfig>::Value<'doc>> {
         self.get(index)

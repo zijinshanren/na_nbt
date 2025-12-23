@@ -31,6 +31,26 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     where
         'doc: 'a;
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    // will not check tag id
+    unsafe fn get_typed_unchecked_scoped<'a, I: Index, T: NBT>(
+        &'a self,
+        index: I,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a;
+
+    fn get_typed_scoped<'a, I: Index, T: NBT>(
+        &'a self,
+        index: I,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a;
+
     fn with<'a, R>(&'a self, match_fn: impl FnOnce(Value<'a, Self::Config>) -> R) -> R
     where
         'doc: 'a;
