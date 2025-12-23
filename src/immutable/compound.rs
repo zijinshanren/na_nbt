@@ -3,8 +3,7 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, EMPTY_COMPOUND, GenericNBT, ImmutableConfig, Mark, Never,
-    ReadableCompound, ReadonlyString, ReadonlyValue, ScopedReadableCompound, TagID, cold_path,
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, GenericNBT, ImmutableConfig, Mark, NBT, Never, ReadonlyString, ReadonlyValue, TagID, cold_path
 };
 
 #[derive(Clone)]
@@ -80,22 +79,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    pub unsafe fn get_unchecked_<T: GenericNBT>(
-        &self,
-        key: &str,
-    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
-        unsafe {
-            self.get_impl(key, |_, ptr, mark, doc| {
-                Some(T::read::<O, D>(ptr, mark, doc))
-            })
-        }
-    }
-
+    #[inline]
     pub fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
@@ -108,9 +92,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    /// Returns the value associated with the given key, or `None` if not found.
-    ///
-    /// Key lookup uses MUTF-8 encoding internally to match NBT string format.
+    #[inline]
     pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
@@ -133,74 +115,23 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
-    for ReadonlyCompound<'doc, O, D>
-{
+impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {
     type Config = ImmutableConfig<O, D>;
-
-    #[inline]
-    unsafe fn at_unchecked_<'a, T: crate::GenericNBT>(
-        &'a self,
-        key: &str,
-    ) -> Option<T::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        unsafe { self.get_unchecked_::<T>(key) }
-    }
-
-    #[inline]
-    fn at_<'a, T: crate::GenericNBT>(
-        &'a self,
-        key: &str,
-    ) -> Option<T::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        self.get_::<T>(key)
-    }
-
-    #[inline]
-    fn at<'a>(
-        &'a self,
-        key: &str,
-    ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'a>>
-    where
-        'doc: 'a,
-    {
-        self.get(key)
-    }
-
-    #[inline]
-    fn iter_scoped<'a>(&'a self) -> <Self::Config as crate::ReadableConfig>::CompoundIter<'a>
-    where
-        'doc: 'a,
-    {
-        self.iter()
-    }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableCompound<'doc> for ReadonlyCompound<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'doc, O, D> {
     #[inline]
-    unsafe fn get_unchecked_<T: GenericNBT>(
-        &self,
-        key: &str,
-    ) -> Option<T::Type<'doc, Self::Config>> {
-        unsafe { self.get_unchecked_::<T>(key) }
-    }
-
-    #[inline]
-    fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
-        self.get_::<T>(key)
-    }
-
-    #[inline]
-    fn get(&self, key: &str) -> Option<<Self::Config as crate::ReadableConfig>::Value<'doc>> {
+    fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
         self.get(key)
     }
 
     #[inline]
-    fn iter(&self) -> <Self::Config as crate::ReadableConfig>::CompoundIter<'doc> {
+    fn get_<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_::<T>(key)
+    }
+
+    #[inline]
+    fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'doc> {
         self.iter()
     }
 }

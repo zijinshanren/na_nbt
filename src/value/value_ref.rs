@@ -5,11 +5,11 @@ pub trait ValueRef<'s>: ValueBase + Clone + Default {
     where
         's: 'a;
 
-    fn into_<'a, T: NBT>(self) -> Option<T::Type<'s, Self::Config>>;
+    fn into_<T: NBT>(self) -> Option<T::Type<'s, Self::Config>>;
 
     fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'s>>;
 
-    fn get_<'a, T: NBT>(&self, index: impl Index) -> Option<T::Type<'s, Self::Config>>;
+    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::Type<'s, Self::Config>>;
 
     fn map<R>(self, match_fn: impl FnOnce(Value<'s, Self::Config>) -> R) -> R;
 }
@@ -19,9 +19,9 @@ pub trait ListRef<'s>:
 {
     fn get(&self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'s>>;
 
-    fn get_<'a, T: NBT>(&self, index: usize) -> Option<T::Type<'s, Self::Config>>;
+    fn get_<T: NBT>(&self, index: usize) -> Option<T::Type<'s, Self::Config>>;
 
-    fn typed_<'a, T: NBT>(&self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
+    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
 
     fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'s>;
 }
@@ -46,7 +46,7 @@ pub trait CompoundRef<'s>:
 {
     fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'s>>;
 
-    fn get_<'a, T: NBT>(&self, key: &str) -> Option<T::Type<'s, Self::Config>>;
+    fn get_<T: NBT>(&self, key: &str) -> Option<T::Type<'s, Self::Config>>;
 
     fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'s>;
 }

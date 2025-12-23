@@ -1,6 +1,9 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    fmt::{self, Display},
+};
 
-use crate::{Document, ReadableString, ReadonlyArray};
+use crate::{Document, ReadonlyArray, StringRef};
 
 pub type ReadonlyString<'doc, D> = ReadonlyArray<'doc, u8, D>;
 
@@ -24,14 +27,16 @@ impl<'doc, D: Document> ReadonlyString<'doc, D> {
     pub fn decode<'a>(&'a self) -> Cow<'a, str> {
         simd_cesu8::mutf8::decode_lossy(self.data)
     }
+}
 
+impl<'doc, D: Document> Display for ReadonlyString<'doc, D> {
     #[inline]
-    pub fn to_string(&self) -> String {
-        self.decode().into_owned()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.decode().into_owned())
     }
 }
 
-impl<'doc, D: Document> ReadableString<'doc> for ReadonlyString<'doc, D> {
+impl<'doc, D: Document> StringRef<'doc> for ReadonlyString<'doc, D> {
     #[inline]
     fn raw_bytes(&self) -> &[u8] {
         self.raw_bytes()
@@ -40,10 +45,5 @@ impl<'doc, D: Document> ReadableString<'doc> for ReadonlyString<'doc, D> {
     #[inline]
     fn decode(&self) -> std::borrow::Cow<'_, str> {
         self.decode()
-    }
-
-    #[inline]
-    fn to_string(&self) -> String {
-        self.to_string()
     }
 }

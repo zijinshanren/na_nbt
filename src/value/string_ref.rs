@@ -1,9 +1,7 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Display};
 
-pub trait StringRef<'s>: Send + Sync + Sized + Clone {
+pub trait StringRef<'s>: Display + Send + Sync + Sized + Clone {
     fn raw_bytes(&self) -> &[u8];
 
     fn decode(&self) -> Cow<'_, str>;
-
-    fn to_string(&self) -> String;
 }

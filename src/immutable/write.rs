@@ -1,8 +1,11 @@
-use std::{hint::unreachable_unchecked, io::Write, ptr, slice};
+use std::{any::TypeId, hint::unreachable_unchecked, io::Write, ptr, slice};
 
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, Error, Result, TagID, cold_path};
+use crate::{
+    ByteOrder, Document, Error, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
+    ReadonlyTypedList, ReadonlyValue, Result, TagID, Writable, cold_path,
+};
 
 macro_rules! change_endian {
     ($value:expr, $type:ident, $from:ident, $to:ident) => {
@@ -422,5 +425,458 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
             }
         }
         Ok(buf.byte_offset_from_unsigned(buf_start))
+    }
+}
+
+#[inline(always)]
+fn reserve_guard<R>(buf: &mut Vec<u8>, size: usize, f: impl FnOnce(*mut u8) -> R) -> R {
+    let old_len = buf.len();
+    buf.reserve(size);
+    let result = f(unsafe { buf.as_mut_ptr().add(old_len) });
+    unsafe { buf.set_len(old_len + size) };
+    result
+}
+
+impl Writable for () {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        buf.push(0);
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        writer.write_all(&[0]).map_err(Error::IO)
+    }
+}
+
+impl Writable for i8 {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        reserve_guard(buf, 1 + 2 + 1, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::Byte as u8, 0u8, 0u8, *self as u8]);
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        writer
+            .write_all(&[TagID::Byte as u8, 0u8, 0u8, *self as u8])
+            .map_err(Error::IO)
+    }
+}
+
+impl Writable for i16 {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        reserve_guard(buf, 1 + 2 + 2, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::Short as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::I16::<TARGET>::new(*self).to_bytes(),
+            );
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf = [0u8; 1 + 2 + 2];
+        unsafe {
+            ptr::write(buf.as_mut_ptr().cast(), [TagID::Short as u8, 0u8, 0u8]);
+            ptr::write(
+                buf.as_mut_ptr().add(3).cast(),
+                byteorder::I16::<TARGET>::new(*self).to_bytes(),
+            );
+        }
+        writer.write_all(&buf).map_err(Error::IO)
+    }
+}
+
+impl Writable for i32 {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        reserve_guard(buf, 1 + 2 + 4, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::Int as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::I32::<TARGET>::new(*self).to_bytes(),
+            );
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf = [0u8; 1 + 2 + 4];
+        unsafe {
+            ptr::write(buf.as_mut_ptr().cast(), [TagID::Int as u8, 0u8, 0u8]);
+            ptr::write(
+                buf.as_mut_ptr().add(3).cast(),
+                byteorder::I32::<TARGET>::new(*self).to_bytes(),
+            );
+        }
+        writer.write_all(&buf).map_err(Error::IO)
+    }
+}
+
+impl Writable for i64 {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        reserve_guard(buf, 1 + 2 + 8, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::Long as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::I64::<TARGET>::new(*self).to_bytes(),
+            );
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf = [0u8; 1 + 2 + 8];
+        unsafe {
+            ptr::write(buf.as_mut_ptr().cast(), [TagID::Long as u8, 0u8, 0u8]);
+            ptr::write(
+                buf.as_mut_ptr().add(3).cast(),
+                byteorder::I64::<TARGET>::new(*self).to_bytes(),
+            );
+        }
+        writer.write_all(&buf).map_err(Error::IO)
+    }
+}
+
+impl Writable for f32 {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        reserve_guard(buf, 1 + 2 + 4, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::Float as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::F32::<TARGET>::new(*self).to_bytes(),
+            );
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf = [0u8; 1 + 2 + 4];
+        unsafe {
+            ptr::write(buf.as_mut_ptr().cast(), [TagID::Float as u8, 0u8, 0u8]);
+            ptr::write(
+                buf.as_mut_ptr().add(3).cast(),
+                byteorder::F32::<TARGET>::new(*self).to_bytes(),
+            );
+        }
+        writer.write_all(&buf).map_err(Error::IO)
+    }
+}
+
+impl Writable for f64 {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        reserve_guard(buf, 1 + 2 + 8, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::Double as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::F64::<TARGET>::new(*self).to_bytes(),
+            );
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf = [0u8; 1 + 2 + 8];
+        unsafe {
+            ptr::write(buf.as_mut_ptr().cast(), [TagID::Double as u8, 0u8, 0u8]);
+            ptr::write(
+                buf.as_mut_ptr().add(3).cast(),
+                byteorder::F64::<TARGET>::new(*self).to_bytes(),
+            );
+        }
+        writer.write_all(&buf).map_err(Error::IO)
+    }
+}
+
+impl<'doc, D: Document> Writable for ReadonlyArray<'doc, i8, D> {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let len = self.data.len();
+        reserve_guard(buf, 1 + 2 + 4 + len, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::ByteArray as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
+            );
+            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr.add(7).cast(), len);
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf_head = [0u8; 1 + 2 + 4];
+        unsafe {
+            ptr::write(
+                buf_head.as_mut_ptr().cast(),
+                [TagID::ByteArray as u8, 0u8, 0u8],
+            );
+            ptr::write(
+                buf_head.as_mut_ptr().add(3).cast(),
+                byteorder::U32::<TARGET>::new(self.data.len() as u32).to_bytes(),
+            );
+        }
+        writer.write_all(&buf_head).map_err(Error::IO)?;
+        let bytes =
+            unsafe { slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), self.data.len()) };
+        writer.write_all(bytes).map_err(Error::IO)
+    }
+}
+
+impl<'doc, D: Document> Writable for ReadonlyString<'doc, D> {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let len = self.data.len();
+        reserve_guard(buf, 1 + 2 + 2 + len, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::String as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::U16::<TARGET>::new(len as u16).to_bytes(),
+            );
+            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr.add(5), len);
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf_head = [0u8; 1 + 2 + 2];
+        unsafe {
+            ptr::write(
+                buf_head.as_mut_ptr().cast(),
+                [TagID::String as u8, 0u8, 0u8],
+            );
+            ptr::write(
+                buf_head.as_mut_ptr().add(3).cast(),
+                byteorder::U16::<TARGET>::new(self.data.len() as u16).to_bytes(),
+            );
+        }
+        writer.write_all(&buf_head).map_err(Error::IO)?;
+        writer.write_all(self.data).map_err(Error::IO)
+    }
+}
+
+impl<'doc, SOURCE: ByteOrder, D: Document> Writable for ReadonlyList<'doc, SOURCE, D> {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let payload_len = self.data.len();
+        reserve_guard(buf, 1 + 2 + payload_len, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr.add(3), payload_len);
+            if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
+                write_list_fallback::<SOURCE, TARGET>(ptr.add(3)).unwrap();
+            }
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        writer
+            .write_all(&[TagID::List as u8, 0u8, 0u8])
+            .map_err(Error::IO)?;
+        if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+            writer.write_all(self.data).map_err(Error::IO)
+        } else {
+            unsafe {
+                write_list_to_writer_fallback::<SOURCE, TARGET>(self.data.as_ptr(), &mut writer)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+impl<'doc, SOURCE: ByteOrder, D: Document, T: NBT> Writable
+    for ReadonlyTypedList<'doc, SOURCE, D, T>
+{
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let payload_len = self.data.len();
+        reserve_guard(buf, 1 + 2 + payload_len, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr.add(3), payload_len);
+            if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
+                write_list_fallback::<SOURCE, TARGET>(ptr.add(3)).unwrap();
+            }
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        writer
+            .write_all(&[TagID::List as u8, 0u8, 0u8])
+            .map_err(Error::IO)?;
+        if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+            writer.write_all(self.data).map_err(Error::IO)
+        } else {
+            unsafe {
+                write_list_to_writer_fallback::<SOURCE, TARGET>(self.data.as_ptr(), &mut writer)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+impl<'doc, SOURCE: ByteOrder, D: Document> Writable for ReadonlyCompound<'doc, SOURCE, D> {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let payload_len = self.data.len();
+        reserve_guard(buf, 1 + 2 + payload_len, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
+            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr.add(3), payload_len);
+            if TypeId::of::<SOURCE>() != TypeId::of::<TARGET>() {
+                write_compound_fallback::<SOURCE, TARGET>(ptr.add(3)).unwrap();
+            }
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        writer
+            .write_all(&[TagID::Compound as u8, 0u8, 0u8])
+            .map_err(Error::IO)?;
+        if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+            writer.write_all(self.data).map_err(Error::IO)
+        } else {
+            unsafe {
+                write_compound_to_writer_fallback::<SOURCE, TARGET>(
+                    self.data.as_ptr(),
+                    &mut writer,
+                )?;
+            }
+            Ok(())
+        }
+    }
+}
+
+impl<'doc, SOURCE: ByteOrder, D: Document> Writable
+    for ReadonlyArray<'doc, byteorder::I32<SOURCE>, D>
+{
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let len = self.data.len();
+        let len_bytes = std::mem::size_of_val(self.data);
+        reserve_guard(buf, 1 + 2 + 4 + len_bytes, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::IntArray as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
+            );
+            let data_ptr = ptr.add(7);
+            if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                ptr::copy_nonoverlapping(self.data.as_ptr().cast(), data_ptr, len_bytes);
+            } else {
+                let mut write_ptr = data_ptr;
+                for element in self.data {
+                    ptr::write(
+                        write_ptr.cast(),
+                        byteorder::I32::<TARGET>::new(element.get()).to_bytes(),
+                    );
+                    write_ptr = write_ptr.add(4);
+                }
+            }
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf_head = [0u8; 1 + 2 + 4];
+        unsafe {
+            ptr::write(
+                buf_head.as_mut_ptr().cast(),
+                [TagID::IntArray as u8, 0u8, 0u8],
+            );
+            ptr::write(
+                buf_head.as_mut_ptr().add(3).cast(),
+                byteorder::U32::<TARGET>::new(self.data.len() as u32).to_bytes(),
+            );
+        }
+        writer.write_all(&buf_head).map_err(Error::IO)?;
+        if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+            let bytes = unsafe {
+                slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), self.data.len() * 4)
+            };
+            writer.write_all(bytes).map_err(Error::IO)
+        } else {
+            for element in self.data {
+                writer
+                    .write_all(&byteorder::I32::<TARGET>::new(element.get()).to_bytes())
+                    .map_err(Error::IO)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+impl<'doc, SOURCE: ByteOrder, D: Document> Writable
+    for ReadonlyArray<'doc, byteorder::I64<SOURCE>, D>
+{
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let len = self.data.len();
+        let len_bytes = std::mem::size_of_val(self.data);
+        reserve_guard(buf, 1 + 2 + 4 + len_bytes, |ptr| unsafe {
+            ptr::write(ptr.cast(), [TagID::LongArray as u8, 0u8, 0u8]);
+            ptr::write(
+                ptr.add(3).cast(),
+                byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
+            );
+            let data_ptr = ptr.add(7);
+            if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+                ptr::copy_nonoverlapping(self.data.as_ptr().cast(), data_ptr, len_bytes);
+            } else {
+                let mut write_ptr = data_ptr;
+                for element in self.data {
+                    ptr::write(
+                        write_ptr.cast(),
+                        byteorder::I64::<TARGET>::new(element.get()).to_bytes(),
+                    );
+                    write_ptr = write_ptr.add(8);
+                }
+            }
+        })
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let mut buf_head = [0u8; 1 + 2 + 4];
+        unsafe {
+            ptr::write(
+                buf_head.as_mut_ptr().cast(),
+                [TagID::LongArray as u8, 0u8, 0u8],
+            );
+            ptr::write(
+                buf_head.as_mut_ptr().add(3).cast(),
+                byteorder::U32::<TARGET>::new(self.data.len() as u32).to_bytes(),
+            );
+        }
+        writer.write_all(&buf_head).map_err(Error::IO)?;
+        if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
+            let bytes = unsafe {
+                slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), self.data.len() * 8)
+            };
+            writer.write_all(bytes).map_err(Error::IO)
+        } else {
+            for element in self.data {
+                writer
+                    .write_all(&byteorder::I64::<TARGET>::new(element.get()).to_bytes())
+                    .map_err(Error::IO)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+impl<'doc, SOURCE: ByteOrder, D: Document> Writable for ReadonlyValue<'doc, SOURCE, D> {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        match self {
+            ReadonlyValue::End(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::Byte(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::Short(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::Int(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::Long(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::Float(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::Double(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::ByteArray(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::String(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::List(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::Compound(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::IntArray(v) => v.write_to_vec::<TARGET>(buf),
+            ReadonlyValue::LongArray(v) => v.write_to_vec::<TARGET>(buf),
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        match self {
+            ReadonlyValue::End(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::Byte(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::Short(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::Int(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::Long(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::Float(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::Double(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::ByteArray(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::String(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::List(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::Compound(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::IntArray(v) => v.write_to_writer::<TARGET>(writer),
+            ReadonlyValue::LongArray(v) => v.write_to_writer::<TARGET>(writer),
+        }
     }
 }

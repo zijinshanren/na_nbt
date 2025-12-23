@@ -3,9 +3,9 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, EMPTY_LIST, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl, Mark,
-    NBT, Never, ReadableList, ReadableTypedList, ReadonlyValue, ScopedReadableList,
-    ScopedReadableTypedList, TagID, cold_path,
+    ByteOrder, ConfigRef, Document, EMPTY_LIST, GenericNBT, ImmutableConfig,
+    ImmutableGenericNBTImpl, ListBase, ListRef, Mark, NBT, Never, ReadonlyValue, TagID,
+    TypedListBase, TypedListRef, cold_path,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -41,7 +41,7 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyList<'doc, O, D> 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         ReadonlyListIter {
-            tag_id: self.tag_id(),
+            tag_id: self.element_tag_id(),
             remaining: self.len() as u32,
             data: unsafe { self.data.as_ptr().add(1 + 4) },
             mark: self.mark,
@@ -53,13 +53,13 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyList<'doc, O, D> 
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     #[inline]
-    pub fn tag_id(&self) -> TagID {
+    pub fn element_tag_id(&self) -> TagID {
         unsafe { *self.data.as_ptr().cast() }
     }
 
     #[inline]
-    pub fn is<T: NBT>(&self) -> bool {
-        self.tag_id() == T::TAG_ID
+    pub fn element_is_<T: NBT>(&self) -> bool {
+        self.element_tag_id() == T::TAG_ID
     }
 
     /// Returns the number of elements in this list.
@@ -74,30 +74,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         self.len() == 0
     }
 
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    pub unsafe fn get_unchecked_<T: GenericNBT>(
-        &self,
-        index: usize,
-    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
-        if index >= self.len() {
-            cold_path();
-            return None;
-        }
-
-        unsafe {
-            T::get_index_unchecked::<O, D>(
-                self.data.as_ptr().add(1 + 4),
-                index,
-                &self.doc,
-                self.mark,
-            )
-        }
-    }
-
     pub fn get_<T: GenericNBT>(
         &self,
         index: usize,
@@ -107,7 +83,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
             return None;
         }
 
-        if self.tag_id() != T::TAG_ID {
+        if self.element_tag_id() != T::TAG_ID {
             cold_path();
             return None;
         }
@@ -136,20 +112,27 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
             macro_rules! match_tag_id {
                 (
                     [
-                        $( ($tag_id:ident, $tag_type:ident) ),* $(,)?
+                        $( $tag:ident ),* $(,)?
                     ], $tag_id_val:expr, $ptr:expr, $index:expr, $doc:expr, $mark:expr
                 ) => {
                     match $tag_id_val {
                         $(
-                            TagID::$tag_id => Some(ReadonlyValue::$tag_id(
-                                $tag_type::get_index_unchecked::<O, D>($ptr, $index, $doc, $mark).unwrap_unchecked()
+                            TagID::$tag => Some(ReadonlyValue::$tag(
+                                $tag::get_index_unchecked::<O, D>($ptr, $index, $doc, $mark).unwrap_unchecked()
                             )),
                         )*
                     }
                 };
             }
 
-            match_tag_id_expand!(match_tag_id, self.tag_id(), ptr, index, &self.doc, mark)
+            match_tag_id_expand!(
+                match_tag_id,
+                self.element_tag_id(),
+                ptr,
+                index,
+                &self.doc,
+                mark
+            )
         }
     }
 
@@ -157,7 +140,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     #[inline]
     pub fn iter(&self) -> ReadonlyListIter<'doc, O, D> {
         ReadonlyListIter {
-            tag_id: self.tag_id(),
+            tag_id: self.element_tag_id(),
             remaining: self.len() as u32,
             data: unsafe { self.data.as_ptr().add(1 + 4) },
             mark: self.mark,
@@ -166,21 +149,10 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         }
     }
 
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
     #[inline]
-    pub unsafe fn extract_typed_list_unchecked<T: NBT>(self) -> ReadonlyTypedList<'doc, O, D, T> {
-        unsafe { self.extract_typed_list().unwrap_unchecked() }
-    }
-
-    #[inline]
-    pub fn extract_typed_list<T: NBT>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
-        self.is::<T>().then_some(ReadonlyTypedList {
-            length: self.len() as u32,
-            data: unsafe { self.data.as_ptr().add(1 + 4) },
+    pub fn typed_<T: NBT>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
+        self.element_is_::<T>().then_some(ReadonlyTypedList {
+            data: self.data,
             mark: self.mark,
             doc: self.doc,
             _marker: PhantomData,
@@ -188,17 +160,17 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
     type Config = ImmutableConfig<O, D>;
 
     #[inline]
-    fn tag_id(&self) -> TagID {
-        self.tag_id()
+    fn element_tag_id(&self) -> TagID {
+        self.element_tag_id()
     }
 
     #[inline]
-    fn is<T: NBT>(&self) -> bool {
-        self.is::<T>()
+    fn element_is_<T: NBT>(&self) -> bool {
+        self.element_is_::<T>()
     }
 
     #[inline]
@@ -210,102 +182,27 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
     fn is_empty(&self) -> bool {
         self.is_empty()
     }
-
-    #[inline]
-    unsafe fn at_unchecked_<'a, T: GenericNBT>(
-        &'a self,
-        index: usize,
-    ) -> Option<T::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        unsafe { self.get_unchecked_::<T>(index) }
-    }
-
-    #[inline]
-    fn at_<'a, T: GenericNBT>(&'a self, index: usize) -> Option<T::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        self.get_::<T>(index)
-    }
-
-    #[inline]
-    fn at<'a>(
-        &'a self,
-        index: usize,
-    ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'a>>
-    where
-        'doc: 'a,
-    {
-        self.get(index)
-    }
-
-    #[inline]
-    fn iter_scoped<'a>(&'a self) -> <Self::Config as crate::ReadableConfig>::ListIter<'a>
-    where
-        'doc: 'a,
-    {
-        self.iter()
-    }
-
-    #[inline]
-    unsafe fn to_typed_list_unchecked<'a, T: NBT>(
-        &'a self,
-    ) -> <Self::Config as crate::ReadableConfig>::TypedList<'a, T>
-    where
-        'doc: 'a,
-    {
-        unsafe { self.to_typed_().unwrap_unchecked() }
-    }
-
-    #[inline]
-    fn to_typed_<'a, T: NBT>(
-        &'a self,
-    ) -> Option<<Self::Config as crate::ReadableConfig>::TypedList<'a, T>>
-    where
-        'doc: 'a,
-    {
-        self.clone().extract_typed_list::<T>()
-    }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ListRef<'doc> for ReadonlyList<'doc, O, D> {
     #[inline]
-    unsafe fn get_unchecked_<T: GenericNBT>(
-        &self,
-        index: usize,
-    ) -> Option<T::Type<'doc, Self::Config>> {
-        unsafe { self.get_unchecked_::<T>(index) }
-    }
-
-    #[inline]
-    fn get_<T: GenericNBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>> {
-        self.get_::<T>(index)
-    }
-
-    #[inline]
-    fn get(&self, index: usize) -> Option<<Self::Config as crate::ReadableConfig>::Value<'doc>> {
+    fn get(&self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
         self.get(index)
     }
 
     #[inline]
-    fn iter(&self) -> <Self::Config as crate::ReadableConfig>::ListIter<'doc> {
+    fn get_<T: NBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_::<T>(index)
+    }
+
+    #[inline]
+    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'doc, T>> {
+        self.typed_::<T>()
+    }
+
+    #[inline]
+    fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'doc> {
         self.iter()
-    }
-
-    #[inline]
-    unsafe fn extract_typed_list_unchecked<T: NBT>(
-        self,
-    ) -> <Self::Config as crate::ReadableConfig>::TypedList<'doc, T> {
-        unsafe { self.extract_typed_list_unchecked::<T>() }
-    }
-
-    #[inline]
-    fn into_typed_<T: NBT>(
-        self,
-    ) -> Option<<Self::Config as crate::ReadableConfig>::TypedList<'doc, T>> {
-        self.extract_typed_list::<T>()
     }
 }
 
@@ -367,18 +264,16 @@ impl<'doc, O: ByteOrder, D: Document> ExactSizeIterator for ReadonlyListIter<'do
 
 #[derive(Clone)]
 pub struct ReadonlyTypedList<'doc, O: ByteOrder, D: Document, T: NBT> {
-    pub(crate) length: u32,
-    pub(crate) data: *const u8,
+    pub(crate) data: &'doc [u8],
     pub(crate) mark: *const Mark,
     pub(crate) doc: D,
-    pub(crate) _marker: PhantomData<(&'doc (), O, T)>,
+    pub(crate) _marker: PhantomData<(O, T)>,
 }
 
 impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedList<'doc, O, D, T> {
     fn default() -> Self {
         Self {
-            length: 0,
-            data: ptr::null(),
+            data: &EMPTY_LIST,
             mark: ptr::null(),
             doc: unsafe { Never::never() },
             _marker: PhantomData,
@@ -389,15 +284,30 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedList<'doc
 unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Send for ReadonlyTypedList<'doc, O, D, T> {}
 unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Sync for ReadonlyTypedList<'doc, O, D, T> {}
 
+impl<'doc, O: ByteOrder, D: Document, T: NBT> IntoIterator for ReadonlyTypedList<'doc, O, D, T> {
+    type Item = T::Type<'doc, ImmutableConfig<O, D>>;
+    type IntoIter = ReadonlyTypedListIter<'doc, O, D, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ReadonlyTypedListIter {
+            remaining: self.len() as u32,
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
+            mark: self.mark,
+            doc: self.doc,
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
     #[inline]
     pub fn len(&self) -> usize {
-        self.length as usize
+        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.length == 0
+        self.len() == 0
     }
 
     #[inline]
@@ -407,16 +317,29 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
             return None;
         }
 
-        unsafe { T::get_index_unchecked::<O, D>(self.data, index, &self.doc, self.mark) }
+        unsafe {
+            T::get_index_unchecked::<O, D>(
+                self.data.as_ptr().add(1 + 4),
+                index,
+                &self.doc,
+                self.mark,
+            )
+        }
     }
 
     #[inline]
-    pub fn iter(&self) -> ReadonlyTypedList<'doc, O, D, T> {
-        self.clone()
+    pub fn iter(&self) -> ReadonlyTypedListIter<'doc, O, D, T> {
+        ReadonlyTypedListIter {
+            remaining: self.len() as u32,
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
+            mark: self.mark,
+            doc: self.doc.clone(),
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> ScopedReadableTypedList<'doc, T>
+impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListBase<T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
     type Config = ImmutableConfig<O, D>;
@@ -430,25 +353,9 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ScopedReadableTypedList<'doc, T>
     fn is_empty(&self) -> bool {
         self.is_empty()
     }
-
-    #[inline]
-    fn at<'a>(&'a self, index: usize) -> Option<<T>::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        self.get(index)
-    }
-
-    #[inline]
-    fn iter_scoped<'a>(&'a self) -> <Self::Config as crate::ReadableConfig>::TypedListIter<'a, T>
-    where
-        'doc: 'a,
-    {
-        self.iter()
-    }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadableTypedList<'doc, T>
+impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListRef<'doc, T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
     #[inline]
@@ -457,21 +364,45 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadableTypedList<'doc, T>
     }
 
     #[inline]
-    fn iter(&self) -> <Self::Config as crate::ReadableConfig>::TypedListIter<'doc, T> {
+    fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'doc, T> {
         self.iter()
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedList<'doc, O, D, T> {
+#[derive(Clone)]
+pub struct ReadonlyTypedListIter<'doc, O: ByteOrder, D: Document, T: NBT> {
+    remaining: u32,
+    data: *const u8,
+    mark: *const Mark,
+    doc: D,
+    _marker: PhantomData<(&'doc (), O, T)>,
+}
+
+impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedListIter<'doc, O, D, T> {
+    fn default() -> Self {
+        Self {
+            remaining: 0,
+            data: ptr::null(),
+            mark: ptr::null(),
+            doc: unsafe { Never::never() },
+            _marker: PhantomData,
+        }
+    }
+}
+
+unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Send for ReadonlyTypedListIter<'doc, O, D, T> {}
+unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Sync for ReadonlyTypedListIter<'doc, O, D, T> {}
+
+impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedListIter<'doc, O, D, T> {
     type Item = T::Type<'doc, ImmutableConfig<O, D>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.length == 0 {
+        if self.remaining == 0 {
             cold_path();
             return None;
         }
 
-        self.length -= 1;
+        self.remaining -= 1;
 
         let value = unsafe { T::read(self.data, self.mark, &self.doc) };
 
@@ -484,12 +415,12 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedList<'do
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.length as usize;
+        let remaining = self.remaining as usize;
         (remaining, Some(remaining))
     }
 }
 
 impl<'doc, O: ByteOrder, D: Document, T: NBT> ExactSizeIterator
-    for ReadonlyTypedList<'doc, O, D, T>
+    for ReadonlyTypedListIter<'doc, O, D, T>
 {
 }

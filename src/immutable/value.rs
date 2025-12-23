@@ -1,9 +1,9 @@
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl, ImmutableNBTImpl,
-    Index, Mark, NBT, ReadableValue, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
-    ScopedReadableValue, TagID, Value,
+    ByteOrder, ConfigRef, Document, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl,
+    ImmutableNBTImpl, Index, Mark, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList,
+    ReadonlyString, TagID, Value, ValueBase, ValueRef,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -39,13 +39,13 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
             macro_rules! match_tag_id {
                 (
                     [
-                        $( ($tag_id:ident, $tag_type:ident) ),* $(,)?
+                        $( $tag:ident ),* $(,)?
                     ], $tag_id_val:expr, $data:expr, $mark:expr, $doc:expr
                 ) => {
                     match $tag_id_val {
                         $(
-                            TagID::$tag_id => ReadonlyValue::$tag_id(
-                                $tag_type::read::<O, D>($data, $mark, $doc)
+                            TagID::$tag => ReadonlyValue::$tag(
+                                $tag::read::<O, D>($data, $mark, $doc)
                             ),
                         )*
                     }
@@ -61,12 +61,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
             macro_rules! match_tag_id {
                 (
                     [
-                        $( ($tag_id:ident, $tag_type:ident) ),* $(,)?
+                        $( $tag:ident ),* $(,)?
                     ], $tag_id_val:expr, $data:expr, $mark:expr
                 ) => {
                     match $tag_id_val {
                         $(
-                            TagID::$tag_id => $tag_type::size::<O>(data, mark),
+                            TagID::$tag => $tag::size::<O>(data, mark),
                         )*
                     }
                 };
@@ -98,67 +98,21 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn is<T: NBT>(&self) -> bool {
+    pub fn is_<T: NBT>(&self) -> bool {
         self.tag_id() == T::TAG_ID
     }
 
-    /// Returns a reference to the peek unchecked of this [`ReadonlyValue<O, D>`].
-    ///
-    /// # Safety
-    ///
-    /// .
     #[inline]
-    pub unsafe fn peek_unchecked<'a, T: NBT>(&'a self) -> &'a T::Type<'doc, ImmutableConfig<O, D>>
+    pub fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, ImmutableConfig<O, D>>>
     where
         'doc: 'a,
     {
-        unsafe { self.peek::<T>().unwrap_unchecked() }
+        T::ref_(self)
     }
 
     #[inline]
-    pub fn peek<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, ImmutableConfig<O, D>>>
-    where
-        'doc: 'a,
-    {
-        T::peek(self)
-    }
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    #[inline]
-    pub unsafe fn extract_unchecked<T: GenericNBT>(self) -> T::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { self.extract::<T>().unwrap_unchecked() }
-    }
-
-    #[inline]
-    pub fn extract<T: GenericNBT>(self) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
-        T::extract(self)
-    }
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    #[inline]
-    pub unsafe fn get_unchecked_<T: GenericNBT>(
-        &self,
-        index: impl Index,
-    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
-        index.index_dispatch(
-            self,
-            |value, index| match value {
-                ReadonlyValue::List(value) => unsafe { value.get_unchecked_::<T>(index) },
-                _ => None,
-            },
-            |value, key| match value {
-                ReadonlyValue::Compound(value) => unsafe { value.get_unchecked_::<T>(key) },
-                _ => None,
-            },
-        )
+    pub fn into_<T: GenericNBT>(self) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+        T::_from(self)
     }
 
     #[inline]
@@ -195,7 +149,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
     type Config = ImmutableConfig<O, D>;
 
     #[inline]
@@ -204,152 +158,50 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    unsafe fn to_unchecked_<'a, T: GenericNBT>(&'a self) -> T::Type<'a, Self::Config>
-    where
-        'doc: 'a,
-    {
-        unsafe { self.clone().extract_unchecked::<T>() }
-    }
-
-    #[inline]
-    fn to_<'a, T: GenericNBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        self.clone().extract::<T>()
-    }
-
-    #[inline]
-    fn is<T: NBT>(&self) -> bool {
-        self.is::<T>()
-    }
-
-    #[inline]
-    fn to_readable<'a>(&'a self) -> <Self::Config as crate::ReadableConfig>::Value<'a>
-    where
-        'doc: 'a,
-    {
-        self.clone()
-    }
-
-    #[inline]
-    fn at<'a>(
-        &'a self,
-        index: impl Index,
-    ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'a>>
-    where
-        'doc: 'a,
-    {
-        self.get(index)
-    }
-
-    #[inline]
-    unsafe fn at_unchecked_<'a, T: GenericNBT>(
-        &'a self,
-        index: impl Index,
-    ) -> Option<T::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        unsafe { self.get_unchecked_::<T>(index) }
-    }
-
-    #[inline]
-    fn at_<'a, T: GenericNBT>(
-        &'a self,
-        index: impl Index,
-    ) -> Option<T::Type<'a, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        self.get_::<T>(index)
-    }
-
-    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(crate::Value<'a, Self::Config>) -> R) -> R
-    where
-        'doc: 'a,
-    {
-        match self {
-            ReadonlyValue::End(()) => match_fn(Value::End(())),
-            ReadonlyValue::Byte(v) => match_fn(Value::Byte(*v)),
-            ReadonlyValue::Short(v) => match_fn(Value::Short(*v)),
-            ReadonlyValue::Int(v) => match_fn(Value::Int(*v)),
-            ReadonlyValue::Long(v) => match_fn(Value::Long(*v)),
-            ReadonlyValue::Float(v) => match_fn(Value::Float(*v)),
-            ReadonlyValue::Double(v) => match_fn(Value::Double(*v)),
-            ReadonlyValue::ByteArray(v) => match_fn(Value::ByteArray(v.clone())),
-            ReadonlyValue::String(v) => match_fn(Value::String(v.clone())),
-            ReadonlyValue::List(v) => match_fn(Value::List(v.clone())),
-            ReadonlyValue::Compound(v) => match_fn(Value::Compound(v.clone())),
-            ReadonlyValue::IntArray(v) => match_fn(Value::IntArray(v.clone())),
-            ReadonlyValue::LongArray(v) => match_fn(Value::LongArray(v.clone())),
-        }
+    fn is_<T: NBT>(&self) -> bool {
+        self.is_::<T>()
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
-    #[inline]
-    unsafe fn as_unchecked_<'a, T: NBT>(&'a self) -> &'a T::Type<'doc, Self::Config>
-    where
-        'doc: 'a,
-    {
-        unsafe { self.peek_unchecked::<T>() }
-    }
-
+impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, D> {
     #[inline]
     fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::Config>>
     where
         'doc: 'a,
     {
-        self.peek::<T>()
+        self.ref_::<T>()
     }
 
     #[inline]
-    unsafe fn into_unchecked_<T: GenericNBT>(self) -> T::Type<'doc, Self::Config> {
-        unsafe { self.extract_unchecked::<T>() }
+    fn into_<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>> {
+        self.into_::<T>()
     }
 
     #[inline]
-    fn into_<T: GenericNBT>(self) -> Option<T::Type<'doc, Self::Config>> {
-        self.extract::<T>()
-    }
-
-    #[inline]
-    fn get(
-        &self,
-        index: impl Index,
-    ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'doc>> {
+    fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
         self.get(index)
     }
 
     #[inline]
-    unsafe fn get_unchecked_<T: GenericNBT>(
-        &self,
-        index: impl Index,
-    ) -> Option<T::Type<'doc, Self::Config>> {
-        unsafe { self.get_unchecked_::<T>(index) }
-    }
-
-    #[inline]
-    fn get_<T: GenericNBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
+    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
         self.get_::<T>(index)
     }
 
     fn map<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R {
         match self {
-            ReadonlyValue::End(v) => match_fn(Value::End(v)),
-            ReadonlyValue::Byte(v) => match_fn(Value::Byte(v)),
-            ReadonlyValue::Short(v) => match_fn(Value::Short(v)),
-            ReadonlyValue::Int(v) => match_fn(Value::Int(v)),
-            ReadonlyValue::Long(v) => match_fn(Value::Long(v)),
-            ReadonlyValue::Float(v) => match_fn(Value::Float(v)),
-            ReadonlyValue::Double(v) => match_fn(Value::Double(v)),
-            ReadonlyValue::ByteArray(v) => match_fn(Value::ByteArray(v)),
-            ReadonlyValue::String(v) => match_fn(Value::String(v)),
-            ReadonlyValue::List(v) => match_fn(Value::List(v)),
-            ReadonlyValue::Compound(v) => match_fn(Value::Compound(v)),
-            ReadonlyValue::IntArray(v) => match_fn(Value::IntArray(v)),
-            ReadonlyValue::LongArray(v) => match_fn(Value::LongArray(v)),
+            ReadonlyValue::End(()) => match_fn(Value::End(())),
+            ReadonlyValue::Byte(value) => match_fn(Value::Byte(value)),
+            ReadonlyValue::Short(value) => match_fn(Value::Short(value)),
+            ReadonlyValue::Int(value) => match_fn(Value::Int(value)),
+            ReadonlyValue::Long(value) => match_fn(Value::Long(value)),
+            ReadonlyValue::Float(value) => match_fn(Value::Float(value)),
+            ReadonlyValue::Double(value) => match_fn(Value::Double(value)),
+            ReadonlyValue::ByteArray(value) => match_fn(Value::ByteArray(value)),
+            ReadonlyValue::String(value) => match_fn(Value::String(value)),
+            ReadonlyValue::List(value) => match_fn(Value::List(value)),
+            ReadonlyValue::Compound(value) => match_fn(Value::Compound(value)),
+            ReadonlyValue::IntArray(value) => match_fn(Value::IntArray(value)),
+            ReadonlyValue::LongArray(value) => match_fn(Value::LongArray(value)),
         }
     }
 }

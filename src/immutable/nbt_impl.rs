@@ -12,12 +12,22 @@ use crate::{
 };
 
 pub trait ImmutableGenericNBTImpl: NBTBase {
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
         mark: *const Mark,
         doc: &D,
     ) -> Self::Type<'doc, ImmutableConfig<O, D>>;
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
@@ -25,13 +35,13 @@ pub trait ImmutableGenericNBTImpl: NBTBase {
         mark: *const Mark,
     ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>>;
 
-    fn extract<'doc, O: ByteOrder, D: Document>(
+    fn _from<'doc, O: ByteOrder, D: Document>(
         value: ReadonlyValue<'doc, O, D>,
     ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>>;
 }
 
 pub trait ImmutableNBTImpl: ImmutableGenericNBTImpl {
-    fn peek<'a, 'doc, O: ByteOrder, D: Document>(
+    fn ref_<'a, 'doc, O: ByteOrder, D: Document>(
         value: &'a ReadonlyValue<'doc, O, D>,
     ) -> Option<&'a Self::Type<'doc, ImmutableConfig<O, D>>>
     where
@@ -48,7 +58,7 @@ pub trait ImmutableNBTImpl: ImmutableGenericNBTImpl {
 macro_rules! immutable_generic_nbt_impl {
     ($name:ident) => {
         #[inline]
-        fn extract<'doc, O: ByteOrder, D: Document>(
+        fn _from<'doc, O: ByteOrder, D: Document>(
             value: ReadonlyValue<'doc, O, D>,
         ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
             match value {
@@ -62,7 +72,7 @@ macro_rules! immutable_generic_nbt_impl {
 macro_rules! immutable_nbt_impl {
     ($name:ident) => {
         #[inline]
-        fn peek<'a, 'doc, O: ByteOrder, D: Document>(
+        fn ref_<'a, 'doc, O: ByteOrder, D: Document>(
             value: &'a ReadonlyValue<'doc, O, D>,
         ) -> Option<&'a Self::Type<'doc, ImmutableConfig<O, D>>>
         where
@@ -641,7 +651,7 @@ impl<T: NBT> ImmutableGenericNBTImpl for TypedList<T> {
         mark: *const Mark,
         doc: &D,
     ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { List::read(data, mark, doc).extract_typed_list_unchecked::<T>() }
+        unsafe { List::read(data, mark, doc).typed_::<T>().unwrap_unchecked() }
     }
 
     #[inline]
@@ -654,16 +664,14 @@ impl<T: NBT> ImmutableGenericNBTImpl for TypedList<T> {
         unsafe {
             List::get_index_unchecked(ptr, index, doc, mark)
                 .unwrap_unchecked()
-                .extract_typed_list::<T>()
+                .typed_::<T>()
         }
     }
 
     #[inline]
-    fn extract<'doc, O: ByteOrder, D: Document>(
+    fn _from<'doc, O: ByteOrder, D: Document>(
         value: ReadonlyValue<'doc, O, D>,
     ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
-        value
-            .extract::<List>()
-            .and_then(|list| list.extract_typed_list::<T>())
+        value.into_::<List>().and_then(|list| list.typed_::<T>())
     }
 }

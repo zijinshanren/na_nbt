@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, NBT, ReadableConfig, ReadonlyArray, ReadonlyCompound,
-    ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter, ReadonlyString, ReadonlyTypedList,
+    ByteOrder, ConfigRef, Document, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyCompoundIter,
+    ReadonlyList, ReadonlyListIter, ReadonlyString, ReadonlyTypedList, ReadonlyTypedListIter,
     ReadonlyValue,
 };
 
@@ -13,7 +13,7 @@ pub struct ImmutableConfig<O: ByteOrder, D: Document> {
     _marker: PhantomData<(O, D)>,
 }
 
-impl<O: ByteOrder, D: Document> ReadableConfig for ImmutableConfig<O, D> {
+impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
     type ByteOrder = O;
     type Value<'doc> = ReadonlyValue<'doc, O, D>;
     type ByteArray<'doc> = ReadonlyArray<'doc, i8, D>;
@@ -21,7 +21,7 @@ impl<O: ByteOrder, D: Document> ReadableConfig for ImmutableConfig<O, D> {
     type List<'doc> = ReadonlyList<'doc, O, D>;
     type ListIter<'doc> = ReadonlyListIter<'doc, O, D>;
     type TypedList<'doc, T: NBT> = ReadonlyTypedList<'doc, O, D, T>;
-    type TypedListIter<'doc, T: NBT> = ReadonlyTypedList<'doc, O, D, T>;
+    type TypedListIter<'doc, T: NBT> = ReadonlyTypedListIter<'doc, O, D, T>;
     type Compound<'doc> = ReadonlyCompound<'doc, O, D>;
     type CompoundIter<'doc> = ReadonlyCompoundIter<'doc, O, D>;
     type IntArray<'doc> = ReadonlyArray<'doc, byteorder::I32<O>, D>;
