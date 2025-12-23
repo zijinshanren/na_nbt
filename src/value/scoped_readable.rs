@@ -1,4 +1,4 @@
-use crate::{Index, NBT, ReadableConfig, TagID, Value};
+use crate::{GenericNBT, Index, NBT, ReadableConfig, TagID, Value};
 
 pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     type Config: ReadableConfig;
@@ -10,11 +10,11 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     /// # Safety
     ///
     /// .
-    unsafe fn to_unchecked<'a, T: NBT>(&'a self) -> T::Type<'a, Self::Config>
+    unsafe fn to_unchecked<'a, T: GenericNBT>(&'a self) -> T::Type<'a, Self::Config>
     where
         'doc: 'a;
 
-    fn to<'a, T: NBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
+    fn to<'a, T: GenericNBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a;
 
@@ -37,14 +37,14 @@ pub trait ScopedReadableValue<'doc>: Send + Sync + Sized {
     ///
     /// .
     // will not check tag id
-    unsafe fn get_typed_unchecked_scoped<'a, T: NBT>(
+    unsafe fn get_typed_unchecked_scoped<'a, T: GenericNBT>(
         &'a self,
         index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a;
 
-    fn get_typed_scoped<'a, T: NBT>(
+    fn get_typed_scoped<'a, T: GenericNBT>(
         &'a self,
         index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
@@ -70,6 +70,20 @@ pub trait ScopedReadableList<'doc>: IntoIterator + Send + Sync + Sized {
     fn len(&self) -> usize;
 
     fn is_empty(&self) -> bool;
+
+    unsafe fn get_typed_unchecked_scoped<'a, T: GenericNBT>(
+        &'a self,
+        index: usize,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a;
+
+    fn get_typed_scoped<'a, T: GenericNBT>(
+        &'a self,
+        index: usize,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a;
 
     fn get_scoped<'a>(
         &'a self,
@@ -120,6 +134,20 @@ pub trait ScopedReadableTypedList<'doc, T: NBT>: IntoIterator + Send + Sync + Si
 
 pub trait ScopedReadableCompound<'doc>: IntoIterator + Send + Sync + Sized {
     type Config: ReadableConfig;
+
+    unsafe fn get_typed_unchecked_scoped<'a, T: GenericNBT>(
+        &'a self,
+        key: &str,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a;
+
+    fn get_typed_scoped<'a, T: GenericNBT>(
+        &'a self,
+        key: &str,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a;
 
     fn get_scoped<'a>(&'a self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'a>>
     where

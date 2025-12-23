@@ -1,9 +1,9 @@
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, ImmutableConfig, ImmutableNBTImpl, Index, Mark, NBT, ReadableValue,
-    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, ScopedReadableValue, TagID,
-    Value,
+    ByteOrder, Document, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl, ImmutableNBTImpl,
+    Index, Mark, NBT, ReadableValue, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
+    ScopedReadableValue, TagID, Value,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -129,12 +129,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     ///
     /// .
     #[inline]
-    pub unsafe fn extract_unchecked<T: NBT>(self) -> T::Type<'doc, ImmutableConfig<O, D>> {
+    pub unsafe fn extract_unchecked<T: GenericNBT>(self) -> T::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { self.extract::<T>().unwrap_unchecked() }
     }
 
     #[inline]
-    pub fn extract<T: NBT>(self) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+    pub fn extract<T: GenericNBT>(self) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         T::extract(self)
     }
 
@@ -144,7 +144,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     ///
     /// .
     #[inline]
-    pub unsafe fn get_typed_unchecked<T: NBT>(
+    pub unsafe fn get_typed_unchecked<T: GenericNBT>(
         &self,
         index: impl Index,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
@@ -162,7 +162,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn get_typed<T: NBT>(
+    pub fn get_typed<T: GenericNBT>(
         &self,
         index: impl Index,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
@@ -204,19 +204,19 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    unsafe fn to_unchecked<'a, T: crate::NBT>(&'a self) -> T::Type<'a, Self::Config>
+    unsafe fn to_unchecked<'a, T: GenericNBT>(&'a self) -> T::Type<'a, Self::Config>
     where
         'doc: 'a,
     {
-        unsafe { self.peek_unchecked::<T>().clone() }
+        unsafe { self.clone().extract_unchecked::<T>() }
     }
 
     #[inline]
-    fn to<'a, T: crate::NBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
+    fn to<'a, T: GenericNBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        self.peek::<T>().cloned()
+        self.clone().extract::<T>()
     }
 
     #[inline]
@@ -244,7 +244,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    unsafe fn get_typed_unchecked_scoped<'a, T: NBT>(
+    unsafe fn get_typed_unchecked_scoped<'a, T: GenericNBT>(
         &'a self,
         index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
@@ -255,7 +255,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    fn get_typed_scoped<'a, T: NBT>(
+    fn get_typed_scoped<'a, T: GenericNBT>(
         &'a self,
         index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
@@ -305,12 +305,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
-    unsafe fn extract_unchecked<T: NBT>(self) -> T::Type<'doc, Self::Config> {
+    unsafe fn extract_unchecked<T: GenericNBT>(self) -> T::Type<'doc, Self::Config> {
         unsafe { self.extract_unchecked::<T>() }
     }
 
     #[inline]
-    fn extract<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>> {
+    fn extract<T: GenericNBT>(self) -> Option<T::Type<'doc, Self::Config>> {
         self.extract::<T>()
     }
 
@@ -323,7 +323,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
-    unsafe fn get_typed_unchecked<T: NBT>(
+    unsafe fn get_typed_unchecked<T: GenericNBT>(
         &self,
         index: impl Index,
     ) -> Option<T::Type<'doc, Self::Config>> {
@@ -331,7 +331,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
-    fn get_typed<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
+    fn get_typed<T: GenericNBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
         self.get_typed::<T>(index)
     }
 

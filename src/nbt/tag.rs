@@ -1,4 +1,6 @@
-use crate::{NBTBase, PrimitiveNBTBase, ReadableConfig, TagID};
+use std::marker::PhantomData;
+
+use crate::{NBT, NBTBase, PrimitiveNBTBase, ReadableConfig, TagID};
 
 macro_rules! define_primary_tag {
     ($($name:ident),* $(,)?) => {
@@ -77,6 +79,14 @@ impl NBTBase for IntArray {
 impl NBTBase for LongArray {
     const TAG_ID: TagID = TagID::LongArray;
     type Type<'a, Config: ReadableConfig> = Config::LongArray<'a>;
+}
+
+#[derive(Clone, Copy)]
+pub struct TypedList<T: NBT>(PhantomData<T>);
+
+impl<T: NBT> NBTBase for TypedList<T> {
+    const TAG_ID: TagID = TagID::List;
+    type Type<'a, Config: ReadableConfig> = Config::TypedList<'a, T>;
 }
 
 macro_rules! primitive_tag {

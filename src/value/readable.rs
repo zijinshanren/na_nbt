@@ -1,5 +1,5 @@
 use crate::{
-    Index, NBT, ReadableConfig, ScopedReadableCompound, ScopedReadableList,
+    GenericNBT, Index, NBT, ReadableConfig, ScopedReadableCompound, ScopedReadableList,
     ScopedReadableTypedList, ScopedReadableValue, Value,
 };
 
@@ -24,9 +24,9 @@ pub trait ReadableValue<'doc>:
     /// # Safety
     ///
     /// .
-    unsafe fn extract_unchecked<T: NBT>(self) -> T::Type<'doc, Self::Config>;
+    unsafe fn extract_unchecked<T: GenericNBT>(self) -> T::Type<'doc, Self::Config>;
 
-    fn extract<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>>;
+    fn extract<T: GenericNBT>(self) -> Option<T::Type<'doc, Self::Config>>;
 
     fn get(&self, index: impl Index) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
 
@@ -36,12 +36,12 @@ pub trait ReadableValue<'doc>:
     ///
     /// .
     // will not check tag id
-    unsafe fn get_typed_unchecked<T: NBT>(
+    unsafe fn get_typed_unchecked<T: GenericNBT>(
         &self,
         index: impl Index,
     ) -> Option<T::Type<'doc, Self::Config>>;
 
-    fn get_typed<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>>;
+    fn get_typed<T: GenericNBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>>;
 
     fn visit<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R;
 }
@@ -55,12 +55,12 @@ pub trait ReadableList<'doc>:
     ///
     /// .
     // will not check tag id
-    unsafe fn get_typed_unchecked<T: NBT>(
+    unsafe fn get_typed_unchecked<T: GenericNBT>(
         &self,
         index: usize,
     ) -> Option<T::Type<'doc, Self::Config>>;
 
-    fn get_typed<T: NBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>>;
+    fn get_typed<T: GenericNBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>>;
 
     /// Gets the element at the given index.
     fn get(&self, index: usize) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
@@ -99,9 +99,12 @@ pub trait ReadableCompound<'doc>:
     ///
     /// .
     // will not check tag id
-    unsafe fn get_typed_unchecked<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>>;
+    unsafe fn get_typed_unchecked<T: GenericNBT>(
+        &self,
+        key: &str,
+    ) -> Option<T::Type<'doc, Self::Config>>;
 
-    fn get_typed<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>>;
+    fn get_typed<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>>;
 
     /// Gets the value associated with the given key.
     fn get(&self, key: &str) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;

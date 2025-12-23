@@ -1,4 +1,4 @@
-use crate::{ImmutableNBTImpl, ReadableConfig};
+use crate::{ImmutableGenericNBTImpl, ImmutableNBTImpl, ReadableConfig};
 
 pub mod tag;
 
@@ -111,3 +111,7 @@ impl<T: NBTBase + ImmutableNBTImpl> NBT for T {}
 pub trait PrimitiveNBT: NBT + PrimitiveNBTBase {}
 
 impl<T: NBT + PrimitiveNBTBase> PrimitiveNBT for T {}
+
+pub trait GenericNBT: NBTBase + ImmutableGenericNBTImpl {}
+
+impl<T: NBTBase + ImmutableGenericNBTImpl> GenericNBT for T {}

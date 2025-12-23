@@ -3,19 +3,34 @@ use std::{marker::PhantomData, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, ImmutableConfig, Mark, NBTBase, ReadonlyArray, ReadonlyCompound,
+    ByteOrder, Document, ImmutableConfig, Mark, NBT, NBTBase, ReadonlyArray, ReadonlyCompound,
     ReadonlyList, ReadonlyString, ReadonlyValue,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
-        String,
+        String, TypedList,
     },
 };
 
-pub trait ImmutableNBTImpl: NBTBase {
+pub trait ImmutableGenericNBTImpl: NBTBase {
+    unsafe fn read<'doc, O: ByteOrder, D: Document>(
+        data: *const u8,
+        mark: *const Mark,
+        doc: &D,
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>>;
+
+    unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
+        ptr: *const u8,
+        index: usize,
+        doc: &D,
+        mark: *const Mark,
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>>;
+
     fn extract<'doc, O: ByteOrder, D: Document>(
         value: ReadonlyValue<'doc, O, D>,
     ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>>;
+}
 
+pub trait ImmutableNBTImpl: ImmutableGenericNBTImpl {
     fn peek<'a, 'doc, O: ByteOrder, D: Document>(
         value: &'a ReadonlyValue<'doc, O, D>,
     ) -> Option<&'a Self::Type<'doc, ImmutableConfig<O, D>>>
@@ -27,44 +42,25 @@ pub trait ImmutableNBTImpl: NBTBase {
     /// # Safety
     ///
     /// .
-    unsafe fn read<'doc, O: ByteOrder, D: Document>(
-        data: *const u8,
-        mark: *const Mark,
-        doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>>;
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
     unsafe fn size<O: ByteOrder>(payload: *const u8, mark: *const Mark) -> (usize, usize);
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
-        ptr: *const u8,
-        index: usize,
-        doc: &D,
-        mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>>;
 }
 
-macro_rules! immutable_nbt_impl {
-    ($name:ident, $value:ident) => {
+macro_rules! immutable_generic_nbt_impl {
+    ($name:ident) => {
         #[inline]
         fn extract<'doc, O: ByteOrder, D: Document>(
             value: ReadonlyValue<'doc, O, D>,
         ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
             match value {
-                ReadonlyValue::$value(v) => Some(v),
+                ReadonlyValue::$name(v) => Some(v),
                 _ => None,
             }
         }
+    };
+}
 
+macro_rules! immutable_nbt_impl {
+    ($name:ident) => {
         #[inline]
         fn peek<'a, 'doc, O: ByteOrder, D: Document>(
             value: &'a ReadonlyValue<'doc, O, D>,
@@ -73,14 +69,14 @@ macro_rules! immutable_nbt_impl {
             'doc: 'a,
         {
             match value {
-                ReadonlyValue::$value(v) => Some(v),
+                ReadonlyValue::$name(v) => Some(v),
                 _ => None,
             }
         }
     };
 }
 
-impl ImmutableNBTImpl for End {
+impl ImmutableGenericNBTImpl for End {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         _data: *const u8,
@@ -90,23 +86,28 @@ impl ImmutableNBTImpl for End {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (0, 0)
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         _ptr: *const u8,
         _index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        Some(())
     }
 
-    immutable_nbt_impl!(TagEnd, End);
+    immutable_generic_nbt_impl!(End);
 }
 
-impl ImmutableNBTImpl for Byte {
+impl ImmutableNBTImpl for End {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (0, 0)
+    }
+
+    immutable_nbt_impl!(End);
+}
+
+impl ImmutableGenericNBTImpl for Byte {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -117,24 +118,28 @@ impl ImmutableNBTImpl for Byte {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (1, 0)
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { *ptr.add(index).cast() }
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        Some(unsafe { *ptr.add(index).cast() })
     }
 
-    immutable_nbt_impl!(TagByte, Byte);
+    immutable_generic_nbt_impl!(Byte);
 }
 
-impl ImmutableNBTImpl for Short {
+impl ImmutableNBTImpl for Byte {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (1, 0)
+    }
+
+    immutable_nbt_impl!(Byte);
+}
+
+impl ImmutableGenericNBTImpl for Short {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -145,24 +150,28 @@ impl ImmutableNBTImpl for Short {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (2, 0)
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { byteorder::I16::<O>::from_bytes(*ptr.add(index * 2).cast()).get() }
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        Some(unsafe { byteorder::I16::<O>::from_bytes(*ptr.add(index * 2).cast()).get() })
     }
 
-    immutable_nbt_impl!(TagShort, Short);
+    immutable_generic_nbt_impl!(Short);
 }
 
-impl ImmutableNBTImpl for Int {
+impl ImmutableNBTImpl for Short {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (2, 0)
+    }
+
+    immutable_nbt_impl!(Short);
+}
+
+impl ImmutableGenericNBTImpl for Int {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -173,24 +182,28 @@ impl ImmutableNBTImpl for Int {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (4, 0)
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { byteorder::I32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() }
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        Some(unsafe { byteorder::I32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() })
     }
 
-    immutable_nbt_impl!(TagInt, Int);
+    immutable_generic_nbt_impl!(Int);
 }
 
-impl ImmutableNBTImpl for Long {
+impl ImmutableNBTImpl for Int {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (4, 0)
+    }
+
+    immutable_nbt_impl!(Int);
+}
+
+impl ImmutableGenericNBTImpl for Long {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -201,24 +214,28 @@ impl ImmutableNBTImpl for Long {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (8, 0)
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { byteorder::I64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() }
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        Some(unsafe { byteorder::I64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() })
     }
 
-    immutable_nbt_impl!(TagLong, Long);
+    immutable_generic_nbt_impl!(Long);
 }
 
-impl ImmutableNBTImpl for Float {
+impl ImmutableNBTImpl for Long {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (8, 0)
+    }
+
+    immutable_nbt_impl!(Long);
+}
+
+impl ImmutableGenericNBTImpl for Float {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -229,24 +246,28 @@ impl ImmutableNBTImpl for Float {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (4, 0)
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { byteorder::F32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() }
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        Some(unsafe { byteorder::F32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() })
     }
 
-    immutable_nbt_impl!(TagFloat, Float);
+    immutable_generic_nbt_impl!(Float);
 }
 
-impl ImmutableNBTImpl for Double {
+impl ImmutableNBTImpl for Float {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (4, 0)
+    }
+
+    immutable_nbt_impl!(Float);
+}
+
+impl ImmutableGenericNBTImpl for Double {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -255,26 +276,29 @@ impl ImmutableNBTImpl for Double {
     ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::F64::<O>::from_bytes(*data.cast()).get() }
     }
-
-    #[inline]
-    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (8, 0)
-    }
-
     #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe { byteorder::F64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() }
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        Some(unsafe { byteorder::F64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() })
     }
 
-    immutable_nbt_impl!(TagDouble, Double);
+    immutable_generic_nbt_impl!(Double);
 }
 
-impl ImmutableNBTImpl for ByteArray {
+impl ImmutableNBTImpl for Double {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(_payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (8, 0)
+    }
+
+    immutable_nbt_impl!(Double);
+}
+
+impl ImmutableGenericNBTImpl for ByteArray {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -293,20 +317,12 @@ impl ImmutableNBTImpl for ByteArray {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (
-            4 + byteorder::U32::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize,
-            0,
-        )
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -314,17 +330,29 @@ impl ImmutableNBTImpl for ByteArray {
                 p = p.add(4 + len as usize);
             }
             let len = byteorder::U32::<O>::from_bytes(*p.cast()).get();
-            ReadonlyArray {
+            Some(ReadonlyArray {
                 data: slice::from_raw_parts(p.add(4).cast(), len as usize),
                 _doc: doc.clone(),
-            }
+            })
         }
     }
 
-    immutable_nbt_impl!(TagByteArray, ByteArray);
+    immutable_generic_nbt_impl!(ByteArray);
 }
 
-impl ImmutableNBTImpl for String {
+impl ImmutableNBTImpl for ByteArray {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (
+            4 + byteorder::U32::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize,
+            0,
+        )
+    }
+
+    immutable_nbt_impl!(ByteArray);
+}
+
+impl ImmutableGenericNBTImpl for String {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -343,20 +371,12 @@ impl ImmutableNBTImpl for String {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (
-            2 + byteorder::U16::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize,
-            0,
-        )
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -364,25 +384,97 @@ impl ImmutableNBTImpl for String {
                 p = p.add(2 + len as usize);
             }
             let len = byteorder::U16::<O>::from_bytes(*p.cast()).get();
-            ReadonlyString {
+            Some(ReadonlyString {
                 data: slice::from_raw_parts(p.add(2), len as usize),
                 _doc: doc.clone(),
+            })
+        }
+    }
+
+    immutable_generic_nbt_impl!(String);
+}
+
+impl ImmutableNBTImpl for String {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (
+            2 + byteorder::U16::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize,
+            0,
+        )
+    }
+
+    immutable_nbt_impl!(String);
+}
+
+impl ImmutableGenericNBTImpl for List {
+    #[inline]
+    unsafe fn read<'doc, O: ByteOrder, D: Document>(
+        data: *const u8,
+        mark: *const Mark,
+        doc: &D,
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+        unsafe {
+            ReadonlyList {
+                data: slice::from_raw_parts(
+                    data,
+                    (*mark).store.end_pointer.byte_offset_from_unsigned(data),
+                ),
+                mark: mark.add(1),
+                doc: doc.clone(),
+                _marker: PhantomData,
             }
         }
     }
 
-    immutable_nbt_impl!(TagString, String);
+    #[inline]
+    unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
+        ptr: *const u8,
+        index: usize,
+        doc: &D,
+        mark: *const Mark,
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        unsafe {
+            let mut p = ptr;
+            let mut m = mark;
+            for _ in 0..index {
+                p = (*m).store.end_pointer;
+                m = m.add((*m).store.flat_next_mark as usize);
+            }
+            Some(ReadonlyList {
+                data: slice::from_raw_parts(p, (*m).store.end_pointer.byte_offset_from_unsigned(p)),
+                mark: m.add(1),
+                doc: doc.clone(),
+                _marker: PhantomData,
+            })
+        }
+    }
+
+    immutable_generic_nbt_impl!(List);
 }
 
 impl ImmutableNBTImpl for List {
     #[inline]
+    unsafe fn size<O: ByteOrder>(payload: *const u8, mark: *const Mark) -> (usize, usize) {
+        unsafe {
+            (
+                (*mark).store.end_pointer.byte_offset_from_unsigned(payload),
+                (*mark).store.flat_next_mark as usize,
+            )
+        }
+    }
+
+    immutable_nbt_impl!(List);
+}
+
+impl ImmutableGenericNBTImpl for Compound {
+    #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
         mark: *const Mark,
         doc: &D,
     ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
-            ReadonlyList {
+            ReadonlyCompound {
                 data: slice::from_raw_parts(
                     data,
                     (*mark).store.end_pointer.byte_offset_from_unsigned(data),
@@ -395,22 +487,12 @@ impl ImmutableNBTImpl for List {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(payload: *const u8, mark: *const Mark) -> (usize, usize) {
-        unsafe {
-            (
-                (*mark).store.end_pointer.byte_offset_from_unsigned(payload),
-                (*mark).store.flat_next_mark as usize,
-            )
-        }
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             let mut m = mark;
@@ -418,39 +500,20 @@ impl ImmutableNBTImpl for List {
                 p = (*m).store.end_pointer;
                 m = m.add((*m).store.flat_next_mark as usize);
             }
-            ReadonlyList {
+            Some(ReadonlyCompound {
                 data: slice::from_raw_parts(p, (*m).store.end_pointer.byte_offset_from_unsigned(p)),
                 mark: m.add(1),
                 doc: doc.clone(),
                 _marker: PhantomData,
-            }
+            })
         }
     }
 
-    immutable_nbt_impl!(TagList, List);
+    immutable_generic_nbt_impl!(Compound);
 }
 
 impl ImmutableNBTImpl for Compound {
     #[inline]
-    unsafe fn read<'doc, O: ByteOrder, D: Document>(
-        data: *const u8,
-        mark: *const Mark,
-        doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe {
-            ReadonlyCompound {
-                data: slice::from_raw_parts(
-                    data,
-                    (*mark).store.end_pointer.byte_offset_from_unsigned(data),
-                ),
-                mark: mark.add(1),
-                doc: doc.clone(),
-                _marker: PhantomData,
-            }
-        }
-    }
-
-    #[inline]
     unsafe fn size<O: ByteOrder>(payload: *const u8, mark: *const Mark) -> (usize, usize) {
         unsafe {
             (
@@ -460,33 +523,10 @@ impl ImmutableNBTImpl for Compound {
         }
     }
 
-    #[inline]
-    unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
-        ptr: *const u8,
-        index: usize,
-        doc: &D,
-        mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe {
-            let mut p = ptr;
-            let mut m = mark;
-            for _ in 0..index {
-                p = (*m).store.end_pointer;
-                m = m.add((*m).store.flat_next_mark as usize);
-            }
-            ReadonlyCompound {
-                data: slice::from_raw_parts(p, (*m).store.end_pointer.byte_offset_from_unsigned(p)),
-                mark: m.add(1),
-                doc: doc.clone(),
-                _marker: PhantomData,
-            }
-        }
-    }
-
-    immutable_nbt_impl!(TagCompound, Compound);
+    immutable_nbt_impl!(Compound);
 }
 
-impl ImmutableNBTImpl for IntArray {
+impl ImmutableGenericNBTImpl for IntArray {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -504,6 +544,31 @@ impl ImmutableNBTImpl for IntArray {
         }
     }
 
+    #[inline]
+    unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
+        ptr: *const u8,
+        index: usize,
+        doc: &D,
+        _mark: *const Mark,
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        unsafe {
+            let mut p = ptr;
+            for _ in 0..index {
+                let len = byteorder::U32::<O>::from_bytes(*p.cast()).get();
+                p = p.add(4 + len as usize * 4);
+            }
+            let len = byteorder::U32::<O>::from_bytes(*p.cast()).get();
+            Some(ReadonlyArray {
+                data: slice::from_raw_parts(p.add(4).cast(), len as usize),
+                _doc: doc.clone(),
+            })
+        }
+    }
+
+    immutable_generic_nbt_impl!(IntArray);
+}
+
+impl ImmutableNBTImpl for IntArray {
     #[inline]
     unsafe fn size<O: ByteOrder>(payload: *const u8, _mark: *const Mark) -> (usize, usize) {
         (
@@ -512,31 +577,10 @@ impl ImmutableNBTImpl for IntArray {
         )
     }
 
-    #[inline]
-    unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
-        ptr: *const u8,
-        index: usize,
-        doc: &D,
-        _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
-        unsafe {
-            let mut p = ptr;
-            for _ in 0..index {
-                let len = byteorder::U32::<O>::from_bytes(*p.cast()).get();
-                p = p.add(4 + len as usize * 4);
-            }
-            let len = byteorder::U32::<O>::from_bytes(*p.cast()).get();
-            ReadonlyArray {
-                data: slice::from_raw_parts(p.add(4).cast(), len as usize),
-                _doc: doc.clone(),
-            }
-        }
-    }
-
-    immutable_nbt_impl!(TagIntArray, IntArray);
+    immutable_nbt_impl!(IntArray);
 }
 
-impl ImmutableNBTImpl for LongArray {
+impl ImmutableGenericNBTImpl for LongArray {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -555,20 +599,12 @@ impl ImmutableNBTImpl for LongArray {
     }
 
     #[inline]
-    unsafe fn size<O: ByteOrder>(payload: *const u8, _mark: *const Mark) -> (usize, usize) {
-        (
-            4 + byteorder::U32::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize * 8,
-            0,
-        )
-    }
-
-    #[inline]
     unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
         ptr: *const u8,
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -576,12 +612,58 @@ impl ImmutableNBTImpl for LongArray {
                 p = p.add(4 + len as usize * 8);
             }
             let len = byteorder::U32::<O>::from_bytes(*p.cast()).get();
-            ReadonlyArray {
+            Some(ReadonlyArray {
                 data: slice::from_raw_parts(p.add(4).cast(), len as usize),
                 _doc: doc.clone(),
-            }
+            })
         }
     }
 
-    immutable_nbt_impl!(TagLongArray, LongArray);
+    immutable_generic_nbt_impl!(LongArray);
+}
+
+impl ImmutableNBTImpl for LongArray {
+    #[inline]
+    unsafe fn size<O: ByteOrder>(payload: *const u8, _mark: *const Mark) -> (usize, usize) {
+        (
+            4 + byteorder::U32::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize * 8,
+            0,
+        )
+    }
+
+    immutable_nbt_impl!(LongArray);
+}
+
+impl<T: NBT> ImmutableGenericNBTImpl for TypedList<T> {
+    #[inline]
+    unsafe fn read<'doc, O: ByteOrder, D: Document>(
+        data: *const u8,
+        mark: *const Mark,
+        doc: &D,
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+        unsafe { List::read(data, mark, doc).extract_typed_list_unchecked::<T>() }
+    }
+
+    #[inline]
+    unsafe fn get_index_unchecked<'doc, O: ByteOrder, D: Document>(
+        ptr: *const u8,
+        index: usize,
+        doc: &D,
+        mark: *const Mark,
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        unsafe {
+            List::get_index_unchecked(ptr, index, doc, mark)
+                .unwrap_unchecked()
+                .extract_typed_list::<T>()
+        }
+    }
+
+    #[inline]
+    fn extract<'doc, O: ByteOrder, D: Document>(
+        value: ReadonlyValue<'doc, O, D>,
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        value
+            .extract::<List>()
+            .and_then(|list| list.extract_typed_list::<T>())
+    }
 }

@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, EMPTY_COMPOUND, ImmutableConfig, Mark, NBT, Never, ReadableCompound,
-    ReadonlyString, ReadonlyValue, ScopedReadableCompound, TagID, cold_path,
+    ByteOrder, Document, EMPTY_COMPOUND, GenericNBT, ImmutableConfig, Mark, Never,
+    ReadableCompound, ReadonlyString, ReadonlyValue, ScopedReadableCompound, TagID, cold_path,
 };
 
 #[derive(Clone)]
@@ -85,7 +85,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     /// # Safety
     ///
     /// .
-    pub unsafe fn get_typed_unchecked<T: NBT>(
+    pub unsafe fn get_typed_unchecked<T: GenericNBT>(
         &self,
         key: &str,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
@@ -96,7 +96,10 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    pub fn get_typed<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+    pub fn get_typed<T: GenericNBT>(
+        &self,
+        key: &str,
+    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
                 if tag_id != T::TAG_ID {
@@ -139,6 +142,28 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
     type Config = ImmutableConfig<O, D>;
 
     #[inline]
+    unsafe fn get_typed_unchecked_scoped<'a, T: crate::GenericNBT>(
+        &'a self,
+        key: &str,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a,
+    {
+        unsafe { self.get_typed_unchecked::<T>(key) }
+    }
+
+    #[inline]
+    fn get_typed_scoped<'a, T: crate::GenericNBT>(
+        &'a self,
+        key: &str,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a,
+    {
+        self.get_typed::<T>(key)
+    }
+
+    #[inline]
     fn get_scoped<'a>(
         &'a self,
         key: &str,
@@ -160,12 +185,15 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
 
 impl<'doc, O: ByteOrder, D: Document> ReadableCompound<'doc> for ReadonlyCompound<'doc, O, D> {
     #[inline]
-    unsafe fn get_typed_unchecked<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
+    unsafe fn get_typed_unchecked<T: GenericNBT>(
+        &self,
+        key: &str,
+    ) -> Option<T::Type<'doc, Self::Config>> {
         unsafe { self.get_typed_unchecked::<T>(key) }
     }
 
     #[inline]
-    fn get_typed<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
+    fn get_typed<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
         self.get_typed::<T>(key)
     }
 

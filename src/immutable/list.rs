@@ -3,9 +3,9 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, EMPTY_LIST, ImmutableConfig, ImmutableNBTImpl, Mark, NBT, Never,
-    ReadableList, ReadableTypedList, ReadonlyValue, ScopedReadableList, ScopedReadableTypedList,
-    TagID, cold_path,
+    ByteOrder, Document, EMPTY_LIST, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl, Mark,
+    NBT, Never, ReadableList, ReadableTypedList, ReadonlyValue, ScopedReadableList,
+    ScopedReadableTypedList, TagID, cold_path,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -79,7 +79,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     /// # Safety
     ///
     /// .
-    pub unsafe fn get_typed_unchecked<T: NBT>(
+    pub unsafe fn get_typed_unchecked<T: GenericNBT>(
         &self,
         index: usize,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
@@ -88,17 +88,20 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
             return None;
         }
 
-        Some(unsafe {
+        unsafe {
             T::get_index_unchecked::<O, D>(
                 self.data.as_ptr().add(1 + 4),
                 index,
                 &self.doc,
                 self.mark,
             )
-        })
+        }
     }
 
-    pub fn get_typed<T: NBT>(&self, index: usize) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+    pub fn get_typed<T: GenericNBT>(
+        &self,
+        index: usize,
+    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         if index >= self.len() {
             cold_path();
             return None;
@@ -109,14 +112,14 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
             return None;
         }
 
-        Some(unsafe {
+        unsafe {
             T::get_index_unchecked::<O, D>(
                 self.data.as_ptr().add(1 + 4),
                 index,
                 &self.doc,
                 self.mark,
             )
-        })
+        }
     }
 
     /// Returns the element at the given index, or `None` if out of bounds.
@@ -139,7 +142,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
                     match $tag_id_val {
                         $(
                             TagID::$tag_id => Some(ReadonlyValue::$tag_id(
-                                $tag_type::get_index_unchecked::<O, D>($ptr, $index, $doc, $mark)
+                                $tag_type::get_index_unchecked::<O, D>($ptr, $index, $doc, $mark).unwrap_unchecked()
                             )),
                         )*
                     }
@@ -209,6 +212,28 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
     }
 
     #[inline]
+    unsafe fn get_typed_unchecked_scoped<'a, T: GenericNBT>(
+        &'a self,
+        index: usize,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a,
+    {
+        unsafe { self.get_typed_unchecked::<T>(index) }
+    }
+
+    #[inline]
+    fn get_typed_scoped<'a, T: GenericNBT>(
+        &'a self,
+        index: usize,
+    ) -> Option<T::Type<'a, Self::Config>>
+    where
+        'doc: 'a,
+    {
+        self.get_typed::<T>(index)
+    }
+
+    #[inline]
     fn get_scoped<'a>(
         &'a self,
         index: usize,
@@ -250,7 +275,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
 
 impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, O, D> {
     #[inline]
-    unsafe fn get_typed_unchecked<T: NBT>(
+    unsafe fn get_typed_unchecked<T: GenericNBT>(
         &self,
         index: usize,
     ) -> Option<T::Type<'doc, Self::Config>> {
@@ -258,7 +283,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, 
     }
 
     #[inline]
-    fn get_typed<T: NBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>> {
+    fn get_typed<T: GenericNBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>> {
         self.get_typed::<T>(index)
     }
 
@@ -385,7 +410,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
             return None;
         }
 
-        Some(unsafe { T::get_index_unchecked::<O, D>(self.data, index, &self.doc, self.mark) })
+        unsafe { T::get_index_unchecked::<O, D>(self.data, index, &self.doc, self.mark) }
     }
 
     #[inline]
