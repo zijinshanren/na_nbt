@@ -141,9 +141,9 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     ///
     /// .
     #[inline]
-    pub unsafe fn get_typed_unchecked<I: Index, T: NBT>(
+    pub unsafe fn get_typed_unchecked<T: NBT>(
         &self,
-        index: I,
+        index: impl Index,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         index.index_dispatch(
             self,
@@ -159,9 +159,9 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn get_typed<I: Index, T: NBT>(
+    pub fn get_typed<T: NBT>(
         &self,
-        index: I,
+        index: impl Index,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         index.index_dispatch(
             self,
@@ -177,7 +177,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn get<I: Index>(&self, index: I) -> Option<ReadonlyValue<'doc, O, D>> {
+    pub fn get(&self, index: impl Index) -> Option<ReadonlyValue<'doc, O, D>> {
         index.index_dispatch(
             self,
             |value, index| match value {
@@ -230,9 +230,9 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    fn get_scoped<'a, I: crate::Index>(
+    fn get_scoped<'a>(
         &'a self,
-        index: I,
+        index: impl Index,
     ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'a>>
     where
         'doc: 'a,
@@ -241,25 +241,25 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    unsafe fn get_typed_unchecked_scoped<'a, I: Index, T: NBT>(
+    unsafe fn get_typed_unchecked_scoped<'a, T: NBT>(
         &'a self,
-        index: I,
+        index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        unsafe { self.get_typed_unchecked::<I, T>(index) }
+        unsafe { self.get_typed_unchecked::<T>(index) }
     }
 
     #[inline]
-    fn get_typed_scoped<'a, I: Index, T: NBT>(
+    fn get_typed_scoped<'a, T: NBT>(
         &'a self,
-        index: I,
+        index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        self.get_typed::<I, T>(index)
+        self.get_typed::<T>(index)
     }
 
     fn with<'a, R>(&'a self, match_fn: impl FnOnce(crate::Value<'a, Self::Config>) -> R) -> R
@@ -312,24 +312,24 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
-    fn get<I: Index>(
+    fn get(
         &self,
-        index: I,
+        index: impl Index,
     ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'doc>> {
         self.get(index)
     }
 
     #[inline]
-    unsafe fn get_typed_unchecked<I: Index, T: NBT>(
+    unsafe fn get_typed_unchecked<T: NBT>(
         &self,
-        index: I,
+        index: impl Index,
     ) -> Option<T::Type<'doc, Self::Config>> {
-        unsafe { self.get_typed_unchecked::<I, T>(index) }
+        unsafe { self.get_typed_unchecked::<T>(index) }
     }
 
     #[inline]
-    fn get_typed<I: Index, T: NBT>(&self, index: I) -> Option<T::Type<'doc, Self::Config>> {
-        self.get_typed::<I, T>(index)
+    fn get_typed<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_typed::<T>(index)
     }
 
     fn visit<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R {

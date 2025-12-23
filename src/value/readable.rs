@@ -28,7 +28,7 @@ pub trait ReadableValue<'doc>:
 
     fn extract<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>>;
 
-    fn get<I: Index>(&self, index: I) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
+    fn get(&self, index: impl Index) -> Option<<Self::Config as ReadableConfig>::Value<'doc>>;
 
     /// .
     ///
@@ -36,12 +36,12 @@ pub trait ReadableValue<'doc>:
     ///
     /// .
     // will not check tag id
-    unsafe fn get_typed_unchecked<I: Index, T: NBT>(
+    unsafe fn get_typed_unchecked<T: NBT>(
         &self,
-        index: I,
+        index: impl Index,
     ) -> Option<T::Type<'doc, Self::Config>>;
 
-    fn get_typed<I: Index, T: NBT>(&self, index: I) -> Option<T::Type<'doc, Self::Config>>;
+    fn get_typed<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>>;
 
     fn visit<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R;
 }
