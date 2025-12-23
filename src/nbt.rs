@@ -1,4 +1,4 @@
-use crate::{ImmutableGenericNBTImpl, ImmutableNBTImpl, ReadableConfig};
+use crate::{ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl};
 
 pub mod tag;
 
@@ -98,9 +98,28 @@ impl TagID {
     }
 }
 
-pub trait NBTBase: Send + Sync + Sized + Clone + Copy + 'static {
+mod private {
+    use crate::{NBT, tag::*};
+    pub trait Sealed {}
+    impl Sealed for End {}
+    impl Sealed for Byte {}
+    impl Sealed for Short {}
+    impl Sealed for Int {}
+    impl Sealed for Long {}
+    impl Sealed for Float {}
+    impl Sealed for Double {}
+    impl Sealed for ByteArray {}
+    impl Sealed for String {}
+    impl Sealed for List {}
+    impl Sealed for Compound {}
+    impl Sealed for IntArray {}
+    impl Sealed for LongArray {}
+    impl<T: NBT> Sealed for TypedList<T> {}
+}
+
+pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'static {
     const TAG_ID: TagID;
-    type Type<'a, Config: ReadableConfig>: Clone;
+    type Type<'a, Config: ConfigRef>: Clone;
 }
 
 pub trait PrimitiveNBTBase: NBTBase {}

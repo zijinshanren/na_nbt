@@ -137,7 +137,7 @@ impl StringViewOwn {
 /// - [`BorrowedValue`](crate::BorrowedValue) - Zero-copy alternative for read-only access
 pub enum OwnedValue<O: ByteOrder> {
     /// End tag (0) - marks the end of a compound.
-    End,
+    End(()),
     /// Byte tag (1) - a signed 8-bit integer.
     Byte(i8),
     /// Short tag (2) - a signed 16-bit integer.

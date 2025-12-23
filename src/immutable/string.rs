@@ -24,6 +24,11 @@ impl<'doc, D: Document> ReadonlyString<'doc, D> {
     pub fn decode<'a>(&'a self) -> Cow<'a, str> {
         simd_cesu8::mutf8::decode_lossy(self.data)
     }
+
+    #[inline]
+    pub fn to_string(&self) -> String {
+        self.decode().into_owned()
+    }
 }
 
 impl<'doc, D: Document> ReadableString<'doc> for ReadonlyString<'doc, D> {
@@ -35,5 +40,10 @@ impl<'doc, D: Document> ReadableString<'doc> for ReadonlyString<'doc, D> {
     #[inline]
     fn decode(&self) -> std::borrow::Cow<'_, str> {
         self.decode()
+    }
+
+    #[inline]
+    fn to_string(&self) -> String {
+        self.to_string()
     }
 }

@@ -79,7 +79,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     /// # Safety
     ///
     /// .
-    pub unsafe fn get_typed_unchecked<T: GenericNBT>(
+    pub unsafe fn get_unchecked_<T: GenericNBT>(
         &self,
         index: usize,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
@@ -98,7 +98,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         }
     }
 
-    pub fn get_typed<T: GenericNBT>(
+    pub fn get_<T: GenericNBT>(
         &self,
         index: usize,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
@@ -212,29 +212,26 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
     }
 
     #[inline]
-    unsafe fn get_typed_unchecked_scoped<'a, T: GenericNBT>(
+    unsafe fn at_unchecked_<'a, T: GenericNBT>(
         &'a self,
         index: usize,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        unsafe { self.get_typed_unchecked::<T>(index) }
+        unsafe { self.get_unchecked_::<T>(index) }
     }
 
     #[inline]
-    fn get_typed_scoped<'a, T: GenericNBT>(
-        &'a self,
-        index: usize,
-    ) -> Option<T::Type<'a, Self::Config>>
+    fn at_<'a, T: GenericNBT>(&'a self, index: usize) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        self.get_typed::<T>(index)
+        self.get_::<T>(index)
     }
 
     #[inline]
-    fn get_scoped<'a>(
+    fn at<'a>(
         &'a self,
         index: usize,
     ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'a>>
@@ -259,11 +256,11 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
     where
         'doc: 'a,
     {
-        unsafe { self.to_typed_list().unwrap_unchecked() }
+        unsafe { self.to_typed_().unwrap_unchecked() }
     }
 
     #[inline]
-    fn to_typed_list<'a, T: NBT>(
+    fn to_typed_<'a, T: NBT>(
         &'a self,
     ) -> Option<<Self::Config as crate::ReadableConfig>::TypedList<'a, T>>
     where
@@ -275,16 +272,16 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<
 
 impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, O, D> {
     #[inline]
-    unsafe fn get_typed_unchecked<T: GenericNBT>(
+    unsafe fn get_unchecked_<T: GenericNBT>(
         &self,
         index: usize,
     ) -> Option<T::Type<'doc, Self::Config>> {
-        unsafe { self.get_typed_unchecked::<T>(index) }
+        unsafe { self.get_unchecked_::<T>(index) }
     }
 
     #[inline]
-    fn get_typed<T: GenericNBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>> {
-        self.get_typed::<T>(index)
+    fn get_<T: GenericNBT>(&self, index: usize) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_::<T>(index)
     }
 
     #[inline]
@@ -305,7 +302,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadableList<'doc> for ReadonlyList<'doc, 
     }
 
     #[inline]
-    fn extract_typed_list<T: NBT>(
+    fn into_typed_<T: NBT>(
         self,
     ) -> Option<<Self::Config as crate::ReadableConfig>::TypedList<'doc, T>> {
         self.extract_typed_list::<T>()
@@ -435,7 +432,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ScopedReadableTypedList<'doc, T>
     }
 
     #[inline]
-    fn get_scoped<'a>(&'a self, index: usize) -> Option<<T>::Type<'a, Self::Config>>
+    fn at<'a>(&'a self, index: usize) -> Option<<T>::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {

@@ -4,10 +4,11 @@ pub use zerocopy::NativeEndian;
 
 pub mod error;
 pub mod immutable;
-mod index;
+pub mod index;
 pub mod nbt;
-mod util;
+pub mod util;
 pub mod value;
+pub mod view;
 
 pub use error::*;
 pub use immutable::*;
@@ -15,3 +16,4 @@ pub use index::*;
 pub use nbt::*;
 pub use util::*;
 pub use value::*;
+pub use view::*;

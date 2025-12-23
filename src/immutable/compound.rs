@@ -85,7 +85,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     /// # Safety
     ///
     /// .
-    pub unsafe fn get_typed_unchecked<T: GenericNBT>(
+    pub unsafe fn get_unchecked_<T: GenericNBT>(
         &self,
         key: &str,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
@@ -96,10 +96,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    pub fn get_typed<T: GenericNBT>(
-        &self,
-        key: &str,
-    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+    pub fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
                 if tag_id != T::TAG_ID {
@@ -142,29 +139,29 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
     type Config = ImmutableConfig<O, D>;
 
     #[inline]
-    unsafe fn get_typed_unchecked_scoped<'a, T: crate::GenericNBT>(
+    unsafe fn at_unchecked_<'a, T: crate::GenericNBT>(
         &'a self,
         key: &str,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        unsafe { self.get_typed_unchecked::<T>(key) }
+        unsafe { self.get_unchecked_::<T>(key) }
     }
 
     #[inline]
-    fn get_typed_scoped<'a, T: crate::GenericNBT>(
+    fn at_<'a, T: crate::GenericNBT>(
         &'a self,
         key: &str,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        self.get_typed::<T>(key)
+        self.get_::<T>(key)
     }
 
     #[inline]
-    fn get_scoped<'a>(
+    fn at<'a>(
         &'a self,
         key: &str,
     ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'a>>
@@ -185,16 +182,16 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
 
 impl<'doc, O: ByteOrder, D: Document> ReadableCompound<'doc> for ReadonlyCompound<'doc, O, D> {
     #[inline]
-    unsafe fn get_typed_unchecked<T: GenericNBT>(
+    unsafe fn get_unchecked_<T: GenericNBT>(
         &self,
         key: &str,
     ) -> Option<T::Type<'doc, Self::Config>> {
-        unsafe { self.get_typed_unchecked::<T>(key) }
+        unsafe { self.get_unchecked_::<T>(key) }
     }
 
     #[inline]
-    fn get_typed<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
-        self.get_typed::<T>(key)
+    fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_::<T>(key)
     }
 
     #[inline]

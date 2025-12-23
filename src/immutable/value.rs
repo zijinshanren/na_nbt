@@ -144,36 +144,36 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     ///
     /// .
     #[inline]
-    pub unsafe fn get_typed_unchecked<T: GenericNBT>(
+    pub unsafe fn get_unchecked_<T: GenericNBT>(
         &self,
         index: impl Index,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         index.index_dispatch(
             self,
             |value, index| match value {
-                ReadonlyValue::List(value) => unsafe { value.get_typed_unchecked::<T>(index) },
+                ReadonlyValue::List(value) => unsafe { value.get_unchecked_::<T>(index) },
                 _ => None,
             },
             |value, key| match value {
-                ReadonlyValue::Compound(value) => unsafe { value.get_typed_unchecked::<T>(key) },
+                ReadonlyValue::Compound(value) => unsafe { value.get_unchecked_::<T>(key) },
                 _ => None,
             },
         )
     }
 
     #[inline]
-    pub fn get_typed<T: GenericNBT>(
+    pub fn get_<T: GenericNBT>(
         &self,
         index: impl Index,
     ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         index.index_dispatch(
             self,
             |value, index| match value {
-                ReadonlyValue::List(value) => value.get_typed::<T>(index),
+                ReadonlyValue::List(value) => value.get_::<T>(index),
                 _ => None,
             },
             |value, key| match value {
-                ReadonlyValue::Compound(value) => value.get_typed::<T>(key),
+                ReadonlyValue::Compound(value) => value.get_::<T>(key),
                 _ => None,
             },
         )
@@ -204,7 +204,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    unsafe fn to_unchecked<'a, T: GenericNBT>(&'a self) -> T::Type<'a, Self::Config>
+    unsafe fn to_unchecked_<'a, T: GenericNBT>(&'a self) -> T::Type<'a, Self::Config>
     where
         'doc: 'a,
     {
@@ -212,7 +212,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    fn to<'a, T: GenericNBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
+    fn to_<'a, T: GenericNBT>(&'a self) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
@@ -233,7 +233,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    fn get_scoped<'a>(
+    fn at<'a>(
         &'a self,
         index: impl Index,
     ) -> Option<<Self::Config as crate::ReadableConfig>::Value<'a>>
@@ -244,28 +244,28 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
     }
 
     #[inline]
-    unsafe fn get_typed_unchecked_scoped<'a, T: GenericNBT>(
+    unsafe fn at_unchecked_<'a, T: GenericNBT>(
         &'a self,
         index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        unsafe { self.get_typed_unchecked::<T>(index) }
+        unsafe { self.get_unchecked_::<T>(index) }
     }
 
     #[inline]
-    fn get_typed_scoped<'a, T: GenericNBT>(
+    fn at_<'a, T: GenericNBT>(
         &'a self,
         index: impl Index,
     ) -> Option<T::Type<'a, Self::Config>>
     where
         'doc: 'a,
     {
-        self.get_typed::<T>(index)
+        self.get_::<T>(index)
     }
 
-    fn with<'a, R>(&'a self, match_fn: impl FnOnce(crate::Value<'a, Self::Config>) -> R) -> R
+    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(crate::Value<'a, Self::Config>) -> R) -> R
     where
         'doc: 'a,
     {
@@ -289,7 +289,7 @@ impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValu
 
 impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
     #[inline]
-    unsafe fn peek_unchecked<'a, T: NBT>(&'a self) -> &'a T::Type<'doc, Self::Config>
+    unsafe fn as_unchecked_<'a, T: NBT>(&'a self) -> &'a T::Type<'doc, Self::Config>
     where
         'doc: 'a,
     {
@@ -297,7 +297,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
-    fn peek<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::Config>>
+    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::Config>>
     where
         'doc: 'a,
     {
@@ -305,12 +305,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
-    unsafe fn extract_unchecked<T: GenericNBT>(self) -> T::Type<'doc, Self::Config> {
+    unsafe fn into_unchecked_<T: GenericNBT>(self) -> T::Type<'doc, Self::Config> {
         unsafe { self.extract_unchecked::<T>() }
     }
 
     #[inline]
-    fn extract<T: GenericNBT>(self) -> Option<T::Type<'doc, Self::Config>> {
+    fn into_<T: GenericNBT>(self) -> Option<T::Type<'doc, Self::Config>> {
         self.extract::<T>()
     }
 
@@ -323,19 +323,19 @@ impl<'doc, O: ByteOrder, D: Document> ReadableValue<'doc> for ReadonlyValue<'doc
     }
 
     #[inline]
-    unsafe fn get_typed_unchecked<T: GenericNBT>(
+    unsafe fn get_unchecked_<T: GenericNBT>(
         &self,
         index: impl Index,
     ) -> Option<T::Type<'doc, Self::Config>> {
-        unsafe { self.get_typed_unchecked::<T>(index) }
+        unsafe { self.get_unchecked_::<T>(index) }
     }
 
     #[inline]
-    fn get_typed<T: GenericNBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
-        self.get_typed::<T>(index)
+    fn get_<T: GenericNBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
+        self.get_::<T>(index)
     }
 
-    fn visit<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R {
+    fn map<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R {
         match self {
             ReadonlyValue::End(v) => match_fn(Value::End(v)),
             ReadonlyValue::Byte(v) => match_fn(Value::Byte(v)),
