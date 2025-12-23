@@ -4,8 +4,11 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, Document, ImmutableConfig, Mark, NBTBase, ReadonlyArray, ReadonlyCompound,
-    ReadonlyList, ReadonlyString, ReadonlyValue, TagByte, TagByteArray, TagCompound, TagDouble,
-    TagEnd, TagFloat, TagInt, TagIntArray, TagList, TagLong, TagLongArray, TagShort, TagString,
+    ReadonlyList, ReadonlyString, ReadonlyValue,
+    tag::{
+        Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
+        String,
+    },
 };
 
 pub trait ImmutableNBTImpl: NBTBase {
@@ -77,7 +80,7 @@ macro_rules! immutable_nbt_impl {
     };
 }
 
-impl ImmutableNBTImpl for TagEnd {
+impl ImmutableNBTImpl for End {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         _data: *const u8,
@@ -103,7 +106,7 @@ impl ImmutableNBTImpl for TagEnd {
     immutable_nbt_impl!(TagEnd, End);
 }
 
-impl ImmutableNBTImpl for TagByte {
+impl ImmutableNBTImpl for Byte {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -131,7 +134,7 @@ impl ImmutableNBTImpl for TagByte {
     immutable_nbt_impl!(TagByte, Byte);
 }
 
-impl ImmutableNBTImpl for TagShort {
+impl ImmutableNBTImpl for Short {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -159,7 +162,7 @@ impl ImmutableNBTImpl for TagShort {
     immutable_nbt_impl!(TagShort, Short);
 }
 
-impl ImmutableNBTImpl for TagInt {
+impl ImmutableNBTImpl for Int {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -187,7 +190,7 @@ impl ImmutableNBTImpl for TagInt {
     immutable_nbt_impl!(TagInt, Int);
 }
 
-impl ImmutableNBTImpl for TagLong {
+impl ImmutableNBTImpl for Long {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -215,7 +218,7 @@ impl ImmutableNBTImpl for TagLong {
     immutable_nbt_impl!(TagLong, Long);
 }
 
-impl ImmutableNBTImpl for TagFloat {
+impl ImmutableNBTImpl for Float {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -243,7 +246,7 @@ impl ImmutableNBTImpl for TagFloat {
     immutable_nbt_impl!(TagFloat, Float);
 }
 
-impl ImmutableNBTImpl for TagDouble {
+impl ImmutableNBTImpl for Double {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -271,7 +274,7 @@ impl ImmutableNBTImpl for TagDouble {
     immutable_nbt_impl!(TagDouble, Double);
 }
 
-impl ImmutableNBTImpl for TagByteArray {
+impl ImmutableNBTImpl for ByteArray {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -321,7 +324,7 @@ impl ImmutableNBTImpl for TagByteArray {
     immutable_nbt_impl!(TagByteArray, ByteArray);
 }
 
-impl ImmutableNBTImpl for TagString {
+impl ImmutableNBTImpl for String {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -371,7 +374,7 @@ impl ImmutableNBTImpl for TagString {
     immutable_nbt_impl!(TagString, String);
 }
 
-impl ImmutableNBTImpl for TagList {
+impl ImmutableNBTImpl for List {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -427,7 +430,7 @@ impl ImmutableNBTImpl for TagList {
     immutable_nbt_impl!(TagList, List);
 }
 
-impl ImmutableNBTImpl for TagCompound {
+impl ImmutableNBTImpl for Compound {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -483,7 +486,7 @@ impl ImmutableNBTImpl for TagCompound {
     immutable_nbt_impl!(TagCompound, Compound);
 }
 
-impl ImmutableNBTImpl for TagIntArray {
+impl ImmutableNBTImpl for IntArray {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,
@@ -533,7 +536,7 @@ impl ImmutableNBTImpl for TagIntArray {
     immutable_nbt_impl!(TagIntArray, IntArray);
 }
 
-impl ImmutableNBTImpl for TagLongArray {
+impl ImmutableNBTImpl for LongArray {
     #[inline]
     unsafe fn read<'doc, O: ByteOrder, D: Document>(
         data: *const u8,

@@ -10,82 +10,71 @@ macro_rules! define_primary_tag {
 }
 
 define_primary_tag!(
-    TagEnd,
-    TagByte,
-    TagShort,
-    TagInt,
-    TagLong,
-    TagFloat,
-    TagDouble,
-    TagByteArray,
-    TagString,
-    TagList,
-    TagCompound,
-    TagIntArray,
-    TagLongArray
+    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound, IntArray,
+    LongArray
 );
 
-impl NBTBase for TagEnd {
+impl NBTBase for End {
     const TAG_ID: TagID = TagID::End;
     type Type<'a, Config: ReadableConfig> = ();
 }
 
-impl NBTBase for TagByte {
+impl NBTBase for Byte {
     const TAG_ID: TagID = TagID::Byte;
     type Type<'a, Config: ReadableConfig> = i8;
 }
 
-impl NBTBase for TagShort {
+impl NBTBase for Short {
     const TAG_ID: TagID = TagID::Short;
     type Type<'a, Config: ReadableConfig> = i16;
 }
 
-impl NBTBase for TagInt {
+impl NBTBase for Int {
     const TAG_ID: TagID = TagID::Int;
     type Type<'a, Config: ReadableConfig> = i32;
 }
 
-impl NBTBase for TagLong {
+impl NBTBase for Long {
     const TAG_ID: TagID = TagID::Long;
     type Type<'a, Config: ReadableConfig> = i64;
 }
 
-impl NBTBase for TagFloat {
+impl NBTBase for Float {
     const TAG_ID: TagID = TagID::Float;
     type Type<'a, Config: ReadableConfig> = f32;
 }
 
-impl NBTBase for TagDouble {
+impl NBTBase for Double {
     const TAG_ID: TagID = TagID::Double;
     type Type<'a, Config: ReadableConfig> = f64;
 }
 
-impl NBTBase for TagByteArray {
+impl NBTBase for ByteArray {
     const TAG_ID: TagID = TagID::ByteArray;
     type Type<'a, Config: ReadableConfig> = Config::ByteArray<'a>;
 }
 
-impl NBTBase for TagString {
+impl NBTBase for String {
     const TAG_ID: TagID = TagID::String;
     type Type<'a, Config: ReadableConfig> = Config::String<'a>;
 }
 
-impl NBTBase for TagList {
+impl NBTBase for List {
     const TAG_ID: TagID = TagID::List;
     type Type<'a, Config: ReadableConfig> = Config::List<'a>;
 }
 
-impl NBTBase for TagCompound {
+impl NBTBase for Compound {
     const TAG_ID: TagID = TagID::Compound;
     type Type<'a, Config: ReadableConfig> = Config::Compound<'a>;
 }
 
-impl NBTBase for TagIntArray {
+impl NBTBase for IntArray {
     const TAG_ID: TagID = TagID::IntArray;
     type Type<'a, Config: ReadableConfig> = Config::IntArray<'a>;
 }
 
-impl NBTBase for TagLongArray {
+impl NBTBase for LongArray {
     const TAG_ID: TagID = TagID::LongArray;
     type Type<'a, Config: ReadableConfig> = Config::LongArray<'a>;
 }
@@ -98,6 +87,4 @@ macro_rules! primitive_tag {
     };
 }
 
-primitive_tag!(
-    TagEnd, TagByte, TagShort, TagInt, TagLong, TagFloat, TagDouble
-);
+primitive_tag!(End, Byte, Short, Int, Long, Float, Double);

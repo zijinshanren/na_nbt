@@ -2,9 +2,12 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, Document, ImmutableConfig, ImmutableNBTImpl, Index, Mark, NBT, ReadableValue,
-    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, ScopedReadableValue, TagByte,
-    TagByteArray, TagCompound, TagDouble, TagEnd, TagFloat, TagID, TagInt, TagIntArray, TagList,
-    TagLong, TagLongArray, TagShort, TagString, Value,
+    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, ScopedReadableValue, TagID,
+    Value,
+    tag::{
+        Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
+        String,
+    },
 };
 
 #[derive(Clone)]

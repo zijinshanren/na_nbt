@@ -1,8 +1,6 @@
 use crate::{ImmutableNBTImpl, ReadableConfig};
 
-mod tag;
-
-pub use tag::*;
+pub mod tag;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
