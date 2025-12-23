@@ -9,7 +9,7 @@ pub trait Writable {
 }
 
 pub trait ValueBase: Writable + Send + Sync + Sized {
-    type Config: ConfigRef;
+    type ConfigRef: ConfigRef;
 
     fn tag_id(&self) -> TagID;
 
@@ -17,7 +17,7 @@ pub trait ValueBase: Writable + Send + Sync + Sized {
 }
 
 pub trait ListBase: Writable + Send + Sync + Sized {
-    type Config: ConfigRef;
+    type ConfigRef: ConfigRef;
 
     fn element_tag_id(&self) -> TagID;
 
@@ -29,7 +29,7 @@ pub trait ListBase: Writable + Send + Sync + Sized {
 }
 
 pub trait TypedListBase<T: NBT>: Writable + Send + Sync + Sized {
-    type Config: ConfigRef;
+    type ConfigRef: ConfigRef;
 
     const ELEMENT_TAG_ID: TagID = T::TAG_ID;
 

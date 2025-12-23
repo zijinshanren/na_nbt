@@ -3,7 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, GenericNBT, ImmutableConfig, Mark, NBT, Never, ReadonlyString, ReadonlyValue, TagID, cold_path
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, GenericNBT,
+    ImmutableConfig, Mark, NBT, Never, ReadonlyString, ReadonlyValue, TagID, cold_path,
 };
 
 #[derive(Clone)]

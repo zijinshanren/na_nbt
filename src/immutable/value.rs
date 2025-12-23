@@ -150,7 +150,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
-    type Config = ImmutableConfig<O, D>;
+    type ConfigRef = ImmutableConfig<O, D>;
 
     #[inline]
     fn tag_id(&self) -> TagID {
@@ -165,7 +165,7 @@ impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
 
 impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, D> {
     #[inline]
-    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::Config>>
+    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::ConfigRef>>
     where
         'doc: 'a,
     {
@@ -173,21 +173,21 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
     }
 
     #[inline]
-    fn into_<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>> {
+    fn into_<T: NBT>(self) -> Option<T::Type<'doc, Self::ConfigRef>> {
         self.into_::<T>()
     }
 
     #[inline]
-    fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
+    fn get(&self, index: impl Index) -> Option<<Self::ConfigRef as ConfigRef>::Value<'doc>> {
         self.get(index)
     }
 
     #[inline]
-    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
+    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::ConfigRef>> {
         self.get_::<T>(index)
     }
 
-    fn map<R>(self, match_fn: impl FnOnce(Value<'doc, Self::Config>) -> R) -> R {
+    fn map<R>(self, match_fn: impl FnOnce(Value<'doc, Self::ConfigRef>) -> R) -> R {
         match self {
             ReadonlyValue::End(()) => match_fn(Value::End(())),
             ReadonlyValue::Byte(value) => match_fn(Value::Byte(value)),
