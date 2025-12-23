@@ -3,7 +3,7 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, EMPTY_COMPOUND, Mark, Never, ReadableCompound, ReadonlyConfig,
+    ByteOrder, Document, EMPTY_COMPOUND, ImmutableConfig, Mark, Never, ReadableCompound,
     ReadonlyString, ReadonlyValue, ScopedReadableCompound, TagID, cold_path,
 };
 
@@ -96,7 +96,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
 impl<'doc, O: ByteOrder, D: Document> ScopedReadableCompound<'doc>
     for ReadonlyCompound<'doc, O, D>
 {
-    type Config = ReadonlyConfig<O, D>;
+    type Config = ImmutableConfig<O, D>;
 
     #[inline]
     fn get_scoped<'a>(

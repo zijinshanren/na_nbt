@@ -9,11 +9,11 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct ReadonlyConfig<O: ByteOrder, D: Document> {
+pub struct ImmutableConfig<O: ByteOrder, D: Document> {
     _marker: PhantomData<(O, D)>,
 }
 
-impl<O: ByteOrder, D: Document> ReadableConfig for ReadonlyConfig<O, D> {
+impl<O: ByteOrder, D: Document> ReadableConfig for ImmutableConfig<O, D> {
     type ByteOrder = O;
     type Value<'doc> = ReadonlyValue<'doc, O, D>;
     type ByteArray<'doc> = ReadonlyArray<'doc, i8, D>;

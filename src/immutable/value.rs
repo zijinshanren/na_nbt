@@ -1,8 +1,8 @@
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, ImmutableNBTImpl, Index, Mark, NBT, ReadableValue, ReadonlyArray,
-    ReadonlyCompound, ReadonlyConfig, ReadonlyList, ReadonlyString, ScopedReadableValue, TagByte,
+    ByteOrder, Document, ImmutableConfig, ImmutableNBTImpl, Index, Mark, NBT, ReadableValue,
+    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, ScopedReadableValue, TagByte,
     TagByteArray, TagCompound, TagDouble, TagEnd, TagFloat, TagID, TagInt, TagIntArray, TagList,
     TagLong, TagLongArray, TagShort, TagString, Value,
 };
@@ -105,7 +105,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     ///
     /// .
     #[inline]
-    pub unsafe fn peek_unchecked<'a, T: NBT>(&'a self) -> &'a T::Type<'doc, ReadonlyConfig<O, D>>
+    pub unsafe fn peek_unchecked<'a, T: NBT>(&'a self) -> &'a T::Type<'doc, ImmutableConfig<O, D>>
     where
         'doc: 'a,
     {
@@ -113,7 +113,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn peek<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, ReadonlyConfig<O, D>>>
+    pub fn peek<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, ImmutableConfig<O, D>>>
     where
         'doc: 'a,
     {
@@ -126,12 +126,12 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     ///
     /// .
     #[inline]
-    pub unsafe fn extract_unchecked<T: NBT>(self) -> T::Type<'doc, ReadonlyConfig<O, D>> {
+    pub unsafe fn extract_unchecked<T: NBT>(self) -> T::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { self.extract::<T>().unwrap_unchecked() }
     }
 
     #[inline]
-    pub fn extract<T: NBT>(self) -> Option<T::Type<'doc, ReadonlyConfig<O, D>>> {
+    pub fn extract<T: NBT>(self) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         T::extract(self)
     }
 
@@ -152,7 +152,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ScopedReadableValue<'doc> for ReadonlyValue<'doc, O, D> {
-    type Config = ReadonlyConfig<O, D>;
+    type Config = ImmutableConfig<O, D>;
 
     #[inline]
     fn tag_id(&self) -> TagID {

@@ -3,7 +3,7 @@ use std::{marker::PhantomData, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, Mark, NBTBase, ReadonlyArray, ReadonlyCompound, ReadonlyConfig,
+    ByteOrder, Document, ImmutableConfig, Mark, NBTBase, ReadonlyArray, ReadonlyCompound,
     ReadonlyList, ReadonlyString, ReadonlyValue, TagByte, TagByteArray, TagCompound, TagDouble,
     TagEnd, TagFloat, TagInt, TagIntArray, TagList, TagLong, TagLongArray, TagShort, TagString,
 };
@@ -11,11 +11,11 @@ use crate::{
 pub trait ImmutableNBTImpl: NBTBase {
     fn extract<'doc, O: ByteOrder, D: Document>(
         value: ReadonlyValue<'doc, O, D>,
-    ) -> Option<Self::Type<'doc, ReadonlyConfig<O, D>>>;
+    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>>;
 
     fn peek<'a, 'doc, O: ByteOrder, D: Document>(
         value: &'a ReadonlyValue<'doc, O, D>,
-    ) -> Option<&'a Self::Type<'doc, ReadonlyConfig<O, D>>>
+    ) -> Option<&'a Self::Type<'doc, ImmutableConfig<O, D>>>
     where
         'doc: 'a;
 
@@ -28,7 +28,7 @@ pub trait ImmutableNBTImpl: NBTBase {
         data: *const u8,
         mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>>;
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>>;
 
     /// .
     ///
@@ -47,7 +47,7 @@ pub trait ImmutableNBTImpl: NBTBase {
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>>;
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>>;
 }
 
 macro_rules! immutable_nbt_impl {
@@ -55,7 +55,7 @@ macro_rules! immutable_nbt_impl {
         #[inline]
         fn extract<'doc, O: ByteOrder, D: Document>(
             value: ReadonlyValue<'doc, O, D>,
-        ) -> Option<Self::Type<'doc, ReadonlyConfig<O, D>>> {
+        ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
             match value {
                 ReadonlyValue::$value(v) => Some(v),
                 _ => None,
@@ -65,7 +65,7 @@ macro_rules! immutable_nbt_impl {
         #[inline]
         fn peek<'a, 'doc, O: ByteOrder, D: Document>(
             value: &'a ReadonlyValue<'doc, O, D>,
-        ) -> Option<&'a Self::Type<'doc, ReadonlyConfig<O, D>>>
+        ) -> Option<&'a Self::Type<'doc, ImmutableConfig<O, D>>>
         where
             'doc: 'a,
         {
@@ -83,7 +83,7 @@ impl ImmutableNBTImpl for TagEnd {
         _data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
     }
 
     #[inline]
@@ -97,7 +97,7 @@ impl ImmutableNBTImpl for TagEnd {
         _index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
     }
 
     immutable_nbt_impl!(TagEnd, End);
@@ -109,7 +109,7 @@ impl ImmutableNBTImpl for TagByte {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { *data.cast() }
     }
 
@@ -124,7 +124,7 @@ impl ImmutableNBTImpl for TagByte {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { *ptr.add(index).cast() }
     }
 
@@ -137,7 +137,7 @@ impl ImmutableNBTImpl for TagShort {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I16::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -152,7 +152,7 @@ impl ImmutableNBTImpl for TagShort {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I16::<O>::from_bytes(*ptr.add(index * 2).cast()).get() }
     }
 
@@ -165,7 +165,7 @@ impl ImmutableNBTImpl for TagInt {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I32::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -180,7 +180,7 @@ impl ImmutableNBTImpl for TagInt {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() }
     }
 
@@ -193,7 +193,7 @@ impl ImmutableNBTImpl for TagLong {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I64::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -208,7 +208,7 @@ impl ImmutableNBTImpl for TagLong {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() }
     }
 
@@ -221,7 +221,7 @@ impl ImmutableNBTImpl for TagFloat {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::F32::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -236,7 +236,7 @@ impl ImmutableNBTImpl for TagFloat {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::F32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() }
     }
 
@@ -249,7 +249,7 @@ impl ImmutableNBTImpl for TagDouble {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::F64::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -264,7 +264,7 @@ impl ImmutableNBTImpl for TagDouble {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::F64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() }
     }
 
@@ -277,7 +277,7 @@ impl ImmutableNBTImpl for TagByteArray {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         ReadonlyArray {
             data: unsafe {
                 slice::from_raw_parts(
@@ -303,7 +303,7 @@ impl ImmutableNBTImpl for TagByteArray {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -327,7 +327,7 @@ impl ImmutableNBTImpl for TagString {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         ReadonlyString {
             data: unsafe {
                 slice::from_raw_parts(
@@ -353,7 +353,7 @@ impl ImmutableNBTImpl for TagString {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -377,7 +377,7 @@ impl ImmutableNBTImpl for TagList {
         data: *const u8,
         mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             ReadonlyList {
                 data: slice::from_raw_parts(
@@ -407,7 +407,7 @@ impl ImmutableNBTImpl for TagList {
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             let mut p = ptr;
             let mut m = mark;
@@ -433,7 +433,7 @@ impl ImmutableNBTImpl for TagCompound {
         data: *const u8,
         mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             ReadonlyCompound {
                 data: slice::from_raw_parts(
@@ -463,7 +463,7 @@ impl ImmutableNBTImpl for TagCompound {
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             let mut p = ptr;
             let mut m = mark;
@@ -489,7 +489,7 @@ impl ImmutableNBTImpl for TagIntArray {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         ReadonlyArray {
             data: unsafe {
                 slice::from_raw_parts(
@@ -515,7 +515,7 @@ impl ImmutableNBTImpl for TagIntArray {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -539,7 +539,7 @@ impl ImmutableNBTImpl for TagLongArray {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         ReadonlyArray {
             data: unsafe {
                 slice::from_raw_parts(
@@ -565,7 +565,7 @@ impl ImmutableNBTImpl for TagLongArray {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Self::Type<'doc, ReadonlyConfig<O, D>> {
+    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {

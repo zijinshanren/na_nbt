@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, EMPTY_LIST, ImmutableNBTImpl, Mark, NBT, Never, ReadableList,
-    ReadableTypedList, ReadonlyConfig, ReadonlyValue, ScopedReadableList, ScopedReadableTypedList,
+    ByteOrder, Document, EMPTY_LIST, ImmutableConfig, ImmutableNBTImpl, Mark, NBT, Never,
+    ReadableList, ReadableTypedList, ReadonlyValue, ScopedReadableList, ScopedReadableTypedList,
     TagByte, TagByteArray, TagCompound, TagDouble, TagEnd, TagFloat, TagID, TagInt, TagIntArray,
     TagList, TagLong, TagLongArray, TagShort, TagString, cold_path,
 };
@@ -138,7 +138,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ScopedReadableList<'doc> for ReadonlyList<'doc, O, D> {
-    type Config = ReadonlyConfig<O, D>;
+    type Config = ImmutableConfig<O, D>;
 
     #[inline]
     fn tag_id(&self) -> TagID {
@@ -318,7 +318,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
     }
 
     #[inline]
-    pub fn get(&self, index: usize) -> Option<T::Type<'doc, ReadonlyConfig<O, D>>> {
+    pub fn get(&self, index: usize) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         if index >= self.len() {
             cold_path();
             return None;
@@ -336,7 +336,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
 impl<'doc, O: ByteOrder, D: Document, T: NBT> ScopedReadableTypedList<'doc, T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
-    type Config = ReadonlyConfig<O, D>;
+    type Config = ImmutableConfig<O, D>;
 
     #[inline]
     fn len(&self) -> usize {
@@ -380,7 +380,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadableTypedList<'doc, T>
 }
 
 impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedList<'doc, O, D, T> {
-    type Item = T::Type<'doc, ReadonlyConfig<O, D>>;
+    type Item = T::Type<'doc, ImmutableConfig<O, D>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.length == 0 {
