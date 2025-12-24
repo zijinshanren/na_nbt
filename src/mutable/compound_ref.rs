@@ -4,8 +4,8 @@ use crate::{ByteOrder, EMPTY_COMPOUND};
 
 #[derive(Clone)]
 pub struct RefCompound<'s, O: ByteOrder> {
-    data: *const u8,
-    _marker: PhantomData<(&'s (), O)>,
+    pub(crate) data: *const u8,
+    pub(crate) _marker: PhantomData<(&'s (), O)>,
 }
 
 impl<'s, O: ByteOrder> Default for RefCompound<'s, O> {

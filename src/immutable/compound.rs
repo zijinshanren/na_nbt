@@ -81,14 +81,17 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    pub fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
+    pub fn get_<T: GenericNBT>(
+        &self,
+        key: &str,
+    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
                 if tag_id != T::TAG_ID {
                     cold_path();
                     return None;
                 }
-                Some(T::read::<O, D>(ptr, mark, doc))
+                T::read::<O, D>(ptr, mark, doc)
             })
         }
     }

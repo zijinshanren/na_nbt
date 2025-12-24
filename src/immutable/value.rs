@@ -46,7 +46,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
                     match $tag_id_val {
                         $(
                             TagID::$tag => ReadonlyValue::$tag(
-                                $tag::read::<O, D>($data, $mark, $doc)
+                                $tag::read::<O, D>($data, $mark, $doc).unwrap_unchecked()
                             ),
                         )*
                     }

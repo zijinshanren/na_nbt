@@ -158,7 +158,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedListIter
         self.data = unsafe { self.data.add(data_advance) };
         self.mark = unsafe { self.mark.add(mark_advance) };
 
-        Some(value)
+        value
     }
 
     #[inline]

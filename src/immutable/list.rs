@@ -141,6 +141,16 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         }
     }
 
+    #[inline]
+    pub fn typed_<T: NBT>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
+        self.element_is_::<T>().then_some(ReadonlyTypedList {
+            data: self.data,
+            mark: self.mark,
+            doc: self.doc,
+            _marker: PhantomData,
+        })
+    }
+
     /// Returns an iterator over the elements of this list.
     #[inline]
     pub fn iter(&self) -> ReadonlyListIter<'doc, O, D> {
@@ -152,16 +162,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
             doc: self.doc.clone(),
             _marker: PhantomData,
         }
-    }
-
-    #[inline]
-    pub fn typed_<T: NBT>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
-        self.element_is_::<T>().then_some(ReadonlyTypedList {
-            data: self.data,
-            mark: self.mark,
-            doc: self.doc,
-            _marker: PhantomData,
-        })
     }
 }
 

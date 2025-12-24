@@ -8,13 +8,13 @@ pub trait Writable {
     fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()>;
 }
 
-pub trait ValueBase: Writable + Send + Sync + Sized {
+pub trait ValueBase: Send + Sync + Sized {
     fn tag_id(&self) -> TagID;
 
     fn is_<T: NBT>(&self) -> bool;
 }
 
-pub trait ListBase: Writable + Send + Sync + Sized {
+pub trait ListBase: Send + Sync + Sized {
     fn element_tag_id(&self) -> TagID;
 
     fn element_is_<T: NBT>(&self) -> bool;
@@ -24,7 +24,7 @@ pub trait ListBase: Writable + Send + Sync + Sized {
     fn is_empty(&self) -> bool;
 }
 
-pub trait TypedListBase<T: NBT>: Writable + Send + Sync + Sized {
+pub trait TypedListBase<T: NBT>: Send + Sync + Sized {
     const ELEMENT_TAG_ID: TagID = T::TAG_ID;
 
     fn len(&self) -> usize;
@@ -32,4 +32,4 @@ pub trait TypedListBase<T: NBT>: Writable + Send + Sync + Sized {
     fn is_empty(&self) -> bool;
 }
 
-pub trait CompoundBase: Writable + Send + Sync + Sized {}
+pub trait CompoundBase: Send + Sync + Sized {}
