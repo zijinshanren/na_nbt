@@ -1,9 +1,9 @@
 use std::hint::{assert_unchecked, unreachable_unchecked};
 
-use zerocopy::{ByteOrder, byteorder};
+use zerocopy::byteorder;
 
 use crate::{
-    Error, Result, cold_path,
+    ByteOrder, Error, Result, cold_path,
     immutable::mark::{Cache, Mark},
 };
 

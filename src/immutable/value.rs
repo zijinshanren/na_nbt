@@ -104,7 +104,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, ImmutableConfig<O, D>>>
+    pub fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'doc, ImmutableConfig<O, D>>>
     where
         'doc: 'a,
     {
@@ -112,7 +112,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     }
 
     #[inline]
-    pub fn into_<T: GenericNBT>(self) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+    pub fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
         T::_from(self)
     }
 
@@ -120,7 +120,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     pub fn get_<T: GenericNBT>(
         &self,
         index: impl Index,
-    ) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
         index.index_dispatch(
             self,
             |value, index| match value {
@@ -166,7 +166,7 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
     type Config = ImmutableConfig<O, D>;
 
     #[inline]
-    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::Config>>
+    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'doc, Self::Config>>
     where
         'doc: 'a,
     {
@@ -174,7 +174,7 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
     }
 
     #[inline]
-    fn into_<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>> {
+    fn into_<T: NBT>(self) -> Option<T::TypeRef<'doc, Self::Config>> {
         self.into_::<T>()
     }
 
@@ -184,7 +184,7 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
     }
 
     #[inline]
-    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
+    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::TypeRef<'doc, Self::Config>> {
         self.get_::<T>(index)
     }
 

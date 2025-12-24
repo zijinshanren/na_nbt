@@ -21,7 +21,7 @@ pub trait ImmutableGenericNBTImpl: NBTBase {
         data: *const u8,
         mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>>;
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>>;
 
     /// .
     ///
@@ -33,17 +33,17 @@ pub trait ImmutableGenericNBTImpl: NBTBase {
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>>;
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>>;
 
     fn _from<'doc, O: ByteOrder, D: Document>(
         value: ReadonlyValue<'doc, O, D>,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>>;
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>>;
 }
 
 pub trait ImmutableNBTImpl: ImmutableGenericNBTImpl {
     fn ref_<'a, 'doc, O: ByteOrder, D: Document>(
         value: &'a ReadonlyValue<'doc, O, D>,
-    ) -> Option<&'a Self::Type<'doc, ImmutableConfig<O, D>>>
+    ) -> Option<&'a Self::TypeRef<'doc, ImmutableConfig<O, D>>>
     where
         'doc: 'a;
 
@@ -60,7 +60,7 @@ macro_rules! immutable_generic_nbt_impl {
         #[inline]
         fn _from<'doc, O: ByteOrder, D: Document>(
             value: ReadonlyValue<'doc, O, D>,
-        ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+        ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
             match value {
                 ReadonlyValue::$name(v) => Some(v),
                 _ => None,
@@ -74,7 +74,7 @@ macro_rules! immutable_nbt_impl {
         #[inline]
         fn ref_<'a, 'doc, O: ByteOrder, D: Document>(
             value: &'a ReadonlyValue<'doc, O, D>,
-        ) -> Option<&'a Self::Type<'doc, ImmutableConfig<O, D>>>
+        ) -> Option<&'a Self::TypeRef<'doc, ImmutableConfig<O, D>>>
         where
             'doc: 'a,
         {
@@ -92,7 +92,7 @@ impl ImmutableGenericNBTImpl for End {
         _data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
     }
 
     #[inline]
@@ -101,7 +101,7 @@ impl ImmutableGenericNBTImpl for End {
         _index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(())
     }
 
@@ -123,7 +123,7 @@ impl ImmutableGenericNBTImpl for Byte {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe { *data.cast() }
     }
 
@@ -133,7 +133,7 @@ impl ImmutableGenericNBTImpl for Byte {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(unsafe { *ptr.add(index).cast() })
     }
 
@@ -155,7 +155,7 @@ impl ImmutableGenericNBTImpl for Short {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I16::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -165,7 +165,7 @@ impl ImmutableGenericNBTImpl for Short {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(unsafe { byteorder::I16::<O>::from_bytes(*ptr.add(index * 2).cast()).get() })
     }
 
@@ -187,7 +187,7 @@ impl ImmutableGenericNBTImpl for Int {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I32::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -197,7 +197,7 @@ impl ImmutableGenericNBTImpl for Int {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(unsafe { byteorder::I32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() })
     }
 
@@ -219,7 +219,7 @@ impl ImmutableGenericNBTImpl for Long {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::I64::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -229,7 +229,7 @@ impl ImmutableGenericNBTImpl for Long {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(unsafe { byteorder::I64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() })
     }
 
@@ -251,7 +251,7 @@ impl ImmutableGenericNBTImpl for Float {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::F32::<O>::from_bytes(*data.cast()).get() }
     }
 
@@ -261,7 +261,7 @@ impl ImmutableGenericNBTImpl for Float {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(unsafe { byteorder::F32::<O>::from_bytes(*ptr.add(index * 4).cast()).get() })
     }
 
@@ -283,7 +283,7 @@ impl ImmutableGenericNBTImpl for Double {
         data: *const u8,
         _mark: *const Mark,
         _doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe { byteorder::F64::<O>::from_bytes(*data.cast()).get() }
     }
     #[inline]
@@ -292,7 +292,7 @@ impl ImmutableGenericNBTImpl for Double {
         index: usize,
         _doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(unsafe { byteorder::F64::<O>::from_bytes(*ptr.add(index * 8).cast()).get() })
     }
 
@@ -314,7 +314,7 @@ impl ImmutableGenericNBTImpl for ByteArray {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         ReadonlyArray {
             data: unsafe {
                 slice::from_raw_parts(
@@ -332,7 +332,7 @@ impl ImmutableGenericNBTImpl for ByteArray {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -368,7 +368,7 @@ impl ImmutableGenericNBTImpl for String {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         ReadonlyString {
             data: unsafe {
                 slice::from_raw_parts(
@@ -386,7 +386,7 @@ impl ImmutableGenericNBTImpl for String {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -422,7 +422,7 @@ impl ImmutableGenericNBTImpl for List {
         data: *const u8,
         mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe {
             ReadonlyList {
                 data: slice::from_raw_parts(
@@ -442,7 +442,7 @@ impl ImmutableGenericNBTImpl for List {
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             let mut m = mark;
@@ -482,7 +482,7 @@ impl ImmutableGenericNBTImpl for Compound {
         data: *const u8,
         mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe {
             ReadonlyCompound {
                 data: slice::from_raw_parts(
@@ -502,7 +502,7 @@ impl ImmutableGenericNBTImpl for Compound {
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             let mut m = mark;
@@ -542,7 +542,7 @@ impl ImmutableGenericNBTImpl for IntArray {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         ReadonlyArray {
             data: unsafe {
                 slice::from_raw_parts(
@@ -560,7 +560,7 @@ impl ImmutableGenericNBTImpl for IntArray {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -596,7 +596,7 @@ impl ImmutableGenericNBTImpl for LongArray {
         data: *const u8,
         _mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         ReadonlyArray {
             data: unsafe {
                 slice::from_raw_parts(
@@ -614,7 +614,7 @@ impl ImmutableGenericNBTImpl for LongArray {
         index: usize,
         doc: &D,
         _mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             let mut p = ptr;
             for _ in 0..index {
@@ -650,7 +650,7 @@ impl<T: NBT> ImmutableGenericNBTImpl for TypedList<T> {
         data: *const u8,
         mark: *const Mark,
         doc: &D,
-    ) -> Self::Type<'doc, ImmutableConfig<O, D>> {
+    ) -> Self::TypeRef<'doc, ImmutableConfig<O, D>> {
         unsafe { List::read(data, mark, doc).typed_::<T>().unwrap_unchecked() }
     }
 
@@ -660,7 +660,7 @@ impl<T: NBT> ImmutableGenericNBTImpl for TypedList<T> {
         index: usize,
         doc: &D,
         mark: *const Mark,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             List::get_index_unchecked(ptr, index, doc, mark)
                 .unwrap_unchecked()
@@ -671,7 +671,7 @@ impl<T: NBT> ImmutableGenericNBTImpl for TypedList<T> {
     #[inline]
     fn _from<'doc, O: ByteOrder, D: Document>(
         value: ReadonlyValue<'doc, O, D>,
-    ) -> Option<Self::Type<'doc, ImmutableConfig<O, D>>> {
+    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         value.into_::<List>().and_then(|list| list.typed_::<T>())
     }
 }

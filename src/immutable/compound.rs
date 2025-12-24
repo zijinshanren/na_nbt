@@ -81,7 +81,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    pub fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
+    pub fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
                 if tag_id != T::TAG_ID {
@@ -126,7 +126,7 @@ impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'do
     }
 
     #[inline]
-    fn get_<T: NBT>(&self, key: &str) -> Option<T::Type<'doc, Self::Config>> {
+    fn get_<T: NBT>(&self, key: &str) -> Option<T::TypeRef<'doc, Self::Config>> {
         self.get_::<T>(key)
     }
 

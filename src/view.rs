@@ -947,6 +947,12 @@ pub struct VecViewOwn<T> {
 unsafe impl<T: Send> Send for VecViewOwn<T> {}
 unsafe impl<T: Sync> Sync for VecViewOwn<T> {}
 
+impl<T> Default for VecViewOwn<T> {
+    fn default() -> Self {
+        vec![].into()
+    }
+}
+
 impl<T> VecViewOwn<T> {
     /// Creates a new `VecView` from mutable references to a Vec's raw parts.
     ///
@@ -1514,6 +1520,12 @@ pub struct StringViewOwn {
 // The raw pointer is only used for the String's buffer, which is guarded by the mutable references.
 unsafe impl Send for StringViewOwn {}
 unsafe impl Sync for StringViewOwn {}
+
+impl Default for StringViewOwn {
+    fn default() -> Self {
+        vec![].into()
+    }
+}
 
 impl StringViewOwn {
     /// Creates a new `StringView` from mutable references to a String's raw parts.

@@ -1,4 +1,6 @@
-use crate::{ConfigMut, ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl};
+use std::ptr;
+
+use crate::{ByteOrder, ConfigMut, ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl};
 
 pub mod tag;
 
@@ -117,10 +119,38 @@ mod private {
     impl<T: NBT> Sealed for TypedList<T> {}
 }
 
+/// .
+///
+/// # Safety
+///
+/// .
+pub unsafe trait BinaryReadWrite: Sized {
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    #[inline]
+    unsafe fn write(self, dst: *mut u8) {
+        unsafe { ptr::write(dst.cast(), self) };
+    }
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    #[inline]
+    unsafe fn read(src: *mut u8) -> Self {
+        unsafe { ptr::read(src.cast()) }
+    }
+}
+
 pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'static {
     const TAG_ID: TagID;
-    type Type<'a, Config: ConfigRef>: Clone;
+    type TypeRef<'a, Config: ConfigRef>: Clone;
     type TypeMut<'a, Config: ConfigMut>;
+    type Type<O: ByteOrder>: BinaryReadWrite + Default;
 }
 
 pub trait PrimitiveNBTBase: NBTBase {}

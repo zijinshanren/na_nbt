@@ -10,6 +10,7 @@ mod mark;
 mod nbt_impl;
 mod read;
 mod string;
+mod typed_list;
 mod value;
 mod write;
 
@@ -21,6 +22,7 @@ pub use list::*;
 pub use mark::*;
 pub use nbt_impl::*;
 pub use string::*;
+pub use typed_list::*;
 pub use value::*;
 
 mod borrowed {

@@ -10,7 +10,7 @@ pub trait ValueMut<'s>: ValueBase {
     where
         's: 'a;
 
-    fn into_<T: NBT>(self) -> Option<T::Type<'s, Self::Config>>;
+    fn into_<T: NBT>(self) -> Option<T::TypeRef<'s, Self::Config>>;
 
     fn into_mut_<T: NBT>(self) -> Option<T::TypeMut<'s, Self::Config>>;
 
@@ -18,7 +18,7 @@ pub trait ValueMut<'s>: ValueBase {
     where
         's: 'a;
 
-    fn get_<'a, T: NBT>(&'a self, index: impl Index) -> Option<T::Type<'a, Self::Config>>
+    fn get_<'a, T: NBT>(&'a self, index: impl Index) -> Option<T::TypeRef<'a, Self::Config>>
     where
         's: 'a;
 
@@ -50,7 +50,7 @@ pub trait ListMut<'s>:
     where
         's: 'a;
 
-    fn get_<'a, T: NBT>(&'a self, index: usize) -> Option<T::Type<'a, Self::Config>>
+    fn get_<'a, T: NBT>(&'a self, index: usize) -> Option<T::TypeRef<'a, Self::Config>>
     where
         's: 'a;
 
@@ -80,7 +80,7 @@ pub trait TypedListMut<'s, T: NBT>:
 {
     type Config: ConfigMut;
 
-    fn get<'a>(&'a self, index: usize) -> Option<T::Type<'a, Self::Config>>
+    fn get<'a>(&'a self, index: usize) -> Option<T::TypeRef<'a, Self::Config>>
     where
         's: 'a;
 
@@ -112,7 +112,7 @@ pub trait CompoundMut<'s>:
     where
         's: 'a;
 
-    fn get_<'a, T: NBT>(&'a self, key: &str) -> Option<T::Type<'a, Self::Config>>
+    fn get_<'a, T: NBT>(&'a self, key: &str) -> Option<T::TypeRef<'a, Self::Config>>
     where
         's: 'a;
 

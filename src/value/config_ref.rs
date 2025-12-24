@@ -12,7 +12,7 @@ pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     type List<'doc>: ListRef<'doc, Config = Self>;
     type ListIter<'doc>: Iterator<Item = Self::Value<'doc>> + ExactSizeIterator + Clone + Default;
     type TypedList<'doc, T: NBT>: TypedListRef<'doc, T, Config = Self>;
-    type TypedListIter<'doc, T: NBT>: Iterator<Item = T::Type<'doc, Self>>
+    type TypedListIter<'doc, T: NBT>: Iterator<Item = T::TypeRef<'doc, Self>>
         + ExactSizeIterator
         + Clone
         + Default;
