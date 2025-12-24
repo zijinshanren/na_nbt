@@ -1,6 +1,5 @@
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl,
-    MutableGenericNBTImpl, MutableNBTImpl,
+    ByteOrder, ConfigMut, ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl, ValueDispatch,
 };
 
 pub mod tag;
@@ -129,9 +128,9 @@ pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'stati
 
 pub trait PrimitiveNBTBase: NBTBase {}
 
-pub trait NBTImpl: ImmutableNBTImpl + MutableNBTImpl {}
+pub trait NBTImpl: ImmutableNBTImpl + ValueDispatch {}
 
-impl<T: ImmutableNBTImpl + MutableNBTImpl> NBTImpl for T {}
+impl<T: ImmutableNBTImpl + ValueDispatch> NBTImpl for T {}
 
 pub trait NBT: NBTBase + NBTImpl {}
 
@@ -140,9 +139,9 @@ pub trait PrimitiveNBT: NBT + PrimitiveNBTBase {}
 
 impl<T: NBT + PrimitiveNBTBase> PrimitiveNBT for T {}
 
-pub trait GenericNBTImpl: ImmutableGenericNBTImpl + MutableGenericNBTImpl {}
+pub trait GenericNBTImpl: ImmutableGenericNBTImpl {}
 
-impl<T: ImmutableGenericNBTImpl + MutableGenericNBTImpl> GenericNBTImpl for T {}
+impl<T: ImmutableGenericNBTImpl> GenericNBTImpl for T {}
 
 pub trait GenericNBT: NBTBase + GenericNBTImpl {}
 

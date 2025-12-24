@@ -2,8 +2,8 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ConfigRef, Document, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl,
-    ImmutableNBTImpl, Index, Mark, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList,
-    ReadonlyString, TagID, ValueBase, ValueRef, Visit,
+    ImmutableNBTImpl, Index, MapRef, Mark, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList,
+    ReadonlyString, TagID, ValueBase, ValueRef, VisitRef,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -190,10 +190,10 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
         self.ref_::<T>()
     }
 
-    #[inline]
-    fn into_<T: NBT>(self) -> Option<T::TypeRef<'doc, Self::Config>> {
-        self.into_::<T>()
-    }
+    // #[inline]
+    // fn into_<T: NBT>(self) -> Option<T::TypeRef<'doc, Self::Config>> {
+    //     self.into_::<T>()
+    // }
 
     #[inline]
     fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
@@ -205,21 +205,42 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
         self.get_::<T>(index)
     }
 
-    fn map<R>(self, match_fn: impl FnOnce(Visit<'doc, Self::Config>) -> R) -> R {
+    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 'doc, Self::Config>) -> R) -> R
+    where
+        'doc: 'a,
+    {
         match self {
-            ReadonlyValue::End(()) => match_fn(Visit::End(())),
-            ReadonlyValue::Byte(value) => match_fn(Visit::Byte(value)),
-            ReadonlyValue::Short(value) => match_fn(Visit::Short(value)),
-            ReadonlyValue::Int(value) => match_fn(Visit::Int(value)),
-            ReadonlyValue::Long(value) => match_fn(Visit::Long(value)),
-            ReadonlyValue::Float(value) => match_fn(Visit::Float(value)),
-            ReadonlyValue::Double(value) => match_fn(Visit::Double(value)),
-            ReadonlyValue::ByteArray(value) => match_fn(Visit::ByteArray(value)),
-            ReadonlyValue::String(value) => match_fn(Visit::String(value)),
-            ReadonlyValue::List(value) => match_fn(Visit::List(value)),
-            ReadonlyValue::Compound(value) => match_fn(Visit::Compound(value)),
-            ReadonlyValue::IntArray(value) => match_fn(Visit::IntArray(value)),
-            ReadonlyValue::LongArray(value) => match_fn(Visit::LongArray(value)),
+            ReadonlyValue::End(value) => match_fn(VisitRef::End(value)),
+            ReadonlyValue::Byte(value) => match_fn(VisitRef::Byte(value)),
+            ReadonlyValue::Short(value) => match_fn(VisitRef::Short(value)),
+            ReadonlyValue::Int(value) => match_fn(VisitRef::Int(value)),
+            ReadonlyValue::Long(value) => match_fn(VisitRef::Long(value)),
+            ReadonlyValue::Float(value) => match_fn(VisitRef::Float(value)),
+            ReadonlyValue::Double(value) => match_fn(VisitRef::Double(value)),
+            ReadonlyValue::ByteArray(value) => match_fn(VisitRef::ByteArray(value)),
+            ReadonlyValue::String(value) => match_fn(VisitRef::String(value)),
+            ReadonlyValue::List(value) => match_fn(VisitRef::List(value)),
+            ReadonlyValue::Compound(value) => match_fn(VisitRef::Compound(value)),
+            ReadonlyValue::IntArray(value) => match_fn(VisitRef::IntArray(value)),
+            ReadonlyValue::LongArray(value) => match_fn(VisitRef::LongArray(value)),
+        }
+    }
+
+    fn map<R>(self, match_fn: impl FnOnce(MapRef<'doc, Self::Config>) -> R) -> R {
+        match self {
+            ReadonlyValue::End(()) => match_fn(MapRef::End(())),
+            ReadonlyValue::Byte(value) => match_fn(MapRef::Byte(value)),
+            ReadonlyValue::Short(value) => match_fn(MapRef::Short(value)),
+            ReadonlyValue::Int(value) => match_fn(MapRef::Int(value)),
+            ReadonlyValue::Long(value) => match_fn(MapRef::Long(value)),
+            ReadonlyValue::Float(value) => match_fn(MapRef::Float(value)),
+            ReadonlyValue::Double(value) => match_fn(MapRef::Double(value)),
+            ReadonlyValue::ByteArray(value) => match_fn(MapRef::ByteArray(value)),
+            ReadonlyValue::String(value) => match_fn(MapRef::String(value)),
+            ReadonlyValue::List(value) => match_fn(MapRef::List(value)),
+            ReadonlyValue::Compound(value) => match_fn(MapRef::Compound(value)),
+            ReadonlyValue::IntArray(value) => match_fn(MapRef::IntArray(value)),
+            ReadonlyValue::LongArray(value) => match_fn(MapRef::LongArray(value)),
         }
     }
 }

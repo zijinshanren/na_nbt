@@ -41,12 +41,6 @@ pub trait ImmutableGenericNBTImpl: NBTBase {
 }
 
 pub trait ImmutableNBTImpl: ImmutableGenericNBTImpl {
-    fn ref_<'a, 'doc, O: ByteOrder, D: Document>(
-        value: &'a ReadonlyValue<'doc, O, D>,
-    ) -> Option<&'a Self::TypeRef<'doc, ImmutableConfig<O, D>>>
-    where
-        'doc: 'a;
-
     /// .
     ///
     /// # Safety
@@ -70,20 +64,7 @@ macro_rules! immutable_generic_nbt_impl {
 }
 
 macro_rules! immutable_nbt_impl {
-    ($name:ident) => {
-        #[inline]
-        fn ref_<'a, 'doc, O: ByteOrder, D: Document>(
-            value: &'a ReadonlyValue<'doc, O, D>,
-        ) -> Option<&'a Self::TypeRef<'doc, ImmutableConfig<O, D>>>
-        where
-            'doc: 'a,
-        {
-            match value {
-                ReadonlyValue::$name(v) => Some(v),
-                _ => None,
-            }
-        }
-    };
+    ($name:ident) => {};
 }
 
 impl ImmutableGenericNBTImpl for End {

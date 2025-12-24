@@ -1,6 +1,6 @@
 use crate::{
-    CompoundBase, ConfigMut, ConfigRef, Index, IntoNBT, ListBase, NBT, NBTBase, OwnValue,
-    TypedListBase, ValueBase, Visit, VisitMut,
+    CompoundBase, ConfigMut, ConfigRef, Index, IntoNBT, ListBase, MapMut, MapRef, NBT, NBTBase,
+    OwnValue, TypedListBase, ValueBase, VisitMut, VisitRef,
 };
 
 pub trait ValueMut<'s>: ValueBase {
@@ -36,9 +36,14 @@ pub trait ValueMut<'s>: ValueBase {
     where
         's: 'a;
 
-    fn map<R>(self, match_fn: impl FnOnce(Visit<'s, Self::Config>) -> R) -> R;
+    fn visit_mut<'a, R>(
+        &'a mut self,
+        match_fn: impl FnOnce(VisitMut<'a, 's, Self::Config>) -> R,
+    ) -> R
+    where
+        's: 'a;
 
-    fn map_mut<R>(self, match_fn: impl FnOnce(VisitMut<'s, Self::Config>) -> R) -> R;
+    fn map_mut<R>(self, match_fn: impl FnOnce(MapMut<'s, Self::Config>) -> R) -> R;
 }
 
 pub trait ListMut<'s>:

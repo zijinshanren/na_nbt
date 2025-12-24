@@ -11,17 +11,27 @@ pub trait Writable {
 pub trait ValueBase: Send + Sync + Sized {
     fn tag_id(&self) -> TagID;
 
-    fn is_<T: NBT>(&self) -> bool;
+    #[inline]
+    fn is_<T: NBT>(&self) -> bool {
+        self.tag_id() == T::TAG_ID
+    }
 }
 
 pub trait ListBase: Send + Sync + Sized {
     fn element_tag_id(&self) -> TagID;
 
-    fn element_is_<T: NBT>(&self) -> bool;
+    #[inline]
+    fn element_is_<T: NBT>(&self) -> bool {
+        self.element_tag_id() == T::TAG_ID
+            || (self.element_tag_id() == TagID::End && self.is_empty())
+    }
 
     fn len(&self) -> usize;
 
-    fn is_empty(&self) -> bool;
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 pub trait TypedListBase<T: NBT>: Send + Sync + Sized {
@@ -29,7 +39,10 @@ pub trait TypedListBase<T: NBT>: Send + Sync + Sized {
 
     fn len(&self) -> usize;
 
-    fn is_empty(&self) -> bool;
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 pub trait CompoundBase: Send + Sync + Sized {}

@@ -15,7 +15,23 @@ use zerocopy::byteorder;
 
 use crate::{MutString, MutVec};
 
-pub enum Visit<'s, C: ConfigRef> {
+pub enum VisitRef<'a, 's: 'a, C: ConfigRef> {
+    End(&'a ()),
+    Byte(&'a i8),
+    Short(&'a i16),
+    Int(&'a i32),
+    Long(&'a i64),
+    Float(&'a f32),
+    Double(&'a f64),
+    ByteArray(&'a C::ByteArray<'s>),
+    String(&'a C::String<'s>),
+    List(&'a C::List<'s>),
+    Compound(&'a C::Compound<'s>),
+    IntArray(&'a C::IntArray<'s>),
+    LongArray(&'a C::LongArray<'s>),
+}
+
+pub enum MapRef<'s, C: ConfigRef> {
     End(()),
     Byte(i8),
     Short(i16),
@@ -31,7 +47,23 @@ pub enum Visit<'s, C: ConfigRef> {
     LongArray(C::LongArray<'s>),
 }
 
-pub enum VisitMut<'s, C: ConfigMut> {
+pub enum VisitMut<'a, 's: 'a, C: ConfigMut> {
+    End(&'a mut ()),
+    Byte(&'a mut i8),
+    Short(&'a mut i16),
+    Int(&'a mut i32),
+    Long(&'a mut i64),
+    Float(&'a mut f32),
+    Double(&'a mut f64),
+    ByteArray(&'a mut MutVec<'s, i8>),
+    String(&'a mut MutString<'s>),
+    List(&'a mut C::ListMut<'s>),
+    Compound(&'a mut C::CompoundMut<'s>),
+    IntArray(&'a mut MutVec<'s, byteorder::I32<C::ByteOrder>>),
+    LongArray(&'a mut MutVec<'s, byteorder::I64<C::ByteOrder>>),
+}
+
+pub enum MapMut<'s, C: ConfigMut> {
     End(&'s mut ()),
     Byte(&'s mut i8),
     Short(&'s mut byteorder::I16<C::ByteOrder>),

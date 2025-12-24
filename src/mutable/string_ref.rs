@@ -4,7 +4,7 @@ use crate::StringRef;
 
 #[derive(Clone)]
 pub struct RefString<'s> {
-    data: &'s [u8],
+    pub(crate) data: &'s [u8],
 }
 
 impl<'s> RefString<'s> {

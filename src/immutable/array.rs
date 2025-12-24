@@ -8,6 +8,15 @@ pub struct ReadonlyArray<'doc, T, D: Document> {
     pub(crate) _doc: D,
 }
 
+impl<'doc, T, D: Document> Default for ReadonlyArray<'doc, T, D> {
+    fn default() -> Self {
+        Self {
+            data: &[],
+            _doc: unsafe { D::never() },
+        }
+    }
+}
+
 impl<'doc, T, D: Document> Deref for ReadonlyArray<'doc, T, D> {
     type Target = [T];
 

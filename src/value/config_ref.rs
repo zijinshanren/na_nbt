@@ -7,7 +7,7 @@ use crate::{ByteOrder, CompoundRef, ListRef, NBT, StringRef, TypedListRef, Value
 pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     type ByteOrder: ByteOrder;
     type Value<'doc>: ValueRef<'doc, Config = Self>;
-    type ByteArray<'doc>: Deref<Target = [i8]> + Clone;
+    type ByteArray<'doc>: Deref<Target = [i8]> + Clone + Default;
     type String<'doc>: StringRef<'doc>;
     type List<'doc>: ListRef<'doc, Config = Self>;
     type ListIter<'doc>: Iterator<Item = Self::Value<'doc>> + ExactSizeIterator + Clone + Default;
@@ -20,6 +20,6 @@ pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     type CompoundIter<'doc>: Iterator<Item = (Self::String<'doc>, Self::Value<'doc>)>
         + Clone
         + Default;
-    type IntArray<'doc>: Deref<Target = [byteorder::I32<Self::ByteOrder>]> + Clone;
-    type LongArray<'doc>: Deref<Target = [byteorder::I64<Self::ByteOrder>]> + Clone;
+    type IntArray<'doc>: Deref<Target = [byteorder::I32<Self::ByteOrder>]> + Clone + Default;
+    type LongArray<'doc>: Deref<Target = [byteorder::I64<Self::ByteOrder>]> + Clone + Default;
 }

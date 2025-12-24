@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ConfigRef, EMPTY_LIST, MutableConfig, NBT, TypedListBase, TypedListRef, cold_path,
-    tag_size,
+    mutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -56,7 +56,7 @@ impl<'s, O: ByteOrder, T: NBT> RefTypedList<'s, O, T> {
             return None;
         }
 
-        unsafe { T::read_ref::<O>(self.data.add(1 + 4).add(index * tag_size(T::TAG_ID))) }
+        unsafe { T::read_ref::<O>(self.data.add(1 + 4).add(index * mutable_tag_size(T::TAG_ID))) }
     }
 
     #[inline]
@@ -128,7 +128,7 @@ impl<'s, O: ByteOrder, T: NBT> Iterator for RefTypedListIter<'s, O, T> {
 
         let value = unsafe { T::read_ref::<O>(self.data) };
 
-        self.data = unsafe { self.data.add(tag_size(T::TAG_ID)) };
+        self.data = unsafe { self.data.add(mutable_tag_size(T::TAG_ID)) };
 
         value
     }

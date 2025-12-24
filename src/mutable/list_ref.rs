@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, EMPTY_LIST, ListBase, ListRef, MutableConfig, RefTypedList, RefValue, TagID,
-    cold_path, tag_size,
+    cold_path, mutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -71,7 +71,10 @@ impl<'s, O: ByteOrder> RefList<'s, O> {
         let tag_id = self.element_tag_id();
 
         Some(unsafe {
-            RefValue::read_ref(tag_id, self.data.add(1 + 4).add(index * tag_size(tag_id)))
+            RefValue::read_ref(
+                tag_id,
+                self.data.add(1 + 4).add(index * mutable_tag_size(tag_id)),
+            )
         })
     }
 
@@ -86,7 +89,13 @@ impl<'s, O: ByteOrder> RefList<'s, O> {
             return None;
         }
 
-        unsafe { T::read_ref::<O>(self.data.add(1 + 4).add(index * tag_size(T::TAG_ID))) }
+        unsafe {
+            T::read_ref::<O>(
+                self.data
+                    .add(1 + 4)
+                    .add(index * mutable_tag_size(T::TAG_ID)),
+            )
+        }
     }
 
     #[inline]
@@ -189,7 +198,7 @@ impl<'s, O: ByteOrder> Iterator for RefListIter<'s, O> {
 
         let value = unsafe { RefValue::read_ref(self.tag_id, self.data) };
 
-        self.data = unsafe { self.data.add(tag_size(self.tag_id)) };
+        self.data = unsafe { self.data.add(mutable_tag_size(self.tag_id)) };
 
         Some(value)
     }
