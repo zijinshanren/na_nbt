@@ -61,6 +61,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     #[inline]
     pub fn element_is_<T: NBT>(&self) -> bool {
         self.element_tag_id() == T::TAG_ID
+            || (self.element_tag_id() == TagID::End && self.is_empty())
     }
 
     /// Returns the number of elements in this list.
