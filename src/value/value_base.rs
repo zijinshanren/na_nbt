@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::{ByteOrder, ConfigRef, NBT, Result, TagID};
+use crate::{ByteOrder, NBT, Result, TagID};
 
 pub trait Writable {
     fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>);
@@ -9,16 +9,12 @@ pub trait Writable {
 }
 
 pub trait ValueBase: Writable + Send + Sync + Sized {
-    type ConfigRef: ConfigRef;
-
     fn tag_id(&self) -> TagID;
 
     fn is_<T: NBT>(&self) -> bool;
 }
 
 pub trait ListBase: Writable + Send + Sync + Sized {
-    type ConfigRef: ConfigRef;
-
     fn element_tag_id(&self) -> TagID;
 
     fn element_is_<T: NBT>(&self) -> bool;
@@ -29,8 +25,6 @@ pub trait ListBase: Writable + Send + Sync + Sized {
 }
 
 pub trait TypedListBase<T: NBT>: Writable + Send + Sync + Sized {
-    type ConfigRef: ConfigRef;
-
     const ELEMENT_TAG_ID: TagID = T::TAG_ID;
 
     fn len(&self) -> usize;
@@ -38,6 +32,4 @@ pub trait TypedListBase<T: NBT>: Writable + Send + Sync + Sized {
     fn is_empty(&self) -> bool;
 }
 
-pub trait CompoundBase: Writable + Send + Sync + Sized {
-    type Config: ConfigRef;
-}
+pub trait CompoundBase: Writable + Send + Sync + Sized {}

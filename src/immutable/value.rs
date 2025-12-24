@@ -3,7 +3,7 @@ use zerocopy::byteorder;
 use crate::{
     ByteOrder, ConfigRef, Document, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl,
     ImmutableNBTImpl, Index, Mark, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList,
-    ReadonlyString, TagID, Value, ValueBase, ValueRef,
+    ReadonlyString, TagID, ValueBase, ValueRef, Visit,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -150,8 +150,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
-    type ConfigRef = ImmutableConfig<O, D>;
-
     #[inline]
     fn tag_id(&self) -> TagID {
         self.tag_id()
@@ -164,8 +162,10 @@ impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, D> {
+    type Config = ImmutableConfig<O, D>;
+
     #[inline]
-    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::ConfigRef>>
+    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::Type<'doc, Self::Config>>
     where
         'doc: 'a,
     {
@@ -173,35 +173,35 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
     }
 
     #[inline]
-    fn into_<T: NBT>(self) -> Option<T::Type<'doc, Self::ConfigRef>> {
+    fn into_<T: NBT>(self) -> Option<T::Type<'doc, Self::Config>> {
         self.into_::<T>()
     }
 
     #[inline]
-    fn get(&self, index: impl Index) -> Option<<Self::ConfigRef as ConfigRef>::Value<'doc>> {
+    fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
         self.get(index)
     }
 
     #[inline]
-    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::ConfigRef>> {
+    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::Type<'doc, Self::Config>> {
         self.get_::<T>(index)
     }
 
-    fn map<R>(self, match_fn: impl FnOnce(Value<'doc, Self::ConfigRef>) -> R) -> R {
+    fn map<R>(self, match_fn: impl FnOnce(Visit<'doc, Self::Config>) -> R) -> R {
         match self {
-            ReadonlyValue::End(()) => match_fn(Value::End(())),
-            ReadonlyValue::Byte(value) => match_fn(Value::Byte(value)),
-            ReadonlyValue::Short(value) => match_fn(Value::Short(value)),
-            ReadonlyValue::Int(value) => match_fn(Value::Int(value)),
-            ReadonlyValue::Long(value) => match_fn(Value::Long(value)),
-            ReadonlyValue::Float(value) => match_fn(Value::Float(value)),
-            ReadonlyValue::Double(value) => match_fn(Value::Double(value)),
-            ReadonlyValue::ByteArray(value) => match_fn(Value::ByteArray(value)),
-            ReadonlyValue::String(value) => match_fn(Value::String(value)),
-            ReadonlyValue::List(value) => match_fn(Value::List(value)),
-            ReadonlyValue::Compound(value) => match_fn(Value::Compound(value)),
-            ReadonlyValue::IntArray(value) => match_fn(Value::IntArray(value)),
-            ReadonlyValue::LongArray(value) => match_fn(Value::LongArray(value)),
+            ReadonlyValue::End(()) => match_fn(Visit::End(())),
+            ReadonlyValue::Byte(value) => match_fn(Visit::Byte(value)),
+            ReadonlyValue::Short(value) => match_fn(Visit::Short(value)),
+            ReadonlyValue::Int(value) => match_fn(Visit::Int(value)),
+            ReadonlyValue::Long(value) => match_fn(Visit::Long(value)),
+            ReadonlyValue::Float(value) => match_fn(Visit::Float(value)),
+            ReadonlyValue::Double(value) => match_fn(Visit::Double(value)),
+            ReadonlyValue::ByteArray(value) => match_fn(Visit::ByteArray(value)),
+            ReadonlyValue::String(value) => match_fn(Visit::String(value)),
+            ReadonlyValue::List(value) => match_fn(Visit::List(value)),
+            ReadonlyValue::Compound(value) => match_fn(Visit::Compound(value)),
+            ReadonlyValue::IntArray(value) => match_fn(Visit::IntArray(value)),
+            ReadonlyValue::LongArray(value) => match_fn(Visit::LongArray(value)),
         }
     }
 }

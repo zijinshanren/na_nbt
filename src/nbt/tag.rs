@@ -104,6 +104,7 @@ pub struct TypedList<T: NBT>(PhantomData<T>);
 impl<T: NBT> NBTBase for TypedList<T> {
     const TAG_ID: TagID = TagID::List;
     type Type<'a, Config: ConfigRef> = Config::TypedList<'a, T>;
+    type TypeMut<'a, Config: ConfigMut> = Config::TypedListMut<'a, T>;
 }
 
 macro_rules! primitive_tag {

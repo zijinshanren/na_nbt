@@ -1,5 +1,134 @@
-use crate::{ConfigMut, ValueBase};
+use crate::{
+    CompoundBase, ConfigMut, ConfigRef, Index, ListBase, NBT, TypedListBase, ValueBase, Visit,
+    VisitMut,
+};
 
-pub trait ValueMut<'s>: ValueBase<ConfigRef = Self::ConfigMut> {
-    type ConfigMut: ConfigMut;
+pub trait ValueMut<'s>: ValueBase {
+    type Config: ConfigMut;
+
+    fn mut_<'a, T: NBT>(&'a mut self) -> Option<&'a mut T::TypeMut<'s, Self::Config>>
+    where
+        's: 'a;
+
+    fn into_<T: NBT>(self) -> Option<T::Type<'s, Self::Config>>;
+
+    fn into_mut_<T: NBT>(self) -> Option<T::TypeMut<'s, Self::Config>>;
+
+    fn get<'a>(&'a self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'a>>
+    where
+        's: 'a;
+
+    fn get_<'a, T: NBT>(&'a self, index: impl Index) -> Option<T::Type<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn get_mut<'a>(
+        &'a mut self,
+        index: impl Index,
+    ) -> Option<<Self::Config as ConfigMut>::ValueMut<'a>>
+    where
+        's: 'a;
+
+    fn get_mut_<'a, T: NBT>(
+        &'a mut self,
+        index: impl Index,
+    ) -> Option<T::TypeMut<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn map<R>(self, match_fn: impl FnOnce(Visit<'s, Self::Config>) -> R) -> R;
+
+    fn map_mut<R>(self, match_fn: impl FnOnce(VisitMut<'s, Self::Config>) -> R) -> R;
+}
+
+pub trait ListMut<'s>:
+    ListBase + IntoIterator<Item = <Self::Config as ConfigMut>::ValueMut<'s>>
+{
+    type Config: ConfigMut;
+
+    fn get<'a>(&'a self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'a>>
+    where
+        's: 'a;
+
+    fn get_<'a, T: NBT>(&'a self, index: usize) -> Option<T::Type<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn get_mut<'a>(&'a mut self, index: usize) -> Option<<Self::Config as ConfigMut>::ValueMut<'a>>
+    where
+        's: 'a;
+
+    fn get_mut_<'a, T: NBT>(&'a mut self, index: usize) -> Option<T::TypeMut<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
+
+    fn typed_mut_<T: NBT>(self) -> Option<<Self::Config as ConfigMut>::TypedListMut<'s, T>>;
+
+    fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::ListIter<'a>
+    where
+        's: 'a;
+
+    fn iter_mut<'a>(&'a mut self) -> <Self::Config as ConfigMut>::ListIterMut<'a>
+    where
+        's: 'a;
+}
+
+pub trait TypedListMut<'s, T: NBT>:
+    TypedListBase<T> + IntoIterator<Item = T::TypeMut<'s, Self::Config>>
+{
+    type Config: ConfigMut;
+
+    fn get<'a>(&'a self, index: usize) -> Option<T::Type<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn get_mut<'a>(&'a mut self, index: usize) -> Option<T::TypeMut<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::TypedListIter<'a, T>
+    where
+        's: 'a;
+
+    fn iter_mut<'a>(&'a mut self) -> <Self::Config as ConfigMut>::TypedListIterMut<'a, T>
+    where
+        's: 'a;
+}
+
+pub trait CompoundMut<'s>:
+    CompoundBase
+    + IntoIterator<
+        Item = (
+            <Self::Config as ConfigRef>::String<'s>,
+            <Self::Config as ConfigMut>::ValueMut<'s>,
+        ),
+    >
+{
+    type Config: ConfigMut;
+
+    fn get<'a>(&'a self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'a>>
+    where
+        's: 'a;
+
+    fn get_<'a, T: NBT>(&'a self, key: &str) -> Option<T::Type<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn get_mut<'a>(&'a mut self, key: &str) -> Option<<Self::Config as ConfigMut>::ValueMut<'a>>
+    where
+        's: 'a;
+
+    fn get_mut_<'a, T: NBT>(&'a mut self, key: &str) -> Option<T::TypeMut<'a, Self::Config>>
+    where
+        's: 'a;
+
+    fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::CompoundIter<'a>
+    where
+        's: 'a;
+
+    fn iter_mut<'a>(&'a mut self) -> <Self::Config as ConfigMut>::CompoundIterMut<'a>
+    where
+        's: 'a;
 }

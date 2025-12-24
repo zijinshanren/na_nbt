@@ -116,11 +116,11 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {
-    type Config = ImmutableConfig<O, D>;
-}
+impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {}
 
 impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'doc, O, D> {
+    type Config = ImmutableConfig<O, D>;
+
     #[inline]
     fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
         self.get(key)
