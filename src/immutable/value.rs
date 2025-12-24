@@ -53,7 +53,16 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
                 };
             }
 
-            match_tag_id_expand!(match_tag_id, tag_id, data, mark, doc)
+            match_tag_id!(
+                [
+                    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound,
+                    IntArray, LongArray
+                ],
+                tag_id,
+                data,
+                mark,
+                doc
+            )
         }
     }
 
@@ -73,7 +82,15 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
                 };
             }
 
-            match_tag_id_expand!(match_tag_id, tag_id, data, mark)
+            match_tag_id!(
+                [
+                    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound,
+                    IntArray, LongArray
+                ],
+                tag_id,
+                data,
+                mark
+            )
         }
     }
 }

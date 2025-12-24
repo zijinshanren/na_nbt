@@ -1,6 +1,3 @@
-#[macro_use]
-mod util;
-
 mod array;
 mod compound;
 mod config;

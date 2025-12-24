@@ -126,8 +126,11 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
                 };
             }
 
-            match_tag_id_expand!(
-                match_tag_id,
+            match_tag_id!(
+                [
+                    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound,
+                    IntArray, LongArray
+                ],
                 self.element_tag_id(),
                 ptr,
                 index,
