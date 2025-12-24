@@ -28,6 +28,7 @@ pub enum ReadonlyValue<'doc, O: ByteOrder, D: Document> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyValue<'doc, O, D> {
+    #[inline]
     fn default() -> Self {
         ReadonlyValue::End(())
     }

@@ -21,6 +21,7 @@ pub struct ReadonlyList<'doc, O: ByteOrder, D: Document> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyList<'doc, O, D> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: &EMPTY_LIST,
@@ -217,6 +218,7 @@ pub struct ReadonlyListIter<'doc, O: ByteOrder, D: Document> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyListIter<'doc, O, D> {
+    #[inline]
     fn default() -> Self {
         Self {
             tag_id: TagID::End,
@@ -271,6 +273,7 @@ pub struct ReadonlyTypedList<'doc, O: ByteOrder, D: Document, T: NBT> {
 }
 
 impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedList<'doc, O, D, T> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: &EMPTY_LIST,
@@ -288,6 +291,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> IntoIterator for ReadonlyTypedList
     type Item = T::Type<'doc, ImmutableConfig<O, D>>;
     type IntoIter = ReadonlyTypedListIter<'doc, O, D, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         ReadonlyTypedListIter {
             remaining: self.len() as u32,
@@ -379,6 +383,7 @@ pub struct ReadonlyTypedListIter<'doc, O: ByteOrder, D: Document, T: NBT> {
 }
 
 impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedListIter<'doc, O, D, T> {
+    #[inline]
     fn default() -> Self {
         Self {
             remaining: 0,

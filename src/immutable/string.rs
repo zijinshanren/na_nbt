@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    fmt::{self, Display},
-};
+use std::borrow::Cow;
 
 use crate::{Document, ReadonlyArray, StringRef};
 
@@ -27,12 +24,10 @@ impl<'doc, D: Document> ReadonlyString<'doc, D> {
     pub fn decode<'a>(&'a self) -> Cow<'a, str> {
         simd_cesu8::mutf8::decode_lossy(self.data)
     }
-}
 
-impl<'doc, D: Document> Display for ReadonlyString<'doc, D> {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.decode().into_owned())
+    pub fn to_utf8_string(&self) -> String {
+        self.decode().into_owned()
     }
 }
 
@@ -45,5 +40,10 @@ impl<'doc, D: Document> StringRef<'doc> for ReadonlyString<'doc, D> {
     #[inline]
     fn decode(&self) -> std::borrow::Cow<'_, str> {
         self.decode()
+    }
+
+    #[inline]
+    fn to_utf8_string(&self) -> String {
+        self.to_utf8_string()
     }
 }

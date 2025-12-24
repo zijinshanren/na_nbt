@@ -16,6 +16,7 @@ pub struct ReadonlyCompound<'doc, O: ByteOrder, D: Document> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyCompound<'doc, O, D> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: &EMPTY_COMPOUND,
@@ -80,7 +81,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    #[inline]
     pub fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::Type<'doc, ImmutableConfig<O, D>>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
@@ -93,7 +93,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
         }
     }
 
-    #[inline]
     pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
         unsafe {
             self.get_impl(key, |tag_id, ptr, mark, doc| {
@@ -146,6 +145,7 @@ pub struct ReadonlyCompoundIter<'doc, O: ByteOrder, D: Document> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyCompoundIter<'doc, O, D> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: EMPTY_COMPOUND.as_ptr(),
