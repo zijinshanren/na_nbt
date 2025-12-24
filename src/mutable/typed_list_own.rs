@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use crate::{ByteOrder, NBT, VecViewOwn};
+use crate::{ByteOrder, NBT, OwnVec};
 
 #[repr(transparent)]
 pub struct OwnedTypedList<T: NBT, O: ByteOrder> {
-    data: VecViewOwn<u8>,
+    data: OwnVec<u8>,
     _marker: PhantomData<(O, T)>,
 }
 

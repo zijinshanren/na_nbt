@@ -1,10 +1,10 @@
+use std::ptr;
+
 use zerocopy::byteorder;
 
-use crate::{
-    BinaryReadWrite, ByteOrder, OwnedCompound, OwnedList, StringViewOwn, TagID, VecViewOwn,
-};
+use crate::{ByteOrder, NBT, OwnCompound, OwnList, OwnString, OwnVec, TagID};
 
-pub enum OwnedValue<O: ByteOrder> {
+pub enum OwnValue<O: ByteOrder> {
     End(()),
     Byte(i8),
     Short(byteorder::I16<O>),
@@ -12,15 +12,15 @@ pub enum OwnedValue<O: ByteOrder> {
     Long(byteorder::I64<O>),
     Float(byteorder::F32<O>),
     Double(byteorder::F64<O>),
-    ByteArray(VecViewOwn<i8>),
-    String(StringViewOwn),
-    List(OwnedList<O>),
-    Compound(OwnedCompound<O>),
-    IntArray(VecViewOwn<byteorder::I32<O>>),
-    LongArray(VecViewOwn<byteorder::I64<O>>),
+    ByteArray(OwnVec<i8>),
+    String(OwnString),
+    List(OwnList<O>),
+    Compound(OwnCompound<O>),
+    IntArray(OwnVec<byteorder::I32<O>>),
+    LongArray(OwnVec<byteorder::I64<O>>),
 }
 
-impl<O: ByteOrder> Default for OwnedValue<O> {
+impl<O: ByteOrder> Default for OwnValue<O> {
     #[inline]
     fn default() -> Self {
         Self::End(())
@@ -31,19 +31,19 @@ impl<O: ByteOrder> Default for OwnedValue<O> {
 //     unsafe fn write(self, dst: *mut u8) {
 //         unsafe {
 //             match self {
-//                 OwnedValue::End(value) => value.write(dst),
-//                 OwnedValue::Byte(value) => value.write(dst),
-//                 OwnedValue::Short(value) => value.write(dst),
-//                 OwnedValue::Int(value) => value.write(dst),
-//                 OwnedValue::Long(value) => value.write(dst),
-//                 OwnedValue::Float(value) => value.write(dst),
-//                 OwnedValue::Double(value) => value.write(dst),
-//                 OwnedValue::ByteArray(value) => value.write(dst),
-//                 OwnedValue::String(value) => value.write(dst),
-//                 OwnedValue::List(value) => value.write(dst),
-//                 OwnedValue::Compound(value) => value.write(dst),
-//                 OwnedValue::IntArray(value) => value.write(dst),
-//                 OwnedValue::LongArray(value) => value.write(dst),
+//                 OwnedValue::End(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::Byte(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::Short(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::Int(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::Long(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::Float(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::Double(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::ByteArray(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::String(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::List(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::Compound(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::IntArray(value) => ptr::write(dst.cast(), value),
+//                 OwnedValue::LongArray(value) => ptr::write(dst.cast(), value),
 //             };
 //         }
 //     }
@@ -52,19 +52,19 @@ impl<O: ByteOrder> Default for OwnedValue<O> {
 //     unsafe fn read(tag_id: TagID, src: *mut u8) -> Self {
 //         unsafe {
 //             match tag_id {
-//                 TagID::End => OwnedValue::End(BinaryReadWrite::read(src)),
-//                 TagID::Byte => OwnedValue::Byte(BinaryReadWrite::read(src)),
-//                 TagID::Short => OwnedValue::Short(BinaryReadWrite::read(src)),
-//                 TagID::Int => OwnedValue::Int(BinaryReadWrite::read(src)),
-//                 TagID::Long => OwnedValue::Long(BinaryReadWrite::read(src)),
-//                 TagID::Float => OwnedValue::Float(BinaryReadWrite::read(src)),
-//                 TagID::Double => OwnedValue::Double(BinaryReadWrite::read(src)),
-//                 TagID::ByteArray => OwnedValue::ByteArray(VecViewOwn::read(src)),
-//                 TagID::String => OwnedValue::String(BinaryReadWrite::read(src)),
-//                 TagID::List => OwnedValue::List(BinaryReadWrite::read(src)),
-//                 TagID::Compound => OwnedValue::Compound(BinaryReadWrite::read(src)),
-//                 TagID::IntArray => OwnedValue::IntArray(BinaryReadWrite::read(src)),
-//                 TagID::LongArray => OwnedValue::LongArray(BinaryReadWrite::read(src)),
+//                 TagID::End => OwnedValue::End(ptr::read(src.cast())),
+//                 TagID::Byte => OwnedValue::Byte(ptr::read(src.cast())),
+//                 TagID::Short => OwnedValue::Short(ptr::read(src.cast())),
+//                 TagID::Int => OwnedValue::Int(ptr::read(src.cast())),
+//                 TagID::Long => OwnedValue::Long(ptr::read(src.cast())),
+//                 TagID::Float => OwnedValue::Float(ptr::read(src.cast())),
+//                 TagID::Double => OwnedValue::Double(ptr::read(src.cast())),
+//                 TagID::ByteArray => OwnedValue::ByteArray(ptr::read(src.cast())),
+//                 TagID::String => OwnedValue::String(ptr::read(src.cast())),
+//                 TagID::List => OwnedValue::List(ptr::read(src.cast())),
+//                 TagID::Compound => OwnedValue::Compound(ptr::read(src.cast())),
+//                 TagID::IntArray => OwnedValue::IntArray(ptr::read(src.cast())),
+//                 TagID::LongArray => OwnedValue::LongArray(ptr::read(src.cast())),
 //             }
 //         }
 //     }

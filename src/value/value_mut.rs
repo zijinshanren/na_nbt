@@ -1,6 +1,6 @@
 use crate::{
-    CompoundBase, ConfigMut, ConfigRef, Index, ListBase, NBT, TypedListBase, ValueBase, Visit,
-    VisitMut,
+    CompoundBase, ConfigMut, ConfigRef, Index, IntoNBT, ListBase, NBT, NBTBase, OwnValue,
+    TypedListBase, ValueBase, Visit, VisitMut,
 };
 
 pub trait ValueMut<'s>: ValueBase {
@@ -62,6 +62,28 @@ pub trait ListMut<'s>:
     where
         's: 'a;
 
+    fn push<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(
+        &mut self,
+        value: V,
+    ) -> Option<<V::Tag as NBTBase>::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn pop(&mut self) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn pop_<T: NBT>(&mut self) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn insert<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(
+        &mut self,
+        index: usize,
+        value: V,
+    ) -> Option<<V::Tag as NBTBase>::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn remove(&mut self, index: usize) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn remove_<T: NBT>(
+        &mut self,
+        index: usize,
+    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
     fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
 
     fn typed_mut_<T: NBT>(self) -> Option<<Self::Config as ConfigMut>::TypedListMut<'s, T>>;
@@ -87,6 +109,21 @@ pub trait TypedListMut<'s, T: NBT>:
     fn get_mut<'a>(&'a mut self, index: usize) -> Option<T::TypeMut<'a, Self::Config>>
     where
         's: 'a;
+
+    fn push(
+        &mut self,
+        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
+    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn pop(&mut self) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn insert(
+        &mut self,
+        index: usize,
+        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
+    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn remove(&mut self, index: usize) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
 
     fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::TypedListIter<'a, T>
     where
@@ -123,6 +160,25 @@ pub trait CompoundMut<'s>:
     fn get_mut_<'a, T: NBT>(&'a mut self, key: &str) -> Option<T::TypeMut<'a, Self::Config>>
     where
         's: 'a;
+
+    fn insert(
+        &mut self,
+        key: &str,
+        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder>,
+    ) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn insert_<T: NBT>(
+        &mut self,
+        key: &str,
+        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder>,
+    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn remove(&mut self, key: &str) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
+
+    fn remove_<T: NBT>(
+        &mut self,
+        key: &str,
+    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
 
     fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::CompoundIter<'a>
     where

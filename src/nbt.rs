@@ -1,6 +1,7 @@
-use std::ptr;
-
-use crate::{ByteOrder, ConfigMut, ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl};
+use crate::{
+    ByteOrder, ConfigMut, ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl,
+    MutableGenericNBTImpl, MutableNBTImpl,
+};
 
 pub mod tag;
 
@@ -119,49 +120,30 @@ mod private {
     impl<T: NBT> Sealed for TypedList<T> {}
 }
 
-/// .
-///
-/// # Safety
-///
-/// .
-pub unsafe trait BinaryReadWrite: Sized {
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    #[inline]
-    unsafe fn write(self, dst: *mut u8) {
-        unsafe { ptr::write(dst.cast(), self) };
-    }
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    #[inline]
-    unsafe fn read(src: *mut u8) -> Self {
-        unsafe { ptr::read(src.cast()) }
-    }
-}
-
 pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'static {
     const TAG_ID: TagID;
     type TypeRef<'a, Config: ConfigRef>: Clone;
     type TypeMut<'a, Config: ConfigMut>;
-    type Type<O: ByteOrder>: BinaryReadWrite + Default;
+    type Type<O: ByteOrder>: Default;
 }
 
 pub trait PrimitiveNBTBase: NBTBase {}
 
-pub trait NBT: NBTBase + ImmutableNBTImpl {}
+pub trait NBTImpl: ImmutableNBTImpl + MutableNBTImpl {}
 
-impl<T: NBTBase + ImmutableNBTImpl> NBT for T {}
+impl<T: ImmutableNBTImpl + MutableNBTImpl> NBTImpl for T {}
+
+pub trait NBT: NBTBase + NBTImpl {}
+
+impl<T: NBTBase + NBTImpl> NBT for T {}
 pub trait PrimitiveNBT: NBT + PrimitiveNBTBase {}
 
 impl<T: NBT + PrimitiveNBTBase> PrimitiveNBT for T {}
 
-pub trait GenericNBT: NBTBase + ImmutableGenericNBTImpl {}
+pub trait GenericNBTImpl: ImmutableGenericNBTImpl + MutableGenericNBTImpl {}
 
-impl<T: NBTBase + ImmutableGenericNBTImpl> GenericNBT for T {}
+impl<T: ImmutableGenericNBTImpl + MutableGenericNBTImpl> GenericNBTImpl for T {}
+
+pub trait GenericNBT: NBTBase + GenericNBTImpl {}
+
+impl<T: NBTBase + GenericNBTImpl> GenericNBT for T {}

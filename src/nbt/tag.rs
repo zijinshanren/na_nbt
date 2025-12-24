@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, NBT, NBTBase, OwnedCompound, OwnedList, OwnedTypedList,
-    PrimitiveNBTBase, StringViewMut, StringViewOwn, TagID, VecViewMut, VecViewOwn,
+    ByteOrder, ConfigMut, ConfigRef, NBT, NBTBase, OwnCompound, OwnList, OwnedTypedList,
+    PrimitiveNBTBase, MutString, OwnString, TagID, MutVec, OwnVec,
 };
 
 macro_rules! define_primary_tag {
@@ -73,43 +73,43 @@ impl NBTBase for Double {
 impl NBTBase for ByteArray {
     const TAG_ID: TagID = TagID::ByteArray;
     type TypeRef<'a, Config: ConfigRef> = Config::ByteArray<'a>;
-    type TypeMut<'a, Config: ConfigMut> = VecViewMut<'a, i8>;
-    type Type<O: ByteOrder> = VecViewOwn<i8>;
+    type TypeMut<'a, Config: ConfigMut> = MutVec<'a, i8>;
+    type Type<O: ByteOrder> = OwnVec<i8>;
 }
 
 impl NBTBase for String {
     const TAG_ID: TagID = TagID::String;
     type TypeRef<'a, Config: ConfigRef> = Config::String<'a>;
-    type TypeMut<'a, Config: ConfigMut> = StringViewMut<'a>;
-    type Type<O: ByteOrder> = StringViewOwn;
+    type TypeMut<'a, Config: ConfigMut> = MutString<'a>;
+    type Type<O: ByteOrder> = OwnString;
 }
 
 impl NBTBase for List {
     const TAG_ID: TagID = TagID::List;
     type TypeRef<'a, Config: ConfigRef> = Config::List<'a>;
     type TypeMut<'a, Config: ConfigMut> = Config::ListMut<'a>;
-    type Type<O: ByteOrder> = OwnedList<O>;
+    type Type<O: ByteOrder> = OwnList<O>;
 }
 
 impl NBTBase for Compound {
     const TAG_ID: TagID = TagID::Compound;
     type TypeRef<'a, Config: ConfigRef> = Config::Compound<'a>;
     type TypeMut<'a, Config: ConfigMut> = Config::CompoundMut<'a>;
-    type Type<O: ByteOrder> = OwnedCompound<O>;
+    type Type<O: ByteOrder> = OwnCompound<O>;
 }
 
 impl NBTBase for IntArray {
     const TAG_ID: TagID = TagID::IntArray;
     type TypeRef<'a, Config: ConfigRef> = Config::IntArray<'a>;
-    type TypeMut<'a, Config: ConfigMut> = VecViewMut<'a, byteorder::I32<Config::ByteOrder>>;
-    type Type<O: ByteOrder> = VecViewOwn<byteorder::I32<O>>;
+    type TypeMut<'a, Config: ConfigMut> = MutVec<'a, byteorder::I32<Config::ByteOrder>>;
+    type Type<O: ByteOrder> = OwnVec<byteorder::I32<O>>;
 }
 
 impl NBTBase for LongArray {
     const TAG_ID: TagID = TagID::LongArray;
     type TypeRef<'a, Config: ConfigRef> = Config::LongArray<'a>;
-    type TypeMut<'a, Config: ConfigMut> = VecViewMut<'a, byteorder::I64<Config::ByteOrder>>;
-    type Type<O: ByteOrder> = VecViewOwn<byteorder::I64<O>>;
+    type TypeMut<'a, Config: ConfigMut> = MutVec<'a, byteorder::I64<Config::ByteOrder>>;
+    type Type<O: ByteOrder> = OwnVec<byteorder::I64<O>>;
 }
 
 #[derive(Clone, Copy)]

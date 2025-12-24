@@ -13,7 +13,7 @@ pub use value_mut::*;
 pub use value_ref::*;
 use zerocopy::byteorder;
 
-use crate::{StringViewMut, VecViewMut};
+use crate::{MutString, MutVec};
 
 pub enum Visit<'s, C: ConfigRef> {
     End(()),
@@ -39,10 +39,10 @@ pub enum VisitMut<'s, C: ConfigMut> {
     Long(&'s mut byteorder::I64<C::ByteOrder>),
     Float(&'s mut byteorder::F32<C::ByteOrder>),
     Double(&'s mut byteorder::F64<C::ByteOrder>),
-    ByteArray(VecViewMut<'s, i8>),
-    String(StringViewMut<'s>),
+    ByteArray(MutVec<'s, i8>),
+    String(MutString<'s>),
     List(C::ListMut<'s>),
     Compound(C::CompoundMut<'s>),
-    IntArray(VecViewMut<'s, byteorder::I32<C::ByteOrder>>),
-    LongArray(VecViewMut<'s, byteorder::I64<C::ByteOrder>>),
+    IntArray(MutVec<'s, byteorder::I32<C::ByteOrder>>),
+    LongArray(MutVec<'s, byteorder::I64<C::ByteOrder>>),
 }
