@@ -403,7 +403,7 @@ pub trait TypedListMut<'s, T: NBT>:
 }
 
 pub trait CompoundMut<'s>:
-    CompoundBase<ConfigRef = Self::ConfigMut>
+    CompoundBase<'s, ConfigRef = Self::ConfigMut>
     + IntoIterator<
         Item = (
             <Self::ConfigMut as ConfigRef>::String<'s>,

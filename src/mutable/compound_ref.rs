@@ -59,7 +59,7 @@ impl<'s, O: ByteOrder> RefCompound<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> CompoundBase for RefCompound<'s, O> {
+impl<'s, O: ByteOrder> CompoundBase<'s> for RefCompound<'s, O> {
     type ConfigRef = MutableConfig<O>;
 
     fn compound_get_impl<'a>(

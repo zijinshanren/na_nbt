@@ -70,7 +70,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> CompoundBase<'doc> for ReadonlyCompound<'doc, O, D> {
     type ConfigRef = ImmutableConfig<O, D>;
 
     fn compound_get_impl<'a>(

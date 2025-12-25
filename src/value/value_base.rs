@@ -68,8 +68,8 @@ pub trait TypedListBase<T: NBT>: Send + Sync + Sized {
     ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a>;
 }
 
-pub trait CompoundBase: Send + Sync + Sized {
-    type ConfigRef: ConfigRef;
+pub trait CompoundBase<'s>: Send + Sync + Sized {
+    type ConfigRef: ConfigRef<Compound<'s> = Self>;
 
     fn compound_get_impl<'a>(
         &'a self,

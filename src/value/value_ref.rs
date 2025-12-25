@@ -184,7 +184,7 @@ pub trait TypedListRef<'s, T: NBT>:
 }
 
 pub trait CompoundRef<'s>:
-    CompoundBase
+    CompoundBase<'s>
     + IntoIterator<
         Item = (
             <Self::ConfigRef as ConfigRef>::String<'s>,

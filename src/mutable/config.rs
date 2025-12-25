@@ -44,12 +44,28 @@ impl<O: ByteOrder> ConfigRef for MutableConfig<O> {
 //     type TypedListIterMut<'doc, T: NBT> = MutTypedListIter<'doc, O, T>;
 //     type CompoundMut<'doc> = MutCompound<'doc, O>;
 //     type CompoundIterMut<'doc> = MutCompoundIter<'doc, O>;
+
+//     unsafe fn read_mut<'a, 'doc, T: GenericNBT>(
+//         params: Self::ReadParams<'a>,
+//     ) -> Option<T::TypeMut<'doc, Self>> {
+//         unsafe { T::read_mutable_mut_impl(params) }
+//     }
 // }
 
 pub trait MutableGenericImpl: NBTBase {
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
         params: <MutableConfig<O> as ConfigRef>::ReadParams<'a>,
-    ) -> Option<Self::TypeRef<'doc, MutableConfig<O>>>;
+    ) -> Option<Self::TypeRef<'doc, MutableConfig<O>>> {
+        todo!()
+    }
+
+    // unsafe fn read_mutable_mut_impl<'a, 'doc, O: ByteOrder>(
+    //     params: <MutableConfig<O> as ConfigRef>::ReadParams<'a>,
+    // ) -> Option<Self::TypeMut<'doc, MutableConfig<O>>>;
 }
 
+impl<T: NBTBase> MutableGenericImpl for T {}
+
 pub trait MutableImpl: MutableGenericImpl {}
+
+impl<T: MutableGenericImpl> MutableImpl for T {}
