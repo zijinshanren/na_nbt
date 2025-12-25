@@ -3,12 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, ImmutableGenericNBTImpl, ListBase,
-    ListRef, Mark, NBTBase, Never, ReadonlyTypedList, ReadonlyValue, TagID, cold_path,
-    tag::{
-        Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
-        String,
-    },
+    ByteOrder, ConfigRef, Document, EMPTY_LIST, GenericNBT, ImmutableConfig, ListBase, ListRef,
+    Mark, NBT, Never, ReadonlyTypedList, ReadonlyValue, TagID, cold_path,
 };
 
 #[derive(Clone)]
@@ -58,9 +54,8 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 
     #[inline]
-    pub fn element_is_<T: NBTBase>(&self) -> bool {
-        self.element_tag_id() == T::TAG_ID
-            || (self.element_tag_id() == TagID::End && self.is_empty())
+    pub fn element_is_<T: NBT>(&self) -> bool {
+        ListBase::element_is_::<T>(self)
     }
 
     /// Returns the number of elements in this list.
@@ -69,79 +64,26 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
     }
 
-    /// Returns `true` if this list contains no elements.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        ListBase::is_empty(self)
     }
 
-    pub fn get_<T: NBTBase>(
+    #[inline]
+    pub fn get(&self, index: usize) -> Option<ReadonlyValue<'doc, O, D>> {
+        ListRef::get(self, index)
+    }
+
+    #[inline]
+    pub fn get_<T: GenericNBT>(
         &self,
         index: usize,
     ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        if index >= self.len() {
-            cold_path();
-            return None;
-        }
-
-        if self.element_tag_id() != T::TAG_ID {
-            cold_path();
-            return None;
-        }
-
-        unsafe {
-            T::get_index_unchecked::<O, D>(
-                self.data.as_ptr().add(1 + 4),
-                index,
-                &self.doc,
-                self.mark,
-            )
-        }
-    }
-
-    /// Returns the element at the given index, or `None` if out of bounds.
-    pub fn get(&self, index: usize) -> Option<ReadonlyValue<'doc, O, D>> {
-        if index >= self.len() {
-            cold_path();
-            return None;
-        }
-
-        unsafe {
-            let ptr = self.data.as_ptr().add(1 + 4);
-            let mark = self.mark;
-
-            macro_rules! match_tag_id {
-                (
-                    [
-                        $( $tag:ident ),* $(,)?
-                    ], $tag_id_val:expr, $ptr:expr, $index:expr, $doc:expr, $mark:expr
-                ) => {
-                    match $tag_id_val {
-                        $(
-                            TagID::$tag => Some(ReadonlyValue::$tag(
-                                $tag::get_index_unchecked::<O, D>($ptr, $index, $doc, $mark).unwrap_unchecked()
-                            )),
-                        )*
-                    }
-                };
-            }
-
-            match_tag_id!(
-                [
-                    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound,
-                    IntArray, LongArray
-                ],
-                self.element_tag_id(),
-                ptr,
-                index,
-                &self.doc,
-                mark
-            )
-        }
+        ListRef::get_::<T>(self, index)
     }
 
     #[inline]
-    pub fn typed_<T: NBTBase>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
+    pub fn typed_<T: NBT>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
         self.element_is_::<T>().then_some(ReadonlyTypedList {
             data: self.data,
             mark: self.mark,
@@ -173,34 +115,27 @@ impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
     }
 
     #[inline]
-    fn element_is_<T: NBTBase>(&self) -> bool {
-        self.element_is_::<T>()
-    }
-
-    #[inline]
     fn len(&self) -> usize {
         self.len()
     }
 
     #[inline]
-    fn is_empty(&self) -> bool {
-        self.is_empty()
+    fn list_get_impl<'a, T: GenericNBT>(
+        &'a self,
+        index: usize,
+    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a> {
+        unsafe {
+            T::list_get_immutable_impl::<O, D>(
+                (self.data.as_ptr().add(1 + 4), self.mark, &self.doc),
+                index,
+            )
+        }
     }
 }
 
 impl<'doc, O: ByteOrder, D: Document> ListRef<'doc> for ReadonlyList<'doc, O, D> {
     #[inline]
-    fn get(&self, index: usize) -> Option<<Self::ConfigRef as ConfigRef>::Value<'doc>> {
-        self.get(index)
-    }
-
-    #[inline]
-    fn get_<T: NBTBase>(&self, index: usize) -> Option<T::TypeRef<'doc, Self::ConfigRef>> {
-        self.get_::<T>(index)
-    }
-
-    #[inline]
-    fn typed_<T: NBTBase>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'doc, T>> {
+    fn typed_<T: NBT>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'doc, T>> {
         self.typed_::<T>()
     }
 
@@ -248,7 +183,9 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyListIter<'doc, O, D> 
 
         self.remaining -= 1;
 
-        let value = unsafe { ReadonlyValue::read(self.tag_id, self.data, self.mark, &self.doc) };
+        let value = unsafe {
+            ImmutableConfig::<O, D>::read_value(self.tag_id, (self.data, self.mark, &self.doc))
+        };
 
         let (data_advance, mark_advance) =
             unsafe { ReadonlyValue::<O, D>::size(self.tag_id, self.data, self.mark) };

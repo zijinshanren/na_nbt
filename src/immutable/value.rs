@@ -1,9 +1,11 @@
+use std::marker::PhantomData;
+
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, ImmutableConfig, ImmutableGenericImpl, ImmutableNBTImpl, MapRef, Mark,
-    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, TagID, ValueBase, ValueRef,
-    VisitRef,
+    ByteOrder, Document, GenericNBT, ImmutableConfig, ImmutableImpl, Index, MapRef, Mark, NBT,
+    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, ReadonlyTypedList, TagID,
+    ValueBase, ValueRef, VisitRef,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -37,29 +39,21 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyValue<'doc, O, D> {
 impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     pub(crate) unsafe fn size(tag_id: TagID, data: *const u8, mark: *const Mark) -> (usize, usize) {
         unsafe {
-            macro_rules! match_tag_id {
-                (
-                    [
-                        $( $tag:ident ),* $(,)?
-                    ], $tag_id_val:expr, $data:expr, $mark:expr
-                ) => {
-                    match $tag_id_val {
-                        $(
-                            TagID::$tag => $tag::size::<O>(data, mark),
-                        )*
-                    }
-                };
+            match tag_id {
+                TagID::End => End::size_immutable_impl::<O>(data, mark),
+                TagID::Byte => Byte::size_immutable_impl::<O>(data, mark),
+                TagID::Short => Short::size_immutable_impl::<O>(data, mark),
+                TagID::Int => Int::size_immutable_impl::<O>(data, mark),
+                TagID::Long => Long::size_immutable_impl::<O>(data, mark),
+                TagID::Float => Float::size_immutable_impl::<O>(data, mark),
+                TagID::Double => Double::size_immutable_impl::<O>(data, mark),
+                TagID::ByteArray => ByteArray::size_immutable_impl::<O>(data, mark),
+                TagID::String => String::size_immutable_impl::<O>(data, mark),
+                TagID::List => List::size_immutable_impl::<O>(data, mark),
+                TagID::Compound => Compound::size_immutable_impl::<O>(data, mark),
+                TagID::IntArray => IntArray::size_immutable_impl::<O>(data, mark),
+                TagID::LongArray => LongArray::size_immutable_impl::<O>(data, mark),
             }
-
-            match_tag_id!(
-                [
-                    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound,
-                    IntArray, LongArray
-                ],
-                tag_id,
-                data,
-                mark
-            )
         }
     }
 }
@@ -83,9 +77,37 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
             ReadonlyValue::LongArray(_) => TagID::LongArray,
         }
     }
+
+    #[inline]
+    pub fn is_<T: NBT>(&self) -> bool {
+        ValueBase::is_::<T>(self)
+    }
+
+    #[inline]
+    pub fn ref_<T: NBT>(&self) -> Option<&T::TypeRef<'doc, ImmutableConfig<O, D>>> {
+        ValueRef::ref_::<T>(self)
+    }
+
+    #[inline]
+    pub fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
+        ValueRef::into_::<T>(self)
+    }
+
+    #[inline]
+    pub fn get(&self, index: impl Index) -> Option<ReadonlyValue<'doc, O, D>> {
+        ValueRef::get(self, index)
+    }
+
+    #[inline]
+    pub fn get_<T: GenericNBT>(
+        &self,
+        index: impl Index,
+    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
+        ValueRef::get_::<T>(self, index)
+    }
 }
 
-impl<'s, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'s, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
     type ConfigRef = ImmutableConfig<O, D>;
 
     #[inline]
@@ -135,3 +157,115 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
     }
 }
 
+impl<'doc, O: ByteOrder, D: Document> From<()> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(_: ()) -> Self {
+        ReadonlyValue::End(())
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<i8> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: i8) -> Self {
+        ReadonlyValue::Byte(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<i16> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: i16) -> Self {
+        ReadonlyValue::Short(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<i32> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: i32) -> Self {
+        ReadonlyValue::Int(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<i64> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: i64) -> Self {
+        ReadonlyValue::Long(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<f32> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: f32) -> Self {
+        ReadonlyValue::Float(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<f64> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: f64) -> Self {
+        ReadonlyValue::Double(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<ReadonlyArray<'doc, i8, D>>
+    for ReadonlyValue<'doc, O, D>
+{
+    #[inline]
+    fn from(value: ReadonlyArray<'doc, i8, D>) -> Self {
+        ReadonlyValue::ByteArray(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<ReadonlyString<'doc, D>> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: ReadonlyString<'doc, D>) -> Self {
+        ReadonlyValue::String(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<ReadonlyList<'doc, O, D>> for ReadonlyValue<'doc, O, D> {
+    #[inline]
+    fn from(value: ReadonlyList<'doc, O, D>) -> Self {
+        ReadonlyValue::List(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<ReadonlyCompound<'doc, O, D>>
+    for ReadonlyValue<'doc, O, D>
+{
+    #[inline]
+    fn from(value: ReadonlyCompound<'doc, O, D>) -> Self {
+        ReadonlyValue::Compound(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<ReadonlyArray<'doc, byteorder::I32<O>, D>>
+    for ReadonlyValue<'doc, O, D>
+{
+    #[inline]
+    fn from(value: ReadonlyArray<'doc, byteorder::I32<O>, D>) -> Self {
+        ReadonlyValue::IntArray(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document> From<ReadonlyArray<'doc, byteorder::I64<O>, D>>
+    for ReadonlyValue<'doc, O, D>
+{
+    #[inline]
+    fn from(value: ReadonlyArray<'doc, byteorder::I64<O>, D>) -> Self {
+        ReadonlyValue::LongArray(value)
+    }
+}
+
+impl<'doc, O: ByteOrder, D: Document, T: NBT> From<ReadonlyTypedList<'doc, O, D, T>>
+    for ReadonlyValue<'doc, O, D>
+{
+    #[inline]
+    fn from(value: ReadonlyTypedList<'doc, O, D, T>) -> Self {
+        ReadonlyValue::List(ReadonlyList {
+            data: value.data,
+            mark: value.mark,
+            doc: value.doc,
+            _marker: PhantomData,
+        })
+    }
+}

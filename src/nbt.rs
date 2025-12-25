@@ -136,6 +136,9 @@ macro_rules! define_trait {
     };
 }
 
+// todo: NBTBase -> GenericNBTBase
+// todo: add NBTBase
+
 define_trait!(GenericNBT: NBTBase, NBTInto, ImmutableGenericImpl);
 
 define_trait!(NBT: GenericNBT, NBTRef, ImmutableImpl);

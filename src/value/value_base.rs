@@ -15,45 +15,13 @@ pub trait Writable {
     fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()>;
 }
 
-pub trait FromNBTRef<'a, T: GenericNBT, C: ConfigRef>: From<T::TypeRef<'a, C>> {}
-
-pub trait FromAnyNBTRefl<'a, C: ConfigRef>:
-    FromNBTRef<'a, End, C>
-    + FromNBTRef<'a, Byte, C>
-    + FromNBTRef<'a, Short, C>
-    + FromNBTRef<'a, Int, C>
-    + FromNBTRef<'a, Long, C>
-    + FromNBTRef<'a, Float, C>
-    + FromNBTRef<'a, Double, C>
-    + FromNBTRef<'a, ByteArray, C>
-    + FromNBTRef<'a, String, C>
-    + FromNBTRef<'a, List, C>
-    + FromNBTRef<'a, Compound, C>
-    + FromNBTRef<'a, IntArray, C>
-    + FromNBTRef<'a, LongArray, C>
-    + FromNBTRef<'a, TypedList<End>, C>
-    + FromNBTRef<'a, TypedList<Byte>, C>
-    + FromNBTRef<'a, TypedList<Short>, C>
-    + FromNBTRef<'a, TypedList<Int>, C>
-    + FromNBTRef<'a, TypedList<Long>, C>
-    + FromNBTRef<'a, TypedList<Float>, C>
-    + FromNBTRef<'a, TypedList<Double>, C>
-    + FromNBTRef<'a, TypedList<ByteArray>, C>
-    + FromNBTRef<'a, TypedList<String>, C>
-    + FromNBTRef<'a, TypedList<List>, C>
-    + FromNBTRef<'a, TypedList<Compound>, C>
-    + FromNBTRef<'a, TypedList<IntArray>, C>
-    + FromNBTRef<'a, TypedList<LongArray>, C>
-{
-}
-
 pub trait ValueBase: Send + Sync + Sized {
     type ConfigRef: ConfigRef;
 
     fn tag_id(&self) -> TagID;
 
     #[inline]
-    fn is_<T: NBTBase>(&self) -> bool {
+    fn is_<T: NBT>(&self) -> bool {
         self.tag_id() == T::TAG_ID
     }
 }
@@ -64,7 +32,7 @@ pub trait ListBase: Send + Sync + Sized {
     fn element_tag_id(&self) -> TagID;
 
     #[inline]
-    fn element_is_<T: NBTBase>(&self) -> bool {
+    fn element_is_<T: NBT>(&self) -> bool {
         self.element_tag_id() == T::TAG_ID
             || (self.element_tag_id() == TagID::End && self.is_empty())
     }
@@ -75,9 +43,14 @@ pub trait ListBase: Send + Sync + Sized {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    fn list_get_impl<'a, T: GenericNBT>(
+        &'a self,
+        index: usize,
+    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a>;
 }
 
-pub trait TypedListBase<T: NBTBase>: Send + Sync + Sized {
+pub trait TypedListBase<T: NBT>: Send + Sync + Sized {
     type ConfigRef: ConfigRef;
 
     const ELEMENT_TAG_ID: TagID = T::TAG_ID;
@@ -88,17 +61,20 @@ pub trait TypedListBase<T: NBTBase>: Send + Sync + Sized {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    fn typed_list_get_impl<'a>(
+        &'a self,
+        index: usize,
+    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a>;
 }
 
 pub trait CompoundBase: Send + Sync + Sized {
     type ConfigRef: ConfigRef;
 
-    fn compound_get_impl<'a, 'doc>(
+    fn compound_get_impl<'a>(
         &'a self,
         key: &str,
-    ) -> Option<(TagID, <Self::ConfigRef as ConfigRef>::ReadParams<'a>)>
-    where
-        'doc: 'a;
+    ) -> Option<(TagID, <Self::ConfigRef as ConfigRef>::ReadParams<'a>)>;
 }
 
 pub trait NBTInto: NBTBase {

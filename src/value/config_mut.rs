@@ -1,4 +1,4 @@
-use crate::{CompoundMut, ConfigRef, ListMut, NBTBase, TypedListMut, ValueMut};
+use crate::{CompoundMut, ConfigRef, ListMut, NBT, TypedListMut, ValueMut};
 
 pub trait ConfigMut: ConfigRef {
     type ValueMut<'doc>: ValueMut<'doc, ConfigMut = Self>;
@@ -7,8 +7,8 @@ pub trait ConfigMut: ConfigRef {
         + ExactSizeIterator
         + Clone
         + Default;
-    type TypedListMut<'doc, T: NBTBase>: TypedListMut<'doc, T, ConfigMut = Self>;
-    type TypedListIterMut<'doc, T: NBTBase>: Iterator<Item = T::TypeMut<'doc, Self>>
+    type TypedListMut<'doc, T: NBT>: TypedListMut<'doc, T, ConfigMut = Self>;
+    type TypedListIterMut<'doc, T: NBT>: Iterator<Item = T::TypeMut<'doc, Self>>
         + ExactSizeIterator
         + Clone
         + Default;

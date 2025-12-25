@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, MutString, MutVec, NBTBase, OwnCompound, OwnList, OwnString,
-    OwnVec, OwnedTypedList, PrimitiveNBTBase, TagID,
+    ByteOrder, ConfigMut, ConfigRef, MutString, MutVec, NBT, NBTBase, OwnCompound, OwnList,
+    OwnString, OwnVec, OwnedTypedList, PrimitiveNBTBase, TagID,
 };
 
 macro_rules! define_primary_tag {
@@ -115,7 +115,7 @@ impl NBTBase for LongArray {
 #[derive(Clone, Copy)]
 pub struct TypedList<T: NBTBase>(PhantomData<T>);
 
-impl<T: NBTBase> NBTBase for TypedList<T> {
+impl<T: NBT> NBTBase for TypedList<T> {
     const TAG_ID: TagID = TagID::List;
     type TypeRef<'a, Config: ConfigRef> = Config::TypedList<'a, T>;
     type TypeMut<'a, Config: ConfigMut> = Config::TypedListMut<'a, T>;

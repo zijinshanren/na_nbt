@@ -17,7 +17,6 @@ pub use config::*;
 pub use document::*;
 pub use list::*;
 pub use mark::*;
-pub use nbt_impl::*;
 pub use string::*;
 pub use typed_list::*;
 pub use value::*;
@@ -25,7 +24,7 @@ pub use value::*;
 mod borrowed {
     use zerocopy::byteorder;
 
-    use crate::{ByteOrder, Result, TagID, cold_path};
+    use crate::{ByteOrder, ConfigRef, Result, TagID, cold_path};
 
     use super::*;
 
@@ -65,11 +64,13 @@ mod borrowed {
                 byteorder::U16::<O>::from_bytes(unsafe { *self.source.add(1).cast() }).get();
 
             unsafe {
-                BorrowedValue::read(
+                <ImmutableConfig<O, ()> as ConfigRef>::read_value(
                     root_tag,
-                    self.source.add(3 + name_len as usize),
-                    self.mark.as_ptr(),
-                    &(),
+                    (
+                        self.source.add(3 + name_len as usize),
+                        self.mark.as_ptr(),
+                        &(),
+                    ),
                 )
             }
         }
@@ -88,7 +89,7 @@ mod shared {
     use bytes::Bytes;
     use zerocopy::byteorder;
 
-    use crate::{ByteOrder, Result, TagID, cold_path};
+    use crate::{ByteOrder, ConfigRef, Result, TagID, cold_path};
 
     use super::*;
 
@@ -137,11 +138,13 @@ mod shared {
                     .get();
 
             unsafe {
-                SharedValue::read(
+                <ImmutableConfig<O, Arc<SharedDocument>> as ConfigRef>::read_value(
                     root_tag,
-                    self.source.as_ptr().add(3 + name_len as usize),
-                    self.mark.as_ptr(),
-                    &self,
+                    (
+                        self.source.as_ptr().add(3 + name_len as usize),
+                        self.mark.as_ptr(),
+                        &self,
+                    ),
                 )
             }
         }

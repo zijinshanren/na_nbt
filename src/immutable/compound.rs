@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, ImmutableConfig,
-    Mark, Never, ReadonlyString, ReadonlyValue, TagID, ValueBase, cold_path,
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, GenericNBT,
+    ImmutableConfig, Mark, Never, ReadonlyString, ReadonlyValue, TagID, cold_path,
 };
 
 #[derive(Clone)]
@@ -47,6 +47,19 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyCompound<'doc, O,
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     #[inline]
+    pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
+        CompoundRef::get(self, key)
+    }
+
+    #[inline]
+    pub fn get_<T: GenericNBT>(
+        &self,
+        key: &str,
+    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
+        CompoundRef::get_::<T>(self, key)
+    }
+
+    #[inline]
     pub fn iter(&self) -> ReadonlyCompoundIter<'doc, O, D> {
         ReadonlyCompoundIter {
             data: self.data.as_ptr(),
@@ -57,16 +70,13 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     }
 }
 
-impl<'s, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'s, O, D> {
+impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {
     type ConfigRef = ImmutableConfig<O, D>;
 
-    fn compound_get_impl<'a, 'doc>(
+    fn compound_get_impl<'a>(
         &'a self,
         key: &str,
-    ) -> Option<(TagID, <Self::ConfigRef as ConfigRef>::ReadParams<'a>)>
-    where
-        'doc: 'a,
-    {
+    ) -> Option<(TagID, <Self::ConfigRef as ConfigRef>::ReadParams<'a>)> {
         let name = simd_cesu8::mutf8::encode(key);
         unsafe {
             let mut ptr = self.data.as_ptr();
@@ -98,9 +108,9 @@ impl<'s, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'s, O, D> 
     }
 }
 
-impl<'s, O: ByteOrder, D: Document> CompoundRef<'s> for ReadonlyCompound<'s, O, D> {
+impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'doc, O, D> {
     #[inline]
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::CompoundIter<'s> {
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::CompoundIter<'doc> {
         self.iter()
     }
 }
@@ -146,7 +156,7 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyCompoundIter<'doc, O,
                 _doc: self.doc.clone(),
             };
 
-            let value = ReadonlyValue::value_read(
+            let value = <ImmutableConfig<O, D> as ConfigRef>::read_value(
                 tag_id,
                 (self.data.add(3 + name_len as usize), self.mark, &self.doc),
             );
