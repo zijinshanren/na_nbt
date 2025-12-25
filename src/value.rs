@@ -48,13 +48,13 @@ pub enum MapRef<'s, C: ConfigRef> {
 }
 
 pub enum VisitMut<'a, 's: 'a, C: ConfigMut> {
-    End(&'a mut ()),
-    Byte(&'a mut i8),
-    Short(&'a mut i16),
-    Int(&'a mut i32),
-    Long(&'a mut i64),
-    Float(&'a mut f32),
-    Double(&'a mut f64),
+    End(&'a mut &'s mut ()),
+    Byte(&'a mut &'s mut i8),
+    Short(&'a mut &'s mut byteorder::I16<C::ByteOrder>),
+    Int(&'a mut &'s mut byteorder::I32<C::ByteOrder>),
+    Long(&'a mut &'s mut byteorder::I64<C::ByteOrder>),
+    Float(&'a mut &'s mut byteorder::F32<C::ByteOrder>),
+    Double(&'a mut &'s mut byteorder::F64<C::ByteOrder>),
     ByteArray(&'a mut MutVec<'s, i8>),
     String(&'a mut MutString<'s>),
     List(&'a mut C::ListMut<'s>),

@@ -48,7 +48,7 @@ pub trait ValueRef<'s>:
 
     #[inline]
     fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
-        T::into_(self)
+        T::ref_into_(self)
     }
 
     #[inline]
@@ -170,6 +170,7 @@ pub trait ListRef<'s>:
 pub trait TypedListRef<'s, T: NBT>:
     TypedListBase<T> + IntoIterator<Item = T::TypeRef<'s, Self::ConfigRef>> + Clone + Default
 {
+    #[inline]
     fn get(&self, index: usize) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
         if index >= self.len() {
             cold_path();
@@ -195,7 +196,7 @@ pub trait CompoundRef<'s>:
     #[inline]
     fn get(&self, key: &str) -> Option<<Self::ConfigRef as ConfigRef>::Value<'s>> {
         let (tag_id, params) = self.compound_get_impl(key)?;
-        unsafe { Some(<Self::ConfigRef as ConfigRef>::read_value(tag_id, params)) }
+        unsafe { Some(Self::ConfigRef::read_value(tag_id, params)) }
     }
 
     #[inline]
@@ -205,7 +206,7 @@ pub trait CompoundRef<'s>:
             cold_path();
             return None;
         }
-        unsafe { <Self::ConfigRef as ConfigRef>::read::<T>(params) }
+        unsafe { Self::ConfigRef::read::<T>(params) }
     }
 
     fn iter(&self) -> <Self::ConfigRef as ConfigRef>::CompoundIter<'s>;

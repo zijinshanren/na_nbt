@@ -1,8 +1,8 @@
 use std::io::Write;
 
 use crate::{
-    ByteOrder, ConfigRef, GenericNBT, ListRef, MapRef, NBT, NBTBase, Result, TagID, ValueRef,
-    VisitRef,
+    ByteOrder, ConfigRef, GenericNBT, ListMut, ListRef, MapMut, MapRef, NBT, NBTBase, Result,
+    TagID, ValueMut, ValueRef, VisitMut, VisitRef,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -78,13 +78,19 @@ pub trait CompoundBase: Send + Sync + Sized {
 }
 
 pub trait NBTInto: NBTBase {
-    fn into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>>;
+    fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>>;
+
+    fn mut_into_<'s, V: ValueMut<'s>>(value: V) -> Option<Self::TypeMut<'s, V::ConfigMut>>;
 }
 
 pub trait NBTRef: NBTBase {
     fn ref_<'a, 's: 'a, V: ValueRef<'s>>(
         value: &'a V,
     ) -> Option<&'a Self::TypeRef<'s, V::ConfigRef>>;
+
+    fn mut_<'a, 's: 'a, V: ValueMut<'s>>(
+        value: &'a mut V,
+    ) -> Option<&'a mut Self::TypeMut<'s, V::ConfigMut>>;
 }
 
 macro_rules! impl_value_ref_dispatch {
@@ -92,9 +98,17 @@ macro_rules! impl_value_ref_dispatch {
         $(
             impl NBTInto for $t {
                 #[inline]
-                fn into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>> {
+                fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>> {
                     value.map(|value| match value {
                         MapRef::$t(v) => Some(v),
+                        _ => None,
+                    })
+                }
+
+                #[inline]
+                fn mut_into_<'s, V: ValueMut<'s>>(value: V) -> Option<Self::TypeMut<'s, V::ConfigMut>> {
+                    value.map(|value| match value {
+                        MapMut::$t(v) => Some(v),
                         _ => None,
                     })
                 }
@@ -105,6 +119,14 @@ macro_rules! impl_value_ref_dispatch {
                 fn ref_<'a, 's: 'a, V:ValueRef<'s>>(value: &'a V) -> Option<&'a Self::TypeRef<'s, V::ConfigRef>> {
                     value.visit(|value| match value {
                         VisitRef::$t(v) => Some(v),
+                        _ => None,
+                    })
+                }
+
+                #[inline]
+                fn mut_<'a, 's: 'a, V: ValueMut<'s>>(value: &'a mut V) -> Option<&'a mut Self::TypeMut<'s, V::ConfigMut>> {
+                    value.visit(|value| match value {
+                        VisitMut::$t(v) => Some(v),
                         _ => None,
                     })
                 }
@@ -119,9 +141,16 @@ impl_value_ref_dispatch!(
 );
 
 impl<T: NBT> NBTInto for TypedList<T> {
-    fn into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>> {
+    fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>> {
         value.map(|value| match value {
             MapRef::List(v) => v.typed_::<T>(),
+            _ => None,
+        })
+    }
+
+    fn mut_into_<'s, V: ValueMut<'s>>(value: V) -> Option<Self::TypeMut<'s, V::ConfigMut>> {
+        value.map(|value| match value {
+            MapMut::List(v) => v.typed_::<T>(),
             _ => None,
         })
     }
