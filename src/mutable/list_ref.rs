@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, EMPTY_LIST, ListBase, ListRef, MutableConfig, RefTypedList, RefValue, TagID,
-    cold_path, mutable_tag_size,
+    ByteOrder, ConfigRef, EMPTY_LIST, GenericNBT, ListBase, ListRef, MutableConfig, NBT,
+    RefTypedList, RefValue, TagID, cold_path, mutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -14,6 +14,7 @@ pub struct RefList<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> Default for RefList<'s, O> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: EMPTY_LIST.as_ptr(),
@@ -47,9 +48,8 @@ impl<'s, O: ByteOrder> RefList<'s, O> {
     }
 
     #[inline]
-    pub fn element_is_<T: crate::NBT>(&self) -> bool {
-        self.element_tag_id() == T::TAG_ID
-            || (self.element_tag_id() == TagID::End && self.is_empty())
+    pub fn element_is_<T: NBT>(&self) -> bool {
+        ListBase::element_is_::<T>(self)
     }
 
     #[inline]
@@ -59,43 +59,17 @@ impl<'s, O: ByteOrder> RefList<'s, O> {
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        ListBase::is_empty(self)
     }
 
+    #[inline]
     pub fn get(&self, index: usize) -> Option<RefValue<'s, O>> {
-        if index >= self.len() {
-            cold_path();
-            return None;
-        }
-
-        let tag_id = self.element_tag_id();
-
-        Some(unsafe {
-            RefValue::read_ref(
-                tag_id,
-                self.data.add(1 + 4).add(index * mutable_tag_size(tag_id)),
-            )
-        })
+        ListRef::get(self, index)
     }
 
+    #[inline]
     pub fn get_<T: crate::NBT>(&self, index: usize) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        if index >= self.len() {
-            cold_path();
-            return None;
-        }
-
-        if !self.element_is_::<T>() {
-            cold_path();
-            return None;
-        }
-
-        unsafe {
-            T::read_ref::<O>(
-                self.data
-                    .add(1 + 4)
-                    .add(index * mutable_tag_size(T::TAG_ID)),
-            )
-        }
+        ListRef::get_::<T>(self, index)
     }
 
     #[inline]
@@ -118,14 +92,11 @@ impl<'s, O: ByteOrder> RefList<'s, O> {
 }
 
 impl<'s, O: ByteOrder> ListBase for RefList<'s, O> {
+    type ConfigRef = MutableConfig<O>;
+
     #[inline]
     fn element_tag_id(&self) -> TagID {
         self.element_tag_id()
-    }
-
-    #[inline]
-    fn element_is_<T: crate::NBT>(&self) -> bool {
-        self.element_is_::<T>()
     }
 
     #[inline]
@@ -134,31 +105,26 @@ impl<'s, O: ByteOrder> ListBase for RefList<'s, O> {
     }
 
     #[inline]
-    fn is_empty(&self) -> bool {
-        self.is_empty()
+    fn list_get_impl<'a, T: GenericNBT>(
+        &'a self,
+        index: usize,
+    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a> {
+        unsafe {
+            self.data
+                .add(1 + 4)
+                .add(index * mutable_tag_size(T::TAG_ID))
+        }
     }
 }
 
 impl<'s, O: ByteOrder> ListRef<'s> for RefList<'s, O> {
-    type Config = MutableConfig<O>;
-
     #[inline]
-    fn get(&self, index: usize) -> Option<<Self::Config as crate::ConfigRef>::Value<'s>> {
-        self.get(index)
-    }
-
-    #[inline]
-    fn get_<T: crate::NBT>(&self, index: usize) -> Option<T::TypeRef<'s, Self::Config>> {
-        self.get_::<T>(index)
-    }
-
-    #[inline]
-    fn typed_<T: crate::NBT>(self) -> Option<<Self::Config as crate::ConfigRef>::TypedList<'s, T>> {
+    fn typed_<T: NBT>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'s, T>> {
         self.typed_::<T>()
     }
 
     #[inline]
-    fn iter(&self) -> <Self::Config as crate::ConfigRef>::ListIter<'s> {
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::ListIter<'s> {
         self.iter()
     }
 }
@@ -172,6 +138,7 @@ pub struct RefListIter<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> Default for RefListIter<'s, O> {
+    #[inline]
     fn default() -> Self {
         Self {
             tag_id: TagID::End,
@@ -196,7 +163,7 @@ impl<'s, O: ByteOrder> Iterator for RefListIter<'s, O> {
 
         self.remaining -= 1;
 
-        let value = unsafe { RefValue::read_ref(self.tag_id, self.data) };
+        let value = unsafe { <MutableConfig<O> as ConfigRef>::read_value(self.tag_id, self.data) };
 
         self.data = unsafe { self.data.add(mutable_tag_size(self.tag_id)) };
 

@@ -7,6 +7,13 @@ pub struct RefString<'s> {
     pub(crate) data: &'s [u8],
 }
 
+impl<'s> Default for RefString<'s> {
+    #[inline]
+    fn default() -> Self {
+        Self { data: &[] }
+    }
+}
+
 impl<'s> RefString<'s> {
     #[inline]
     pub fn raw_bytes(&self) -> &[u8] {

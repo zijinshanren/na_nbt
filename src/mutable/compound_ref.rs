@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, CompoundBase, CompoundRef, EMPTY_COMPOUND, MutableConfig, NBT, RefString, RefValue,
-    TagID, cold_path, compound_get, mutable_tag_size,
+    TagID, cold_path, mutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -14,6 +14,7 @@ pub struct RefCompound<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> Default for RefCompound<'s, O> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: EMPTY_COMPOUND.as_ptr(),
@@ -40,25 +41,13 @@ impl<'s, O: ByteOrder> IntoIterator for RefCompound<'s, O> {
 
 impl<'s, O: ByteOrder> RefCompound<'s, O> {
     #[inline]
-    fn get(&self, key: &str) -> Option<RefValue<'s, O>> {
-        unsafe {
-            compound_get::<O, _, _>(self.data, key, |tag_id, ptr| {
-                Some(RefValue::read_ref(tag_id, ptr))
-            })
-        }
+    pub fn get(&self, key: &str) -> Option<RefValue<'s, O>> {
+        CompoundRef::get(self, key)
     }
 
     #[inline]
-    fn get_<T: NBT>(&self, key: &str) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        unsafe {
-            compound_get::<O, _, _>(self.data, key, |tag_id, ptr| {
-                if tag_id != T::TAG_ID {
-                    cold_path();
-                    return None;
-                }
-                T::read_ref::<O>(ptr)
-            })
-        }
+    pub fn get_<T: NBT>(&self, key: &str) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
+        CompoundRef::get_::<T>(self, key)
     }
 
     #[inline]
@@ -70,23 +59,45 @@ impl<'s, O: ByteOrder> RefCompound<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> CompoundBase for RefCompound<'s, O> {}
+impl<'s, O: ByteOrder> CompoundBase for RefCompound<'s, O> {
+    type ConfigRef = MutableConfig<O>;
+
+    fn compound_get_impl<'a>(
+        &'a self,
+        key: &str,
+    ) -> Option<(TagID, <Self::ConfigRef as crate::ConfigRef>::ReadParams<'a>)> {
+        let name = simd_cesu8::mutf8::encode(key);
+
+        unsafe {
+            let mut ptr = self.data;
+            loop {
+                let tag_id = *ptr.cast();
+                ptr = ptr.add(1);
+
+                if tag_id == TagID::End {
+                    cold_path();
+                    return None;
+                }
+
+                let name_len = byteorder::U16::<O>::from_bytes(*ptr.cast()).get();
+                ptr = ptr.add(2);
+
+                let name_bytes = slice::from_raw_parts(ptr, name_len as usize);
+                ptr = ptr.add(name_len as usize);
+
+                if name == name_bytes {
+                    return Some((tag_id, ptr));
+                }
+
+                ptr = ptr.add(mutable_tag_size(tag_id));
+            }
+        }
+    }
+}
 
 impl<'s, O: ByteOrder> CompoundRef<'s> for RefCompound<'s, O> {
-    type Config = MutableConfig<O>;
-
     #[inline]
-    fn get(&self, key: &str) -> Option<<Self::Config as crate::ConfigRef>::Value<'s>> {
-        self.get(key)
-    }
-
-    #[inline]
-    fn get_<T: crate::NBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::Config>> {
-        self.get_::<T>(key)
-    }
-
-    #[inline]
-    fn iter(&self) -> <Self::Config as crate::ConfigRef>::CompoundIter<'s> {
+    fn iter(&self) -> <Self::ConfigRef as crate::ConfigRef>::CompoundIter<'s> {
         self.iter()
     }
 }
@@ -98,6 +109,7 @@ pub struct RefCompoundIter<'s, O: ByteOrder> {
 }
 
 impl<'s, O: ByteOrder> Default for RefCompoundIter<'s, O> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: ptr::null(),
@@ -126,7 +138,10 @@ impl<'s, O: ByteOrder> Iterator for RefCompoundIter<'s, O> {
                 data: slice::from_raw_parts(self.data.add(3), name_len as usize),
             };
 
-            let value = RefValue::read_ref(tag_id, self.data.add(3 + name_len as usize));
+            let value = <MutableConfig<O> as crate::ConfigRef>::read_value(
+                tag_id,
+                self.data.add(3 + name_len as usize),
+            );
 
             self.data = self
                 .data

@@ -14,6 +14,7 @@ pub struct RefTypedList<'s, O: ByteOrder, T: NBT> {
 }
 
 impl<'s, O: ByteOrder, T: NBT> Default for RefTypedList<'s, O, T> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: EMPTY_LIST.as_ptr(),
@@ -47,16 +48,12 @@ impl<'s, O: ByteOrder, T: NBT> RefTypedList<'s, O, T> {
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        TypedListBase::is_empty(self)
     }
 
+    #[inline]
     pub fn get(&self, index: usize) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        if index >= self.len() {
-            cold_path();
-            return None;
-        }
-
-        unsafe { T::read_ref::<O>(self.data.add(1 + 4).add(index * mutable_tag_size(T::TAG_ID))) }
+        TypedListRef::get(self, index)
     }
 
     #[inline]
@@ -70,27 +67,28 @@ impl<'s, O: ByteOrder, T: NBT> RefTypedList<'s, O, T> {
 }
 
 impl<'s, O: ByteOrder, T: NBT> TypedListBase<T> for RefTypedList<'s, O, T> {
+    type ConfigRef = MutableConfig<O>;
+
     #[inline]
     fn len(&self) -> usize {
         self.len()
     }
 
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.is_empty()
+    fn typed_list_get_impl<'a>(
+        &'a self,
+        index: usize,
+    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a> {
+        unsafe {
+            self.data
+                .add(1 + 4)
+                .add(index * mutable_tag_size(T::TAG_ID))
+        }
     }
 }
 
 impl<'s, O: ByteOrder, T: NBT> TypedListRef<'s, T> for RefTypedList<'s, O, T> {
-    type Config = MutableConfig<O>;
-
     #[inline]
-    fn get(&self, index: usize) -> Option<T::TypeRef<'s, Self::Config>> {
-        self.get(index)
-    }
-
-    #[inline]
-    fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'s, T> {
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::TypedListIter<'s, T> {
         self.iter()
     }
 }
@@ -103,6 +101,7 @@ pub struct RefTypedListIter<'s, O: ByteOrder, T: NBT> {
 }
 
 impl<'s, O: ByteOrder, T: NBT> Default for RefTypedListIter<'s, O, T> {
+    #[inline]
     fn default() -> Self {
         Self {
             remaining: 0,
@@ -126,7 +125,7 @@ impl<'s, O: ByteOrder, T: NBT> Iterator for RefTypedListIter<'s, O, T> {
 
         self.remaining -= 1;
 
-        let value = unsafe { T::read_ref::<O>(self.data) };
+        let value = unsafe { T::read_mutable_impl(self.data) };
 
         self.data = unsafe { self.data.add(mutable_tag_size(T::TAG_ID)) };
 
