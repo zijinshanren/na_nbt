@@ -3,9 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, EMPTY_LIST, GenericNBT, ImmutableConfig,
-    ImmutableGenericNBTImpl, ListBase, ListRef, Mark, NBT, Never, ReadonlyTypedList, ReadonlyValue,
-    TagID, cold_path,
+    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, ImmutableGenericNBTImpl, ListBase,
+    ListRef, Mark, NBTBase, Never, ReadonlyTypedList, ReadonlyValue, TagID, cold_path,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -59,7 +58,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 
     #[inline]
-    pub fn element_is_<T: NBT>(&self) -> bool {
+    pub fn element_is_<T: NBTBase>(&self) -> bool {
         self.element_tag_id() == T::TAG_ID
             || (self.element_tag_id() == TagID::End && self.is_empty())
     }
@@ -76,7 +75,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
         self.len() == 0
     }
 
-    pub fn get_<T: GenericNBT>(
+    pub fn get_<T: NBTBase>(
         &self,
         index: usize,
     ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
@@ -142,7 +141,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
     }
 
     #[inline]
-    pub fn typed_<T: NBT>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
+    pub fn typed_<T: NBTBase>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
         self.element_is_::<T>().then_some(ReadonlyTypedList {
             data: self.data,
             mark: self.mark,
@@ -166,13 +165,15 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
+    type ConfigRef = ImmutableConfig<O, D>;
+
     #[inline]
     fn element_tag_id(&self) -> TagID {
         self.element_tag_id()
     }
 
     #[inline]
-    fn element_is_<T: NBT>(&self) -> bool {
+    fn element_is_<T: NBTBase>(&self) -> bool {
         self.element_is_::<T>()
     }
 
@@ -188,25 +189,23 @@ impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ListRef<'doc> for ReadonlyList<'doc, O, D> {
-    type Config = ImmutableConfig<O, D>;
-
     #[inline]
-    fn get(&self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
+    fn get(&self, index: usize) -> Option<<Self::ConfigRef as ConfigRef>::Value<'doc>> {
         self.get(index)
     }
 
     #[inline]
-    fn get_<T: NBT>(&self, index: usize) -> Option<T::TypeRef<'doc, Self::Config>> {
+    fn get_<T: NBTBase>(&self, index: usize) -> Option<T::TypeRef<'doc, Self::ConfigRef>> {
         self.get_::<T>(index)
     }
 
     #[inline]
-    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'doc, T>> {
+    fn typed_<T: NBTBase>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'doc, T>> {
         self.typed_::<T>()
     }
 
     #[inline]
-    fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'doc> {
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::ListIter<'doc> {
         self.iter()
     }
 }

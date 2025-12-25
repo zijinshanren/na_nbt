@@ -3,19 +3,19 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, Mark, NBT, Never, TypedListBase,
-    TypedListRef, cold_path,
+    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, Mark, NBTBase, Never,
+    TypedListBase, TypedListRef, cold_path,
 };
 
 #[derive(Clone)]
-pub struct ReadonlyTypedList<'doc, O: ByteOrder, D: Document, T: NBT> {
+pub struct ReadonlyTypedList<'doc, O: ByteOrder, D: Document, T: NBTBase> {
     pub(crate) data: &'doc [u8],
     pub(crate) mark: *const Mark,
     pub(crate) doc: D,
     pub(crate) _marker: PhantomData<(O, T)>,
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedList<'doc, O, D, T> {
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> Default for ReadonlyTypedList<'doc, O, D, T> {
     #[inline]
     fn default() -> Self {
         Self {
@@ -27,10 +27,12 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedList<'doc
     }
 }
 
-unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Send for ReadonlyTypedList<'doc, O, D, T> {}
-unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Sync for ReadonlyTypedList<'doc, O, D, T> {}
+unsafe impl<'doc, O: ByteOrder, D: Document, T: NBTBase> Send for ReadonlyTypedList<'doc, O, D, T> {}
+unsafe impl<'doc, O: ByteOrder, D: Document, T: NBTBase> Sync for ReadonlyTypedList<'doc, O, D, T> {}
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> IntoIterator for ReadonlyTypedList<'doc, O, D, T> {
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> IntoIterator
+    for ReadonlyTypedList<'doc, O, D, T>
+{
     type Item = T::TypeRef<'doc, ImmutableConfig<O, D>>;
     type IntoIter = ReadonlyTypedListIter<'doc, O, D, T>;
 
@@ -46,7 +48,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> IntoIterator for ReadonlyTypedList
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> ReadonlyTypedList<'doc, O, D, T> {
     #[inline]
     pub fn len(&self) -> usize {
         unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
@@ -86,9 +88,11 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListBase<T>
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> TypedListBase<T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
+    type ConfigRef = ImmutableConfig<O, D>;
+
     #[inline]
     fn len(&self) -> usize {
         self.len()
@@ -100,24 +104,22 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListBase<T>
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListRef<'doc, T>
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> TypedListRef<'doc, T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
-    type Config = ImmutableConfig<O, D>;
-
     #[inline]
-    fn get(&self, index: usize) -> Option<<T>::TypeRef<'doc, Self::Config>> {
+    fn get(&self, index: usize) -> Option<<T>::TypeRef<'doc, Self::ConfigRef>> {
         self.get(index)
     }
 
     #[inline]
-    fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'doc, T> {
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::TypedListIter<'doc, T> {
         self.iter()
     }
 }
 
 #[derive(Clone)]
-pub struct ReadonlyTypedListIter<'doc, O: ByteOrder, D: Document, T: NBT> {
+pub struct ReadonlyTypedListIter<'doc, O: ByteOrder, D: Document, T: NBTBase> {
     remaining: u32,
     data: *const u8,
     mark: *const Mark,
@@ -125,7 +127,7 @@ pub struct ReadonlyTypedListIter<'doc, O: ByteOrder, D: Document, T: NBT> {
     _marker: PhantomData<(&'doc (), O, T)>,
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedListIter<'doc, O, D, T> {
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> Default for ReadonlyTypedListIter<'doc, O, D, T> {
     #[inline]
     fn default() -> Self {
         Self {
@@ -138,10 +140,18 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedListIter<
     }
 }
 
-unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Send for ReadonlyTypedListIter<'doc, O, D, T> {}
-unsafe impl<'doc, O: ByteOrder, D: Document, T: NBT> Sync for ReadonlyTypedListIter<'doc, O, D, T> {}
+unsafe impl<'doc, O: ByteOrder, D: Document, T: NBTBase> Send
+    for ReadonlyTypedListIter<'doc, O, D, T>
+{
+}
+unsafe impl<'doc, O: ByteOrder, D: Document, T: NBTBase> Sync
+    for ReadonlyTypedListIter<'doc, O, D, T>
+{
+}
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedListIter<'doc, O, D, T> {
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> Iterator
+    for ReadonlyTypedListIter<'doc, O, D, T>
+{
     type Item = T::TypeRef<'doc, ImmutableConfig<O, D>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -168,7 +178,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedListIter
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> ExactSizeIterator
+impl<'doc, O: ByteOrder, D: Document, T: NBTBase> ExactSizeIterator
     for ReadonlyTypedListIter<'doc, O, D, T>
 {
 }

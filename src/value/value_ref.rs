@@ -1,52 +1,15 @@
 use crate::{
-    CompoundBase, ConfigRef, Index, ListBase, MapRef, NBT, NBTBase, TypedListBase, ValueBase,
-    VisitRef,
+    CompoundBase, ConfigRef, FromAnyNBTRefl, GenericNBT, Index, ListBase, MapRef, NBT, NBTBase,
+    TagID, TypedListBase, ValueBase, VisitRef, cold_path,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
     },
 };
 
-pub trait ValueDispatch: NBTBase {
-    fn ref_<'a, 's: 'a, V: ValueRef<'s>>(value: &'a V) -> Option<&'a Self::TypeRef<'s, V::Config>>;
-
-    fn into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::Config>>;
-}
-
-macro_rules! impl_value_ref_dispatch {
-    ($($t:ident),*) => {
-        $(
-            impl ValueDispatch for $t {
-                #[inline]
-                fn ref_<'a, 's: 'a, V:ValueRef<'s>>(value: &'a V) -> Option<&'a Self::TypeRef<'s, V::Config>> {
-                    value.visit(|value| match value {
-                        VisitRef::$t(v) => Some(v),
-                        _ => None,
-                    })
-                }
-
-                #[inline]
-                fn into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::Config>> {
-                    value.map(|value| match value {
-                        MapRef::$t(v) => Some(v),
-                        _ => None,
-                    })
-                }
-            }
-        )*
-    };
-}
-
-impl_value_ref_dispatch!(
-    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound, IntArray,
-    LongArray
-);
-
-pub trait ValueRef<'s>: ValueBase + Clone + Default {
-    type Config: ConfigRef;
-
+pub trait ValueRef<'s>: ValueBase + Clone + Default + FromAnyNBTRefl<'s, Self::ConfigRef> {
     #[inline]
-    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'s, Self::Config>>
+    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'s, Self::ConfigRef>>
     where
         's: 'a,
     {
@@ -54,60 +17,120 @@ pub trait ValueRef<'s>: ValueBase + Clone + Default {
     }
 
     #[inline]
-    fn into_<T: NBT>(self) -> Option<T::TypeRef<'s, Self::Config>> {
+    fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
         T::into_(self)
     }
 
-    fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'s>>;
+    #[inline]
+    fn get(&self, index: impl Index) -> Option<<Self::ConfigRef as ConfigRef>::Value<'s>> {
+        index.index_dispatch(
+            self,
+            |value, index| value.ref_::<List>()?.get(index),
+            |value, key| value.ref_::<Compound>()?.get(key),
+        )
+    }
 
-    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::TypeRef<'s, Self::Config>>;
+    #[inline]
+    fn get_<T: GenericNBT>(&self, index: impl Index) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
+        index.index_dispatch(
+            self,
+            |value, index| value.ref_::<List>()?.get_::<T>(index),
+            |value, key| value.ref_::<Compound>()?.get_::<T>(key),
+        )
+    }
 
-    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 's, Self::Config>) -> R) -> R
+    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 's, Self::ConfigRef>) -> R) -> R
     where
         's: 'a;
 
-    fn map<R>(self, match_fn: impl FnOnce(MapRef<'s, Self::Config>) -> R) -> R;
+    fn map<R>(self, match_fn: impl FnOnce(MapRef<'s, Self::ConfigRef>) -> R) -> R;
 }
 
 pub trait ListRef<'s>:
-    ListBase + IntoIterator<Item = <Self::Config as ConfigRef>::Value<'s>> + Clone + Default
+    ListBase + IntoIterator<Item = <Self::ConfigRef as ConfigRef>::Value<'s>> + Clone + Default
 {
-    type Config: ConfigRef;
+    fn get(&self, index: usize) -> Option<<Self::ConfigRef as ConfigRef>::Value<'s>>;
 
-    fn get(&self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'s>>;
+    fn get_<T: GenericNBT>(&self, index: usize) -> Option<T::TypeRef<'s, Self::ConfigRef>>;
 
-    fn get_<T: NBT>(&self, index: usize) -> Option<T::TypeRef<'s, Self::Config>>;
+    fn typed_<T: NBT>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'s, T>>;
 
-    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
-
-    fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'s>;
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::ListIter<'s>;
 }
 
-pub trait TypedListRef<'s, T: NBT>:
-    TypedListBase<T> + IntoIterator<Item = T::TypeRef<'s, Self::Config>> + Clone + Default
+pub trait TypedListRef<'s, T: NBTBase>:
+    TypedListBase<T> + IntoIterator<Item = T::TypeRef<'s, Self::ConfigRef>> + Clone + Default
 {
-    type Config: ConfigRef;
+    fn get(&self, index: usize) -> Option<T::TypeRef<'s, Self::ConfigRef>>;
 
-    fn get(&self, index: usize) -> Option<T::TypeRef<'s, Self::Config>>;
-
-    fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'s, T>;
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::TypedListIter<'s, T>;
 }
 
 pub trait CompoundRef<'s>:
     CompoundBase
     + IntoIterator<
         Item = (
-            <Self::Config as ConfigRef>::String<'s>,
-            <Self::Config as ConfigRef>::Value<'s>,
+            <Self::ConfigRef as ConfigRef>::String<'s>,
+            <Self::ConfigRef as ConfigRef>::Value<'s>,
         ),
     > + Clone
     + Default
 {
-    type Config: ConfigRef;
+    #[inline]
+    fn get(&self, key: &str) -> Option<<Self::ConfigRef as ConfigRef>::Value<'s>> {
+        let (tag_id, params) = self.compound_get_impl(key)?;
+        match tag_id {
+            TagID::End => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<End>(params).unwrap_unchecked()
+            })),
+            TagID::Byte => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<Byte>(params).unwrap_unchecked()
+            })),
+            TagID::Short => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<Short>(params).unwrap_unchecked()
+            })),
+            TagID::Int => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<Int>(params).unwrap_unchecked()
+            })),
+            TagID::Long => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<Long>(params).unwrap_unchecked()
+            })),
+            TagID::Float => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<Float>(params).unwrap_unchecked()
+            })),
+            TagID::Double => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<Double>(params).unwrap_unchecked()
+            })),
+            TagID::ByteArray => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<ByteArray>(params).unwrap_unchecked()
+            })),
+            TagID::String => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<String>(params).unwrap_unchecked()
+            })),
+            TagID::List => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<List>(params).unwrap_unchecked()
+            })),
+            TagID::Compound => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<Compound>(params).unwrap_unchecked()
+            })),
+            TagID::IntArray => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<IntArray>(params).unwrap_unchecked()
+            })),
+            TagID::LongArray => Some(<Self::ConfigRef as ConfigRef>::Value::from(unsafe {
+                <Self::ConfigRef as ConfigRef>::read::<LongArray>(params).unwrap_unchecked()
+            })),
+        }
+    }
 
-    fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'s>>;
+    #[inline]
+    fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
+        let (tag_id, params) = self.compound_get_impl(key)?;
+        if tag_id != T::TAG_ID {
+            cold_path();
+            return None;
+        }
+        unsafe { <Self::ConfigRef as ConfigRef>::read::<T>(params) }
+    }
 
-    fn get_<T: NBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::Config>>;
-
-    fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'s>;
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::CompoundIter<'s>;
 }

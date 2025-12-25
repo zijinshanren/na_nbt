@@ -1,9 +1,9 @@
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, GenericNBT, ImmutableConfig, ImmutableGenericNBTImpl,
-    ImmutableNBTImpl, Index, MapRef, Mark, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList,
-    ReadonlyString, TagID, ValueBase, ValueRef, VisitRef,
+    ByteOrder, Document, ImmutableConfig, ImmutableGenericImpl, ImmutableNBTImpl, MapRef, Mark,
+    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, TagID, ValueBase, ValueRef,
+    VisitRef,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -35,37 +35,6 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyValue<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
-    pub(crate) unsafe fn read(tag_id: TagID, data: *const u8, mark: *const Mark, doc: &D) -> Self {
-        unsafe {
-            macro_rules! match_tag_id {
-                (
-                    [
-                        $( $tag:ident ),* $(,)?
-                    ], $tag_id_val:expr, $data:expr, $mark:expr, $doc:expr
-                ) => {
-                    match $tag_id_val {
-                        $(
-                            TagID::$tag => ReadonlyValue::$tag(
-                                $tag::read::<O, D>($data, $mark, $doc).unwrap_unchecked()
-                            ),
-                        )*
-                    }
-                };
-            }
-
-            match_tag_id!(
-                [
-                    End, Byte, Short, Int, Long, Float, Double, ByteArray, String, List, Compound,
-                    IntArray, LongArray
-                ],
-                tag_id,
-                data,
-                mark,
-                doc
-            )
-        }
-    }
-
     pub(crate) unsafe fn size(tag_id: TagID, data: *const u8, mark: *const Mark) -> (usize, usize) {
         unsafe {
             macro_rules! match_tag_id {
@@ -114,98 +83,19 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
             ReadonlyValue::LongArray(_) => TagID::LongArray,
         }
     }
-
-    #[inline]
-    pub fn is_<T: NBT>(&self) -> bool {
-        self.tag_id() == T::TAG_ID
-    }
-
-    #[inline]
-    pub fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'doc, ImmutableConfig<O, D>>>
-    where
-        'doc: 'a,
-    {
-        T::ref_(self)
-    }
-
-    #[inline]
-    pub fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        T::_from(self)
-    }
-
-    #[inline]
-    pub fn get_<T: GenericNBT>(
-        &self,
-        index: impl Index,
-    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        index.index_dispatch(
-            self,
-            |value, index| match value {
-                ReadonlyValue::List(value) => value.get_::<T>(index),
-                _ => None,
-            },
-            |value, key| match value {
-                ReadonlyValue::Compound(value) => value.get_::<T>(key),
-                _ => None,
-            },
-        )
-    }
-
-    #[inline]
-    pub fn get(&self, index: impl Index) -> Option<ReadonlyValue<'doc, O, D>> {
-        index.index_dispatch(
-            self,
-            |value, index| match value {
-                ReadonlyValue::List(value) => value.get(index),
-                _ => None,
-            },
-            |value, key| match value {
-                ReadonlyValue::Compound(value) => value.get(key),
-                _ => None,
-            },
-        )
-    }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
+impl<'s, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'s, O, D> {
+    type ConfigRef = ImmutableConfig<O, D>;
+
     #[inline]
     fn tag_id(&self) -> TagID {
         self.tag_id()
     }
-
-    #[inline]
-    fn is_<T: NBT>(&self) -> bool {
-        self.is_::<T>()
-    }
 }
 
 impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, D> {
-    type Config = ImmutableConfig<O, D>;
-
-    #[inline]
-    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'doc, Self::Config>>
-    where
-        'doc: 'a,
-    {
-        self.ref_::<T>()
-    }
-
-    // #[inline]
-    // fn into_<T: NBT>(self) -> Option<T::TypeRef<'doc, Self::Config>> {
-    //     self.into_::<T>()
-    // }
-
-    #[inline]
-    fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
-        self.get(index)
-    }
-
-    #[inline]
-    fn get_<T: NBT>(&self, index: impl Index) -> Option<T::TypeRef<'doc, Self::Config>> {
-        self.get_::<T>(index)
-    }
-
-    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 'doc, Self::Config>) -> R) -> R
+    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 'doc, Self::ConfigRef>) -> R) -> R
     where
         'doc: 'a,
     {
@@ -226,7 +116,7 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
         }
     }
 
-    fn map<R>(self, match_fn: impl FnOnce(MapRef<'doc, Self::Config>) -> R) -> R {
+    fn map<R>(self, match_fn: impl FnOnce(MapRef<'doc, Self::ConfigRef>) -> R) -> R {
         match self {
             ReadonlyValue::End(()) => match_fn(MapRef::End(())),
             ReadonlyValue::Byte(value) => match_fn(MapRef::Byte(value)),
@@ -244,3 +134,4 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
         }
     }
 }
+

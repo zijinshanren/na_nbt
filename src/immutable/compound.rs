@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, GenericNBT,
-    ImmutableConfig, Mark, NBT, Never, ReadonlyString, ReadonlyValue, TagID, cold_path,
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, ImmutableConfig,
+    Mark, Never, ReadonlyString, ReadonlyValue, TagID, ValueBase, cold_path,
 };
 
 #[derive(Clone)]
@@ -47,9 +47,25 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyCompound<'doc, O,
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     #[inline]
-    fn get_impl<F, R>(&self, key: &str, map: F) -> Option<R>
+    pub fn iter(&self) -> ReadonlyCompoundIter<'doc, O, D> {
+        ReadonlyCompoundIter {
+            data: self.data.as_ptr(),
+            mark: self.mark,
+            doc: self.doc.clone(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'s, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'s, O, D> {
+    type ConfigRef = ImmutableConfig<O, D>;
+
+    fn compound_get_impl<'a, 'doc>(
+        &'a self,
+        key: &str,
+    ) -> Option<(TagID, <Self::ConfigRef as ConfigRef>::ReadParams<'a>)>
     where
-        F: FnOnce(TagID, *const u8, *const Mark, &D) -> Option<R>,
+        'doc: 'a,
     {
         let name = simd_cesu8::mutf8::encode(key);
         unsafe {
@@ -71,7 +87,7 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
                 ptr = ptr.add(name_len as usize);
 
                 if name == name_bytes {
-                    return map(tag_id, ptr, mark, &self.doc);
+                    return Some((tag_id, (ptr, mark, &self.doc)));
                 }
 
                 let (data_advance, mark_advance) = ReadonlyValue::<O, D>::size(tag_id, ptr, mark);
@@ -80,61 +96,11 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
             }
         }
     }
-
-    pub fn get_<T: GenericNBT>(
-        &self,
-        key: &str,
-    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        unsafe {
-            self.get_impl(key, |tag_id, ptr, mark, doc| {
-                if tag_id != T::TAG_ID {
-                    cold_path();
-                    return None;
-                }
-                T::read::<O, D>(ptr, mark, doc)
-            })
-        }
-    }
-
-    pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
-        unsafe {
-            self.get_impl(key, |tag_id, ptr, mark, doc| {
-                Some(ReadonlyValue::read(tag_id, ptr, mark, doc))
-            })
-        }
-    }
-
-    /// Returns an iterator over the entries of this compound.
-    ///
-    /// Each entry is a `(ReadonlyString, ReadonlyValue)` pair.
-    #[inline]
-    pub fn iter(&self) -> ReadonlyCompoundIter<'doc, O, D> {
-        ReadonlyCompoundIter {
-            data: self.data.as_ptr(),
-            mark: self.mark,
-            doc: self.doc.clone(),
-            _marker: PhantomData,
-        }
-    }
 }
 
-impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {}
-
-impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'doc, O, D> {
-    type Config = ImmutableConfig<O, D>;
-
+impl<'s, O: ByteOrder, D: Document> CompoundRef<'s> for ReadonlyCompound<'s, O, D> {
     #[inline]
-    fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'doc>> {
-        self.get(key)
-    }
-
-    #[inline]
-    fn get_<T: NBT>(&self, key: &str) -> Option<T::TypeRef<'doc, Self::Config>> {
-        self.get_::<T>(key)
-    }
-
-    #[inline]
-    fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'doc> {
+    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::CompoundIter<'s> {
         self.iter()
     }
 }
@@ -180,11 +146,9 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyCompoundIter<'doc, O,
                 _doc: self.doc.clone(),
             };
 
-            let value = ReadonlyValue::read(
+            let value = ReadonlyValue::value_read(
                 tag_id,
-                self.data.add(3 + name_len as usize),
-                self.mark,
-                &self.doc,
+                (self.data.add(3 + name_len as usize), self.mark, &self.doc),
             );
 
             self.data = self.data.add(1 + 2 + name_len as usize);

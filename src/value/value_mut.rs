@@ -1,195 +1,205 @@
 use crate::{
-    CompoundBase, ConfigMut, ConfigRef, Index, IntoNBT, ListBase, MapMut, MapRef, NBT, NBTBase,
-    OwnValue, TypedListBase, ValueBase, VisitMut, VisitRef,
+    CompoundBase, ConfigMut, ConfigRef, Index, IntoNBT, ListBase, MapMut, NBTBase, OwnValue,
+    TypedListBase, ValueBase, VisitMut,
 };
 
-pub trait ValueMut<'s>: ValueBase {
-    type Config: ConfigMut;
+pub trait ValueMut<'s>: ValueBase<ConfigRef = Self::ConfigMut> {
+    type ConfigMut: ConfigMut;
 
-    fn mut_<'a, T: NBT>(&'a mut self) -> Option<&'a mut T::TypeMut<'s, Self::Config>>
+    fn mut_<'a, T: NBTBase>(&'a mut self) -> Option<&'a mut T::TypeMut<'s, Self::ConfigMut>>
     where
         's: 'a;
 
-    fn into_<T: NBT>(self) -> Option<T::TypeRef<'s, Self::Config>>;
+    fn into_<T: NBTBase>(self) -> Option<T::TypeRef<'s, Self::ConfigMut>>;
 
-    fn into_mut_<T: NBT>(self) -> Option<T::TypeMut<'s, Self::Config>>;
+    fn into_mut_<T: NBTBase>(self) -> Option<T::TypeMut<'s, Self::ConfigMut>>;
 
-    fn get<'a>(&'a self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'a>>
+    fn get<'a>(&'a self, index: impl Index) -> Option<<Self::ConfigMut as ConfigRef>::Value<'a>>
     where
         's: 'a;
 
-    fn get_<'a, T: NBT>(&'a self, index: impl Index) -> Option<T::TypeRef<'a, Self::Config>>
+    fn get_<'a, T: NBTBase>(&'a self, index: impl Index) -> Option<T::TypeRef<'a, Self::ConfigMut>>
     where
         's: 'a;
 
     fn get_mut<'a>(
         &'a mut self,
         index: impl Index,
-    ) -> Option<<Self::Config as ConfigMut>::ValueMut<'a>>
+    ) -> Option<<Self::ConfigMut as ConfigMut>::ValueMut<'a>>
     where
         's: 'a;
 
-    fn get_mut_<'a, T: NBT>(
+    fn get_mut_<'a, T: NBTBase>(
         &'a mut self,
         index: impl Index,
-    ) -> Option<T::TypeMut<'a, Self::Config>>
+    ) -> Option<T::TypeMut<'a, Self::ConfigMut>>
     where
         's: 'a;
 
     fn visit_mut<'a, R>(
         &'a mut self,
-        match_fn: impl FnOnce(VisitMut<'a, 's, Self::Config>) -> R,
+        match_fn: impl FnOnce(VisitMut<'a, 's, Self::ConfigMut>) -> R,
     ) -> R
     where
         's: 'a;
 
-    fn map_mut<R>(self, match_fn: impl FnOnce(MapMut<'s, Self::Config>) -> R) -> R;
+    fn map_mut<R>(self, match_fn: impl FnOnce(MapMut<'s, Self::ConfigMut>) -> R) -> R;
 }
 
 pub trait ListMut<'s>:
-    ListBase + IntoIterator<Item = <Self::Config as ConfigMut>::ValueMut<'s>>
+    ListBase<ConfigRef = Self::ConfigMut>
+    + IntoIterator<Item = <Self::ConfigMut as ConfigMut>::ValueMut<'s>>
 {
-    type Config: ConfigMut;
+    type ConfigMut: ConfigMut;
 
-    fn get<'a>(&'a self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'a>>
+    fn get<'a>(&'a self, index: usize) -> Option<<Self::ConfigMut as ConfigRef>::Value<'a>>
     where
         's: 'a;
 
-    fn get_<'a, T: NBT>(&'a self, index: usize) -> Option<T::TypeRef<'a, Self::Config>>
+    fn get_<'a, T: NBTBase>(&'a self, index: usize) -> Option<T::TypeRef<'a, Self::ConfigMut>>
     where
         's: 'a;
 
-    fn get_mut<'a>(&'a mut self, index: usize) -> Option<<Self::Config as ConfigMut>::ValueMut<'a>>
+    fn get_mut<'a>(
+        &'a mut self,
+        index: usize,
+    ) -> Option<<Self::ConfigMut as ConfigMut>::ValueMut<'a>>
     where
         's: 'a;
 
-    fn get_mut_<'a, T: NBT>(&'a mut self, index: usize) -> Option<T::TypeMut<'a, Self::Config>>
+    fn get_mut_<'a, T: NBTBase>(&'a mut self, index: usize) -> Option<T::TypeMut<'a, Self::ConfigMut>>
     where
         's: 'a;
 
-    fn push<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(
+    fn push<V: IntoNBT<<Self::ConfigMut as ConfigRef>::ByteOrder>>(
         &mut self,
         value: V,
-    ) -> Option<<V::Tag as NBTBase>::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+    ) -> Option<<V::Tag as NBTBase>::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn pop(&mut self) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
+    fn pop(&mut self) -> Option<OwnValue<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn pop_<T: NBT>(&mut self) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+    fn pop_<T: NBTBase>(&mut self) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn insert<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(
+    fn insert<V: IntoNBT<<Self::ConfigMut as ConfigRef>::ByteOrder>>(
         &mut self,
         index: usize,
         value: V,
-    ) -> Option<<V::Tag as NBTBase>::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+    ) -> Option<<V::Tag as NBTBase>::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn remove(&mut self, index: usize) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
-
-    fn remove_<T: NBT>(
+    fn remove(
         &mut self,
         index: usize,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+    ) -> Option<OwnValue<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
+    fn remove_<T: NBTBase>(
+        &mut self,
+        index: usize,
+    ) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn typed_mut_<T: NBT>(self) -> Option<<Self::Config as ConfigMut>::TypedListMut<'s, T>>;
+    fn typed_<T: NBTBase>(self) -> Option<<Self::ConfigMut as ConfigRef>::TypedList<'s, T>>;
 
-    fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::ListIter<'a>
+    fn typed_mut_<T: NBTBase>(self) -> Option<<Self::ConfigMut as ConfigMut>::TypedListMut<'s, T>>;
+
+    fn iter<'a>(&'a self) -> <Self::ConfigMut as ConfigRef>::ListIter<'a>
     where
         's: 'a;
 
-    fn iter_mut<'a>(&'a mut self) -> <Self::Config as ConfigMut>::ListIterMut<'a>
+    fn iter_mut<'a>(&'a mut self) -> <Self::ConfigMut as ConfigMut>::ListIterMut<'a>
     where
         's: 'a;
 }
 
-pub trait TypedListMut<'s, T: NBT>:
-    TypedListBase<T> + IntoIterator<Item = T::TypeMut<'s, Self::Config>>
+pub trait TypedListMut<'s, T: NBTBase>:
+    TypedListBase<T, ConfigRef = Self::ConfigMut> + IntoIterator<Item = T::TypeMut<'s, Self::ConfigMut>>
 {
-    type Config: ConfigMut;
+    type ConfigMut: ConfigMut;
 
-    fn get<'a>(&'a self, index: usize) -> Option<T::TypeRef<'a, Self::Config>>
+    fn get<'a>(&'a self, index: usize) -> Option<T::TypeRef<'a, Self::ConfigMut>>
     where
         's: 'a;
 
-    fn get_mut<'a>(&'a mut self, index: usize) -> Option<T::TypeMut<'a, Self::Config>>
+    fn get_mut<'a>(&'a mut self, index: usize) -> Option<T::TypeMut<'a, Self::ConfigMut>>
     where
         's: 'a;
 
     fn push(
         &mut self,
-        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+        value: impl IntoNBT<<Self::ConfigMut as ConfigRef>::ByteOrder, Tag = T>,
+    ) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn pop(&mut self) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+    fn pop(&mut self) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
     fn insert(
         &mut self,
         index: usize,
-        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+        value: impl IntoNBT<<Self::ConfigMut as ConfigRef>::ByteOrder, Tag = T>,
+    ) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn remove(&mut self, index: usize) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+    fn remove(
+        &mut self,
+        index: usize,
+    ) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::TypedListIter<'a, T>
+    fn iter<'a>(&'a self) -> <Self::ConfigMut as ConfigRef>::TypedListIter<'a, T>
     where
         's: 'a;
 
-    fn iter_mut<'a>(&'a mut self) -> <Self::Config as ConfigMut>::TypedListIterMut<'a, T>
+    fn iter_mut<'a>(&'a mut self) -> <Self::ConfigMut as ConfigMut>::TypedListIterMut<'a, T>
     where
         's: 'a;
 }
 
 pub trait CompoundMut<'s>:
-    CompoundBase
+    CompoundBase<ConfigRef = Self::ConfigMut>
     + IntoIterator<
         Item = (
-            <Self::Config as ConfigRef>::String<'s>,
-            <Self::Config as ConfigMut>::ValueMut<'s>,
+            <Self::ConfigMut as ConfigRef>::String<'s>,
+            <Self::ConfigMut as ConfigMut>::ValueMut<'s>,
         ),
     >
 {
-    type Config: ConfigMut;
+    type ConfigMut: ConfigMut;
 
-    fn get<'a>(&'a self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'a>>
+    fn get<'a>(&'a self, key: &str) -> Option<<Self::ConfigMut as ConfigRef>::Value<'a>>
     where
         's: 'a;
 
-    fn get_<'a, T: NBT>(&'a self, key: &str) -> Option<T::TypeRef<'a, Self::Config>>
+    fn get_<'a, T: NBTBase>(&'a self, key: &str) -> Option<T::TypeRef<'a, Self::ConfigMut>>
     where
         's: 'a;
 
-    fn get_mut<'a>(&'a mut self, key: &str) -> Option<<Self::Config as ConfigMut>::ValueMut<'a>>
+    fn get_mut<'a>(&'a mut self, key: &str) -> Option<<Self::ConfigMut as ConfigMut>::ValueMut<'a>>
     where
         's: 'a;
 
-    fn get_mut_<'a, T: NBT>(&'a mut self, key: &str) -> Option<T::TypeMut<'a, Self::Config>>
+    fn get_mut_<'a, T: NBTBase>(&'a mut self, key: &str) -> Option<T::TypeMut<'a, Self::ConfigMut>>
     where
         's: 'a;
 
     fn insert(
         &mut self,
         key: &str,
-        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder>,
-    ) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
+        value: impl IntoNBT<<Self::ConfigMut as ConfigRef>::ByteOrder>,
+    ) -> Option<OwnValue<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn insert_<T: NBT>(
+    fn insert_<T: NBTBase>(
         &mut self,
         key: &str,
-        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder>,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+        value: impl IntoNBT<<Self::ConfigMut as ConfigRef>::ByteOrder>,
+    ) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn remove(&mut self, key: &str) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>>;
+    fn remove(&mut self, key: &str) -> Option<OwnValue<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn remove_<T: NBT>(
+    fn remove_<T: NBTBase>(
         &mut self,
         key: &str,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>>;
+    ) -> Option<T::Type<<Self::ConfigMut as ConfigRef>::ByteOrder>>;
 
-    fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::CompoundIter<'a>
+    fn iter<'a>(&'a self) -> <Self::ConfigMut as ConfigRef>::CompoundIter<'a>
     where
         's: 'a;
 
-    fn iter_mut<'a>(&'a mut self) -> <Self::Config as ConfigMut>::CompoundIterMut<'a>
+    fn iter_mut<'a>(&'a mut self) -> <Self::ConfigMut as ConfigMut>::CompoundIterMut<'a>
     where
         's: 'a;
 }

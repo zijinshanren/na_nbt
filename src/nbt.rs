@@ -1,5 +1,5 @@
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, ImmutableGenericNBTImpl, ImmutableNBTImpl, ValueDispatch,
+    ByteOrder, ConfigMut, ConfigRef, ImmutableGenericImpl, ImmutableImpl, NBTInto, NBTRef,
 };
 
 pub mod tag;
@@ -101,7 +101,7 @@ impl TagID {
 }
 
 mod private {
-    use crate::{NBT, tag::*};
+    use crate::{NBTBase, tag::*};
     pub trait Sealed {}
     impl Sealed for End {}
     impl Sealed for Byte {}
@@ -116,7 +116,7 @@ mod private {
     impl Sealed for Compound {}
     impl Sealed for IntArray {}
     impl Sealed for LongArray {}
-    impl<T: NBT> Sealed for TypedList<T> {}
+    impl<T: NBTBase> Sealed for TypedList<T> {}
 }
 
 pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'static {
@@ -128,21 +128,16 @@ pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'stati
 
 pub trait PrimitiveNBTBase: NBTBase {}
 
-pub trait NBTImpl: ImmutableNBTImpl + ValueDispatch {}
+macro_rules! define_trait {
+    ($name:ident: $first:path $(, $rest:path)*) => {
+        pub trait $name: $first $(+ $rest)* {}
 
-impl<T: ImmutableNBTImpl + ValueDispatch> NBTImpl for T {}
+        impl<T: $first $(+ $rest)*> $name for T {}
+    };
+}
 
-pub trait NBT: NBTBase + NBTImpl {}
+define_trait!(GenericNBT: NBTBase, NBTInto, ImmutableGenericImpl);
 
-impl<T: NBTBase + NBTImpl> NBT for T {}
-pub trait PrimitiveNBT: NBT + PrimitiveNBTBase {}
+define_trait!(NBT: GenericNBT, NBTRef, ImmutableImpl);
 
-impl<T: NBT + PrimitiveNBTBase> PrimitiveNBT for T {}
-
-pub trait GenericNBTImpl: ImmutableGenericNBTImpl {}
-
-impl<T: ImmutableGenericNBTImpl> GenericNBTImpl for T {}
-
-pub trait GenericNBT: NBTBase + GenericNBTImpl {}
-
-impl<T: NBTBase + GenericNBTImpl> GenericNBT for T {}
+define_trait!(PrimitiveNBT: NBTBase, PrimitiveNBTBase);

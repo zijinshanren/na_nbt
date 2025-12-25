@@ -3,7 +3,7 @@ use std::{any::TypeId, hint::unreachable_unchecked, io::Write, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, Error, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
+    ByteOrder, Document, Error, NBTBase, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
     ReadonlyTypedList, ReadonlyValue, Result, TagID, Writable, cold_path,
 };
 
@@ -670,7 +670,7 @@ impl<'doc, SOURCE: ByteOrder, D: Document> Writable for ReadonlyList<'doc, SOURC
     }
 }
 
-impl<'doc, SOURCE: ByteOrder, D: Document, T: NBT> Writable
+impl<'doc, SOURCE: ByteOrder, D: Document, T: NBTBase> Writable
     for ReadonlyTypedList<'doc, SOURCE, D, T>
 {
     fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {

@@ -2,7 +2,7 @@ use std::ptr;
 
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, NBT, OwnCompound, OwnList, OwnString, OwnVec, TagID};
+use crate::{ByteOrder, NBTBase, OwnCompound, OwnList, OwnString, OwnVec, TagID};
 
 pub enum OwnValue<O: ByteOrder> {
     End(()),
