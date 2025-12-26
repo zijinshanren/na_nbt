@@ -5,7 +5,7 @@ use zerocopy::byteorder;
 use crate::{
     ByteOrder, ConfigRef, Document, GenericNBT, Mark, NBT, NBTBase, ReadonlyArray,
     ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter, ReadonlyString,
-    ReadonlyTypedList, ReadonlyTypedListIter, ReadonlyValue,
+    ReadonlyTypedList, ReadonlyTypedListIter, ReadonlyValue, TagID, cold_path,
 };
 
 #[derive(Clone)]
@@ -28,6 +28,73 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
     type LongArray<'doc> = ReadonlyArray<'doc, byteorder::I64<O>, D>;
 
     type ReadParams<'a> = (*const u8, *const Mark, &'a D);
+
+    unsafe fn list_get<'a, 'doc, T: GenericNBT>(
+        value: &'a Self::List<'doc>,
+        index: usize,
+    ) -> Self::ReadParams<'a>
+    where
+        'doc: 'a,
+    {
+        unsafe {
+            T::list_get_immutable_impl::<O, D>(
+                (value.data.as_ptr().add(1 + 4), value.mark, &value.doc),
+                index,
+            )
+        }
+    }
+
+    unsafe fn typed_list_get<'a, 'doc, T: NBT>(
+        value: &'a Self::TypedList<'doc, T>,
+        index: usize,
+    ) -> Self::ReadParams<'a>
+    where
+        'doc: 'a,
+    {
+        unsafe {
+            T::list_get_immutable_impl::<O, D>(
+                (value.data.as_ptr().add(1 + 4), value.mark, &value.doc),
+                index,
+            )
+        }
+    }
+
+    unsafe fn compound_get<'a, 'doc>(
+        value: &'a Self::Compound<'doc>,
+        key: &str,
+    ) -> Option<(crate::TagID, Self::ReadParams<'a>)>
+    where
+        'doc: 'a,
+    {
+        let name = simd_cesu8::mutf8::encode(key);
+        unsafe {
+            let mut ptr = value.data.as_ptr();
+            let mut mark = value.mark;
+            loop {
+                let tag_id = *ptr.cast();
+                ptr = ptr.add(1);
+
+                if tag_id == TagID::End {
+                    cold_path();
+                    return None;
+                }
+
+                let name_len = byteorder::U16::<O>::from_bytes(*ptr.cast()).get();
+                ptr = ptr.add(2);
+
+                let name_bytes = core::slice::from_raw_parts(ptr, name_len as usize);
+                ptr = ptr.add(name_len as usize);
+
+                if name == name_bytes {
+                    return Some((tag_id, (ptr, mark, &value.doc)));
+                }
+
+                let (data_advance, mark_advance) = ReadonlyValue::<O, D>::size(tag_id, ptr, mark);
+                ptr = ptr.add(data_advance);
+                mark = mark.add(mark_advance);
+            }
+        }
+    }
 
     #[inline]
     unsafe fn read<'a, 'doc, T: GenericNBT>(

@@ -77,31 +77,23 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
 impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListBase<T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
-    type ConfigRef = ImmutableConfig<O, D>;
-
     #[inline]
     fn len(&self) -> usize {
         self.len()
-    }
-
-    fn typed_list_get_impl<'a>(
-        &'a self,
-        index: usize,
-    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a> {
-        unsafe {
-            T::list_get_immutable_impl::<O, D>(
-                (self.data.as_ptr().add(1 + 4), self.mark, &self.doc),
-                index,
-            )
-        }
     }
 }
 
 impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListRef<'doc, T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
+    type Config = ImmutableConfig<O, D>;
+
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::TypedList<'doc, T> {
+        self
+    }
+
     #[inline]
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::TypedListIter<'doc, T> {
+    fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'doc, T> {
         self.iter()
     }
 }

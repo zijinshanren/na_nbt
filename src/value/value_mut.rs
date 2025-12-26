@@ -36,7 +36,7 @@ pub trait ValueMut<'s>:
     + From<<TypedList<IntArray> as NBTBase>::TypeMut<'s, Self::Config>>
     + From<<TypedList<LongArray> as NBTBase>::TypeMut<'s, Self::Config>>
 {
-    type Config: ConfigMut<ValueMut<'s> = Self>;
+    type Config: ConfigMut;
 
     #[inline]
     fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeMut<'s, Self::Config>>
@@ -83,10 +83,6 @@ pub trait ValueMut<'s>:
         )
     }
 
-    fn shorten<'a>(self) -> <Self::Config as ConfigMut>::ValueMut<'a>
-    where
-        's: 'a;
-
     #[inline]
     fn get_mut<'a>(
         &'a mut self,
@@ -131,7 +127,11 @@ pub trait ListMut<'s>:
         Item = <Self::Config as ConfigMut>::ValueMut<'s>,
     >
 {
-    type Config: ConfigMut<ListMut<'s> = Self>;
+    type Config: ConfigMut;
+
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::List<'s>;
+
+    fn _transform_mut(&mut self) -> &mut <Self::Config as ConfigMut>::ListMut<'s>;
 
     #[inline]
     #[allow(clippy::unit_arg)]
@@ -147,56 +147,95 @@ pub trait ListMut<'s>:
         unsafe {
             Some(match self.element_tag_id() {
                 TagID::End => From::from(
-                    Self::ConfigRef::read::<End>(self.list_get_impl::<End>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<End>(Self::Config::list_get::<End>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Byte => From::from(
-                    Self::ConfigRef::read::<Byte>(self.list_get_impl::<Byte>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Byte>(Self::Config::list_get::<Byte>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Short => From::from(
-                    Self::ConfigRef::read::<Short>(self.list_get_impl::<Short>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Short>(Self::Config::list_get::<Short>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Int => From::from(
-                    Self::ConfigRef::read::<Int>(self.list_get_impl::<Int>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Int>(Self::Config::list_get::<Int>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Long => From::from(
-                    Self::ConfigRef::read::<Long>(self.list_get_impl::<Long>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Long>(Self::Config::list_get::<Long>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Float => From::from(
-                    Self::ConfigRef::read::<Float>(self.list_get_impl::<Float>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Float>(Self::Config::list_get::<Float>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Double => From::from(
-                    Self::ConfigRef::read::<Double>(self.list_get_impl::<Double>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Double>(Self::Config::list_get::<Double>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::ByteArray => From::from(
-                    Self::ConfigRef::read::<ByteArray>(self.list_get_impl::<ByteArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<ByteArray>(Self::Config::list_get::<ByteArray>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::String => From::from(
-                    Self::ConfigRef::read::<String>(self.list_get_impl::<String>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<String>(Self::Config::list_get::<String>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::List => From::from(
-                    Self::ConfigRef::read::<List>(self.list_get_impl::<List>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<List>(Self::Config::list_get::<List>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Compound => From::from(
-                    Self::ConfigRef::read::<Compound>(self.list_get_impl::<Compound>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Compound>(Self::Config::list_get::<Compound>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::IntArray => From::from(
-                    Self::ConfigRef::read::<IntArray>(self.list_get_impl::<IntArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<IntArray>(Self::Config::list_get::<IntArray>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::LongArray => From::from(
-                    Self::ConfigRef::read::<LongArray>(self.list_get_impl::<LongArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<LongArray>(Self::Config::list_get::<LongArray>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
             })
         }
@@ -219,7 +258,7 @@ pub trait ListMut<'s>:
             return None;
         }
 
-        unsafe { Self::ConfigRef::read::<T>(self.list_get_impl::<T>(index)) }
+        unsafe { Self::Config::read::<T>(Self::Config::list_get::<T>(self._transform(), index)) }
     }
 
     #[inline]
@@ -235,56 +274,95 @@ pub trait ListMut<'s>:
         unsafe {
             Some(match self.element_tag_id() {
                 TagID::End => From::from(
-                    Self::Config::read_mut::<End>(self.list_get_impl::<End>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<End>(Self::Config::list_get_mut::<End>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Byte => From::from(
-                    Self::Config::read_mut::<Byte>(self.list_get_impl::<Byte>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<Byte>(Self::Config::list_get_mut::<Byte>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Short => From::from(
-                    Self::Config::read_mut::<Short>(self.list_get_impl::<Short>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<Short>(Self::Config::list_get_mut::<Short>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Int => From::from(
-                    Self::Config::read_mut::<Int>(self.list_get_impl::<Int>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<Int>(Self::Config::list_get_mut::<Int>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Long => From::from(
-                    Self::Config::read_mut::<Long>(self.list_get_impl::<Long>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<Long>(Self::Config::list_get_mut::<Long>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Float => From::from(
-                    Self::Config::read_mut::<Float>(self.list_get_impl::<Float>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<Float>(Self::Config::list_get_mut::<Float>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Double => From::from(
-                    Self::Config::read_mut::<Double>(self.list_get_impl::<Double>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<Double>(Self::Config::list_get_mut::<Double>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::ByteArray => From::from(
-                    Self::Config::read_mut::<ByteArray>(self.list_get_impl::<ByteArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<ByteArray>(Self::Config::list_get_mut::<ByteArray>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::String => From::from(
-                    Self::Config::read_mut::<String>(self.list_get_impl::<String>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<String>(Self::Config::list_get_mut::<String>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::List => From::from(
-                    Self::Config::read_mut::<List>(self.list_get_impl::<List>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<List>(Self::Config::list_get_mut::<List>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Compound => From::from(
-                    Self::Config::read_mut::<Compound>(self.list_get_impl::<Compound>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<Compound>(Self::Config::list_get_mut::<Compound>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::IntArray => From::from(
-                    Self::Config::read_mut::<IntArray>(self.list_get_impl::<IntArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<IntArray>(Self::Config::list_get_mut::<IntArray>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::LongArray => From::from(
-                    Self::Config::read_mut::<LongArray>(self.list_get_impl::<LongArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read_mut::<LongArray>(Self::Config::list_get_mut::<LongArray>(
+                        self._transform_mut(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
             })
         }
@@ -310,7 +388,12 @@ pub trait ListMut<'s>:
             return None;
         }
 
-        unsafe { Self::Config::read_mut::<T>(self.list_get_impl::<T>(index)) }
+        unsafe {
+            Self::Config::read_mut::<T>(Self::Config::list_get_mut::<T>(
+                self._transform_mut(),
+                index,
+            ))
+        }
     }
 
     fn push<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(
@@ -353,7 +436,11 @@ pub trait TypedListMut<'s, T: NBT>:
         Item = T::TypeMut<'s, Self::Config>,
     >
 {
-    type Config: ConfigMut<TypedListMut<'s, T> = Self>;
+    type Config: ConfigMut;
+
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::TypedList<'s, T>;
+
+    fn _transform_mut(&mut self) -> &mut <Self::Config as ConfigMut>::TypedListMut<'s, T>;
 
     #[inline]
     fn get<'a>(&'a self, index: usize) -> Option<T::TypeRef<'a, Self::Config>>
@@ -365,7 +452,9 @@ pub trait TypedListMut<'s, T: NBT>:
             return None;
         }
 
-        unsafe { Self::ConfigRef::read::<T>(self.typed_list_get_impl(index)) }
+        unsafe {
+            Self::Config::read::<T>(Self::Config::typed_list_get::<T>(self._transform(), index))
+        }
     }
 
     #[inline]
@@ -378,7 +467,12 @@ pub trait TypedListMut<'s, T: NBT>:
             return None;
         }
 
-        unsafe { Self::Config::read_mut::<T>(Self::Config::typed_list_get::<T>(self, index)) }
+        unsafe {
+            Self::Config::read_mut::<T>(Self::Config::typed_list_get_mut::<T>(
+                self._transform_mut(),
+                index,
+            ))
+        }
     }
 
     fn push(
@@ -415,15 +509,21 @@ pub trait CompoundMut<'s>:
         ),
     >
 {
-    type Config: ConfigMut<CompoundMut<'s> = Self>;
+    type Config: ConfigMut;
+
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::Compound<'s>;
+
+    fn _transform_mut(&mut self) -> &mut <Self::Config as ConfigMut>::CompoundMut<'s>;
 
     #[inline]
     fn get<'a>(&'a self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'a>>
     where
         's: 'a,
     {
-        let (tag_id, params) = self.compound_get_impl(key)?;
-        unsafe { Some(Self::ConfigRef::read_value(tag_id, params)) }
+        unsafe {
+            let (tag_id, params) = Self::Config::compound_get(self._transform(), key)?;
+            Some(Self::Config::read_value(tag_id, params))
+        }
     }
 
     #[inline]
@@ -431,12 +531,14 @@ pub trait CompoundMut<'s>:
     where
         's: 'a,
     {
-        let (tag_id, params) = self.compound_get_impl(key)?;
-        if tag_id != T::TAG_ID {
-            cold_path();
-            return None;
+        unsafe {
+            let (tag_id, params) = Self::Config::compound_get(self._transform(), key)?;
+            if tag_id != T::TAG_ID {
+                cold_path();
+                return None;
+            }
+            Self::Config::read::<T>(params)
         }
-        unsafe { Self::ConfigRef::read::<T>(params) }
     }
 
     #[inline]
@@ -444,8 +546,10 @@ pub trait CompoundMut<'s>:
     where
         's: 'a,
     {
-        let (tag_id, params) = self.compound_get_impl(key)?;
-        unsafe { Some(Self::Config::read_value_mut(tag_id, params)) }
+        unsafe {
+            let (tag_id, params) = Self::Config::compound_get_mut(self._transform_mut(), key)?;
+            Some(Self::Config::read_value_mut(tag_id, params))
+        }
     }
 
     #[inline]
@@ -453,12 +557,14 @@ pub trait CompoundMut<'s>:
     where
         's: 'a,
     {
-        let (tag_id, params) = self.compound_get_impl(key)?;
-        if tag_id != T::TAG_ID {
-            cold_path();
-            return None;
+        unsafe {
+            let (tag_id, params) = Self::Config::compound_get_mut(self._transform_mut(), key)?;
+            if tag_id != T::TAG_ID {
+                cold_path();
+                return None;
+            }
+            Self::Config::read_mut::<T>(params)
         }
-        unsafe { Self::Config::read_mut::<T>(params) }
     }
 
     fn insert(

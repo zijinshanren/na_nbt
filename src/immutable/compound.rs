@@ -70,47 +70,18 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> CompoundBase<'doc> for ReadonlyCompound<'doc, O, D> {
-    type ConfigRef = ImmutableConfig<O, D>;
-
-    fn compound_get_impl<'a>(
-        &'a self,
-        key: &str,
-    ) -> Option<(TagID, <Self::ConfigRef as ConfigRef>::ReadParams<'a>)> {
-        let name = simd_cesu8::mutf8::encode(key);
-        unsafe {
-            let mut ptr = self.data.as_ptr();
-            let mut mark = self.mark;
-            loop {
-                let tag_id = *ptr.cast();
-                ptr = ptr.add(1);
-
-                if tag_id == TagID::End {
-                    cold_path();
-                    return None;
-                }
-
-                let name_len = byteorder::U16::<O>::from_bytes(*ptr.cast()).get();
-                ptr = ptr.add(2);
-
-                let name_bytes = core::slice::from_raw_parts(ptr, name_len as usize);
-                ptr = ptr.add(name_len as usize);
-
-                if name == name_bytes {
-                    return Some((tag_id, (ptr, mark, &self.doc)));
-                }
-
-                let (data_advance, mark_advance) = ReadonlyValue::<O, D>::size(tag_id, ptr, mark);
-                ptr = ptr.add(data_advance);
-                mark = mark.add(mark_advance);
-            }
-        }
-    }
-}
+impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {}
 
 impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'doc, O, D> {
+    type Config = ImmutableConfig<O, D>;
+
     #[inline]
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::CompoundIter<'doc> {
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::Compound<'doc> {
+        self
+    }
+
+    #[inline]
+    fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'doc> {
         self.iter()
     }
 }

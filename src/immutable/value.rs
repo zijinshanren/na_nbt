@@ -108,8 +108,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
-    type ConfigRef = ImmutableConfig<O, D>;
-
     #[inline]
     fn tag_id(&self) -> TagID {
         self.tag_id()
@@ -117,7 +115,9 @@ impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, D> {
-    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 'doc, Self::ConfigRef>) -> R) -> R
+    type Config = ImmutableConfig<O, D>;
+
+    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 'doc, Self::Config>) -> R) -> R
     where
         'doc: 'a,
     {
@@ -138,7 +138,7 @@ impl<'doc, O: ByteOrder, D: Document> ValueRef<'doc> for ReadonlyValue<'doc, O, 
         }
     }
 
-    fn map<R>(self, match_fn: impl FnOnce(MapRef<'doc, Self::ConfigRef>) -> R) -> R {
+    fn map<R>(self, match_fn: impl FnOnce(MapRef<'doc, Self::Config>) -> R) -> R {
         match self {
             ReadonlyValue::End(()) => match_fn(MapRef::End(())),
             ReadonlyValue::Byte(value) => match_fn(MapRef::Byte(value)),

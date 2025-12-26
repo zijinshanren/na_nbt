@@ -23,6 +23,27 @@ pub trait ConfigMut: ConfigRef {
         + Clone
         + Default;
 
+    unsafe fn list_get_mut<'a, 'doc, T: GenericNBT>(
+        value: &'a Self::ListMut<'doc>,
+        index: usize,
+    ) -> Self::ReadParams<'a>
+    where
+        'doc: 'a;
+
+    unsafe fn typed_list_get_mut<'a, 'doc, T: NBT>(
+        value: &'a Self::TypedListMut<'doc, T>,
+        index: usize,
+    ) -> Self::ReadParams<'a>
+    where
+        'doc: 'a;
+
+    unsafe fn compound_get_mut<'a, 'doc>(
+        value: &'a Self::CompoundMut<'doc>,
+        key: &str,
+    ) -> Option<(TagID, Self::ReadParams<'a>)>
+    where
+        'doc: 'a;
+
     /// .
     ///
     /// # Safety

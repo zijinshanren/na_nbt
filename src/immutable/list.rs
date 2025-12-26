@@ -107,8 +107,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
 }
 
 impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
-    type ConfigRef = ImmutableConfig<O, D>;
-
     #[inline]
     fn element_tag_id(&self) -> TagID {
         self.element_tag_id()
@@ -118,29 +116,23 @@ impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
     fn len(&self) -> usize {
         self.len()
     }
-
-    #[inline]
-    fn list_get_impl<'a, T: GenericNBT>(
-        &'a self,
-        index: usize,
-    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a> {
-        unsafe {
-            T::list_get_immutable_impl::<O, D>(
-                (self.data.as_ptr().add(1 + 4), self.mark, &self.doc),
-                index,
-            )
-        }
-    }
 }
 
 impl<'doc, O: ByteOrder, D: Document> ListRef<'doc> for ReadonlyList<'doc, O, D> {
+    type Config = ImmutableConfig<O, D>;
+
     #[inline]
-    fn typed_<T: NBT>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'doc, T>> {
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::List<'doc> {
+        self
+    }
+
+    #[inline]
+    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'doc, T>> {
         self.typed_::<T>()
     }
 
     #[inline]
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::ListIter<'doc> {
+    fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'doc> {
         self.iter()
     }
 }

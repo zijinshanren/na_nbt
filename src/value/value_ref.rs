@@ -38,7 +38,7 @@ pub trait ValueRef<'s>:
     + From<<TypedList<IntArray> as NBTBase>::TypeRef<'s, Self::Config>>
     + From<<TypedList<LongArray> as NBTBase>::TypeRef<'s, Self::Config>>
 {
-    type Config: ConfigRef<Value<'s> = Self>;
+    type Config: ConfigRef;
 
     #[inline]
     fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'s, Self::Config>>
@@ -86,7 +86,10 @@ pub trait ListRef<'s>:
     > + Clone
     + Default
 {
-    type Config: ConfigRef<List<'s> = Self>;
+    type Config: ConfigRef;
+
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::List<'s>;
+
     #[inline]
     #[allow(clippy::unit_arg)]
     fn get(&self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'s>> {
@@ -98,58 +101,93 @@ pub trait ListRef<'s>:
         unsafe {
             Some(match self.element_tag_id() {
                 TagID::End => From::from(
-                    Self::Config::read::<End>(Self::Config::list_get::<End>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<End>(Self::Config::list_get::<End>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Byte => From::from(
-                    Self::Config::read::<Byte>(Self::Config::list_get::<Byte>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Byte>(Self::Config::list_get::<Byte>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Short => From::from(
-                    Self::Config::read::<Short>(Self::Config::list_get::<Short>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Short>(Self::Config::list_get::<Short>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Int => From::from(
-                    Self::Config::read::<Int>(Self::Config::list_get::<Int>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Int>(Self::Config::list_get::<Int>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Long => From::from(
-                    Self::Config::read::<Long>(Self::Config::list_get::<Long>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Long>(Self::Config::list_get::<Long>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Float => From::from(
-                    Self::Config::read::<Float>(Self::Config::list_get::<Float>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Float>(Self::Config::list_get::<Float>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Double => From::from(
-                    Self::Config::read::<Double>(Self::Config::list_get::<Double>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Double>(Self::Config::list_get::<Double>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::ByteArray => From::from(
                     Self::Config::read::<ByteArray>(Self::Config::list_get::<ByteArray>(
-                        self, index,
+                        self._transform(),
+                        index,
                     ))
                     .unwrap_unchecked(),
                 ),
                 TagID::String => From::from(
-                    Self::Config::read::<String>(Self::Config::list_get::<String>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<String>(Self::Config::list_get::<String>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::List => From::from(
-                    Self::Config::read::<List>(Self::Config::list_get::<List>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<List>(Self::Config::list_get::<List>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::Compound => From::from(
-                    Self::Config::read::<Compound>(Self::Config::list_get::<Compound>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<Compound>(Self::Config::list_get::<Compound>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::IntArray => From::from(
-                    Self::Config::read::<IntArray>(Self::Config::list_get::<IntArray>(self, index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<IntArray>(Self::Config::list_get::<IntArray>(
+                        self._transform(),
+                        index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::LongArray => From::from(
                     Self::Config::read::<LongArray>(Self::Config::list_get::<LongArray>(
-                        self, index,
+                        self._transform(),
+                        index,
                     ))
                     .unwrap_unchecked(),
                 ),
@@ -171,7 +209,7 @@ pub trait ListRef<'s>:
             return None;
         }
 
-        unsafe { Self::Config::read::<T>(Self::Config::list_get::<T>(self, index)) }
+        unsafe { Self::Config::read::<T>(Self::Config::list_get::<T>(self._transform(), index)) }
     }
 
     fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
@@ -187,7 +225,10 @@ pub trait TypedListRef<'s, T: NBT>:
     > + Clone
     + Default
 {
-    type Config: ConfigRef<TypedList<'s, T> = Self>;
+    type Config: ConfigRef;
+
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::TypedList<'s, T>;
+
     #[inline]
     fn get(&self, index: usize) -> Option<T::TypeRef<'s, Self::Config>> {
         if index >= self.len() {
@@ -195,7 +236,9 @@ pub trait TypedListRef<'s, T: NBT>:
             return None;
         }
 
-        unsafe { Self::Config::read::<T>(Self::Config::typed_list_get::<T>(self, index)) }
+        unsafe {
+            Self::Config::read::<T>(Self::Config::typed_list_get::<T>(self._transform(), index))
+        }
     }
 
     fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'s, T>;
@@ -212,11 +255,14 @@ pub trait CompoundRef<'s>:
     > + Clone
     + Default
 {
-    type Config: ConfigRef<Compound<'s> = Self>;
+    type Config: ConfigRef;
+
+    fn _transform(&self) -> &<Self::Config as ConfigRef>::Compound<'s>;
+
     #[inline]
     fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'s>> {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self, key)?;
+            let (tag_id, params) = Self::Config::compound_get(self._transform(), key)?;
             Some(Self::Config::read_value(tag_id, params))
         }
     }
@@ -224,7 +270,7 @@ pub trait CompoundRef<'s>:
     #[inline]
     fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::Config>> {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self, key)?;
+            let (tag_id, params) = Self::Config::compound_get(self._transform(), key)?;
             if tag_id != T::TAG_ID {
                 cold_path();
                 return None;
