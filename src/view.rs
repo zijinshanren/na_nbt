@@ -85,6 +85,21 @@ impl<'a, T> MutVec<'a, T> {
         }
     }
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    #[inline]
+    pub unsafe fn from_own(own: &'a mut OwnVec<T>) -> Self {
+        MutVec {
+            ptr: &mut own.ptr,
+            len: &mut own.len,
+            cap: &mut own.cap,
+            _marker: PhantomData,
+        }
+    }
+
     // ============ Basic accessors ============
 
     /// Returns the number of elements in the vector.

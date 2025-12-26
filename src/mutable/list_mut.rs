@@ -4,8 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ConfigMut, GenericNBT, IntoNBT, ListBase, ListMut, MutTypedList, MutValue, MutVec,
-    MutableConfig, NBT, NBTBase, OwnValue, RefListIter, RefValue, TagID, cold_path,
-    mutable_tag_size,
+    MutableConfig, NBT, OwnValue, RefListIter, RefValue, TagID, cold_path, mutable_tag_size,
 };
 
 pub struct MutList<'s, O: ByteOrder> {

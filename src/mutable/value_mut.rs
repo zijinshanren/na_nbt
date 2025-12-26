@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, MapMut, MutCompound, MutList, MutString, MutTypedList, MutVec, MutableConfig, NBT,
-    TagID, ValueBase, ValueMut, VisitMut, VisitMutShared,
+    ByteOrder, GenericNBT, Index, MapMut, MutCompound, MutList, MutString, MutTypedList, MutVec,
+    MutableConfig, NBT, RefValue, TagID, ValueBase, ValueMut, VisitMut, VisitMutShared,
 };
 
 pub enum MutValue<'s, O: ByteOrder> {
@@ -41,6 +41,37 @@ impl<'s, O: ByteOrder> MutValue<'s, O> {
             MutValue::IntArray(_) => TagID::IntArray,
             MutValue::LongArray(_) => TagID::LongArray,
         }
+    }
+
+    #[inline]
+    pub fn is_<T: NBT>(&self) -> bool {
+        ValueBase::is_::<T>(self)
+    }
+
+    #[inline]
+    pub fn get<'a>(&'a self, index: impl Index) -> Option<RefValue<'a, O>> {
+        ValueMut::get(self, index)
+    }
+
+    #[inline]
+    pub fn get_<'a, T: GenericNBT>(
+        &'a self,
+        index: impl Index,
+    ) -> Option<T::TypeRef<'a, MutableConfig<O>>> {
+        ValueMut::get_::<T>(self, index)
+    }
+
+    #[inline]
+    pub fn get_mut<'a>(&'a mut self, index: impl Index) -> Option<MutValue<'a, O>> {
+        ValueMut::get_mut(self, index)
+    }
+
+    #[inline]
+    pub fn get_mut_<'a, T: GenericNBT>(
+        &'a mut self,
+        index: impl Index,
+    ) -> Option<T::TypeMut<'a, MutableConfig<O>>> {
+        ValueMut::get_mut_::<T>(self, index)
     }
 }
 

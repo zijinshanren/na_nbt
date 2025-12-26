@@ -122,6 +122,7 @@ mod private {
 
 pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'static {
     const TAG_ID: TagID;
+    type Element: NBT;
     type TypeRef<'a, Config: ConfigRef>: Clone;
     type TypeMut<'a, Config: ConfigMut>;
     type Type<O: ByteOrder>: Default;

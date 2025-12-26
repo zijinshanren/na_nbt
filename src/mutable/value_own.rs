@@ -1,9 +1,10 @@
-use std::{marker::PhantomData, ptr};
+use std::{marker::PhantomData, mem::ManuallyDrop, ptr};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, NBT, NBTBase, OwnCompound, OwnList, OwnString, OwnTypedList, OwnVec, TagID,
+    ByteOrder, GenericNBT, Index, MutValue, MutableConfig, NBT, OwnCompound, OwnList, OwnString,
+    OwnTypedList, OwnVec, RefValue, TagID,
 };
 
 pub enum OwnValue<O: ByteOrder> {
@@ -29,29 +30,7 @@ impl<O: ByteOrder> Default for OwnValue<O> {
     }
 }
 
-// todo: impl Drop
-
 impl<O: ByteOrder> OwnValue<O> {
-    pub(crate) unsafe fn write(self, dst: *mut u8) {
-        unsafe {
-            match self {
-                OwnValue::End(value) => ptr::write(dst.cast(), value),
-                OwnValue::Byte(value) => ptr::write(dst.cast(), value),
-                OwnValue::Short(value) => ptr::write(dst.cast(), value),
-                OwnValue::Int(value) => ptr::write(dst.cast(), value),
-                OwnValue::Long(value) => ptr::write(dst.cast(), value),
-                OwnValue::Float(value) => ptr::write(dst.cast(), value),
-                OwnValue::Double(value) => ptr::write(dst.cast(), value),
-                OwnValue::ByteArray(value) => ptr::write(dst.cast(), value),
-                OwnValue::String(value) => ptr::write(dst.cast(), value),
-                OwnValue::List(value) => ptr::write(dst.cast(), value),
-                OwnValue::Compound(value) => ptr::write(dst.cast(), value),
-                OwnValue::IntArray(value) => ptr::write(dst.cast(), value),
-                OwnValue::LongArray(value) => ptr::write(dst.cast(), value),
-            };
-        }
-    }
-
     #[allow(clippy::unit_arg)]
     pub(crate) unsafe fn read(tag_id: TagID, src: *mut u8) -> Self {
         unsafe {
@@ -71,6 +50,98 @@ impl<O: ByteOrder> OwnValue<O> {
                 TagID::LongArray => OwnValue::LongArray(ptr::read(src.cast())),
             }
         }
+    }
+}
+
+impl<O: ByteOrder> OwnValue<O> {
+    #[inline]
+    pub fn tag_id(&self) -> TagID {
+        match self {
+            OwnValue::End(_) => TagID::End,
+            OwnValue::Byte(_) => TagID::Byte,
+            OwnValue::Short(_) => TagID::Short,
+            OwnValue::Int(_) => TagID::Int,
+            OwnValue::Long(_) => TagID::Long,
+            OwnValue::Float(_) => TagID::Float,
+            OwnValue::Double(_) => TagID::Double,
+            OwnValue::ByteArray(_) => TagID::ByteArray,
+            OwnValue::String(_) => TagID::String,
+            OwnValue::List(_) => TagID::List,
+            OwnValue::Compound(_) => TagID::Compound,
+            OwnValue::IntArray(_) => TagID::IntArray,
+            OwnValue::LongArray(_) => TagID::LongArray,
+        }
+    }
+
+    #[inline]
+    pub fn is_<T: NBT>(&self) -> bool {
+        self.tag_id() == T::TAG_ID
+    }
+
+    #[inline]
+    pub fn get<'a>(&'a self, index: impl Index) -> Option<RefValue<'a, O>> {
+        index.index_dispatch(
+            self,
+            |value, index| match value {
+                OwnValue::List(value) => value.get(index),
+                _ => None,
+            },
+            |value, key| match value {
+                OwnValue::Compound(value) => value.get(key),
+                _ => None,
+            },
+        )
+    }
+
+    #[inline]
+    pub fn get_<'a, T: GenericNBT>(
+        &'a self,
+        index: impl Index,
+    ) -> Option<T::TypeRef<'a, MutableConfig<O>>> {
+        index.index_dispatch(
+            self,
+            |value, index| match value {
+                OwnValue::List(value) => value.get_::<T>(index),
+                _ => None,
+            },
+            |value, key| match value {
+                OwnValue::Compound(value) => value.get_::<T>(key),
+                _ => None,
+            },
+        )
+    }
+
+    #[inline]
+    pub fn get_mut<'a>(&'a mut self, index: impl Index) -> Option<MutValue<'a, O>> {
+        index.index_dispatch_mut(
+            self,
+            |value, index| match value {
+                OwnValue::List(value) => value.get_mut(index),
+                _ => None,
+            },
+            |value, key| match value {
+                OwnValue::Compound(value) => value.get_mut(key),
+                _ => None,
+            },
+        )
+    }
+
+    #[inline]
+    pub fn get_mut_<'a, T: GenericNBT>(
+        &'a mut self,
+        index: impl Index,
+    ) -> Option<T::TypeMut<'a, MutableConfig<O>>> {
+        index.index_dispatch_mut(
+            self,
+            |value, index| match value {
+                OwnValue::List(value) => value.get_mut_::<T>(index),
+                _ => None,
+            },
+            |value, key| match value {
+                OwnValue::Compound(value) => value.get_mut_::<T>(key),
+                _ => None,
+            },
+        )
     }
 }
 
@@ -168,8 +239,9 @@ impl<O: ByteOrder> From<OwnVec<byteorder::I64<O>>> for OwnValue<O> {
 impl<O: ByteOrder, T: NBT> From<OwnTypedList<O, T>> for OwnValue<O> {
     #[inline]
     fn from(value: OwnTypedList<O, T>) -> Self {
+        let me = ManuallyDrop::new(value);
         OwnValue::List(OwnList {
-            data: value.data,
+            data: unsafe { ptr::read(&me.data) },
             _marker: PhantomData,
         })
     }

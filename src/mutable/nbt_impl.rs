@@ -4,34 +4,12 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, MutCompound, MutList, MutString, MutVec, MutableConfig, MutableGenericImpl,
-    MutableImpl, NBT, NBTBase, RefCompound, RefList, RefString, SIZE_USIZE,
+    MutableImpl, NBT, RefCompound, RefList, RefString, SIZE_USIZE,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
     },
 };
-
-pub(crate) unsafe fn list_decrease<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
-    unsafe {
-        ptr::write(
-            data.as_mut_ptr().add(1).cast(),
-            byteorder::U32::<O>::new(
-                byteorder::U32::<O>::from_bytes(*data.as_ptr().add(1).cast()).get() - 1,
-            ),
-        )
-    }
-}
-
-pub(crate) unsafe fn list_increase<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
-    unsafe {
-        let len = byteorder::U32::<O>::from_bytes(*data.as_ptr().add(1).cast()).get();
-        assert!(len < u32::MAX, "list length too long");
-        ptr::write(
-            data.as_mut_ptr().add(1).cast(),
-            byteorder::U32::<O>::new(len + 1),
-        )
-    }
-}
 
 impl MutableGenericImpl for End {
     #[inline]

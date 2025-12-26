@@ -6,8 +6,30 @@ use crate::{
     ByteOrder, ConfigMut, ConfigRef, GenericNBT, MutCompound, MutCompoundIter, MutList,
     MutListIter, MutTypedList, MutTypedListIter, MutValue, MutVec, NBT, NBTBase, OwnList, OwnValue,
     RefCompound, RefCompoundIter, RefList, RefListIter, RefString, RefTypedList, RefTypedListIter,
-    RefValue, TagID, cold_path, list_decrease, list_increase, mutable_tag_size, tag::List,
+    RefValue, TagID, cold_path, mutable_tag_size, tag::List,
 };
+
+unsafe fn list_decrease<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
+    unsafe {
+        ptr::write(
+            data.as_mut_ptr().add(1).cast(),
+            byteorder::U32::<O>::new(
+                byteorder::U32::<O>::from_bytes(*data.as_ptr().add(1).cast()).get() - 1,
+            ),
+        )
+    }
+}
+
+unsafe fn list_increase<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
+    unsafe {
+        let len = byteorder::U32::<O>::from_bytes(*data.as_ptr().add(1).cast()).get();
+        assert!(len < u32::MAX, "list length too long");
+        ptr::write(
+            data.as_mut_ptr().add(1).cast(),
+            byteorder::U32::<O>::new(len + 1),
+        )
+    }
+}
 
 #[derive(Clone)]
 pub struct MutableConfig<O: ByteOrder> {
@@ -131,17 +153,18 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
             |mut params| unsafe {
                 let tag_size = mutable_tag_size(T::TAG_ID);
                 let len_bytes = params.len();
-                let value = todo!();
-                // let value = ptr::read(
-                //     params
-                //         .as_mut_ptr()
-                //         .add(len_bytes - tag_size)
-                //         .cast::<OwnList<O>>(),
-                // )
-                // .typed_()?;
+                let value = ptr::read(
+                    params
+                        .as_mut_ptr()
+                        .add(len_bytes - tag_size)
+                        .cast::<OwnList<O>>(),
+                )
+                .typed_::<T::Element>()?;
                 params.set_len(len_bytes - tag_size);
                 list_decrease::<O>(&mut params);
-                Some(value)
+                let result = ptr::read(&value as *const _ as *const _);
+                std::mem::forget(value);
+                Some(result)
             },
         )
     }
@@ -189,14 +212,15 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
                 let tag_size = mutable_tag_size(T::TAG_ID);
                 let pos_bytes = index * tag_size + 1 + 4;
                 let len_bytes = params.len();
-                let value = todo!();
-                // let value =
-                // ptr::read(params.as_mut_ptr().add(pos_bytes).cast::<OwnList<O>>()).typed_()?;
+                let value = ptr::read(params.as_mut_ptr().add(pos_bytes).cast::<OwnList<O>>())
+                    .typed_::<T::Element>()?;
                 let start = params.as_mut_ptr().add(pos_bytes);
                 ptr::copy(start.add(tag_size), start, len_bytes - pos_bytes - tag_size);
                 params.set_len(len_bytes - tag_size);
                 list_decrease::<O>(&mut params);
-                Some(value)
+                let result = ptr::read(&value as *const _ as *const _);
+                std::mem::forget(value);
+                Some(result)
             },
         )
     }
