@@ -1,14 +1,14 @@
 use std::marker::PhantomData;
 
-use crate::{ByteOrder, NBTBase, OwnVec};
+use crate::{ByteOrder, NBT, OwnVec};
 
 #[repr(transparent)]
-pub struct OwnedTypedList<T: NBTBase, O: ByteOrder> {
-    data: OwnVec<u8>,
+pub struct OwnTypedList<O: ByteOrder, T: NBT> {
+    pub(crate) data: OwnVec<u8>,
     _marker: PhantomData<(O, T)>,
 }
 
-impl<T: NBTBase, O: ByteOrder> Default for OwnedTypedList<T, O> {
+impl<O: ByteOrder, T: NBT> Default for OwnTypedList<O, T> {
     fn default() -> Self {
         Self {
             data: Default::default(),

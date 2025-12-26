@@ -4,8 +4,8 @@ use crate::{ByteOrder, OwnVec};
 
 #[repr(transparent)]
 pub struct OwnList<O: ByteOrder> {
-    data: OwnVec<u8>,
-    _marker: PhantomData<O>,
+    pub(crate) data: OwnVec<u8>,
+    pub(crate) _marker: PhantomData<O>,
 }
 
 impl<O: ByteOrder> Default for OwnList<O> {

@@ -73,7 +73,7 @@ impl<'s, O: ByteOrder> MutList<'s, O> {
     }
 
     #[inline]
-    pub fn push<V: IntoNBT<O>>(&mut self, value: V) -> Option<<V::Tag as NBTBase>::Type<O>> {
+    pub fn push<V: IntoNBT<O>>(&mut self, value: V) {
         ListMut::push(self, value)
     }
 
@@ -88,11 +88,7 @@ impl<'s, O: ByteOrder> MutList<'s, O> {
     }
 
     #[inline]
-    pub fn insert<V: IntoNBT<O>>(
-        &mut self,
-        index: usize,
-        value: V,
-    ) -> Option<<V::Tag as NBTBase>::Type<O>> {
+    pub fn insert<V: IntoNBT<O>>(&mut self, index: usize, value: V) {
         ListMut::insert(self, index, value)
     }
 
@@ -153,6 +149,13 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
         's: 'a,
     {
         unsafe { self.data.as_ptr().add(1 + 4) }
+    }
+
+    fn _to_write_params<'a>(&'a mut self) -> <Self::Config as ConfigMut>::WriteParams<'a>
+    where
+        's: 'a,
+    {
+        unsafe { self.data.new_clone() }
     }
 
     #[inline]

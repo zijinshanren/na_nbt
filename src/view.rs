@@ -70,6 +70,21 @@ impl<'a, T> MutVec<'a, T> {
         result
     }
 
+    /// Returns the new clone of this [`MutVec<T>`].
+    ///
+    /// # Safety
+    ///
+    /// .
+    #[inline]
+    pub unsafe fn new_clone(&mut self) -> Self {
+        MutVec {
+            ptr: unsafe { &mut *(self.ptr as *mut _) },
+            len: unsafe { &mut *(self.len as *mut _) },
+            cap: unsafe { &mut *(self.cap as *mut _) },
+            _marker: PhantomData,
+        }
+    }
+
     // ============ Basic accessors ============
 
     /// Returns the number of elements in the vector.

@@ -24,6 +24,7 @@ pub use into_nbt::*;
 pub use list_mut::*;
 pub use list_own::*;
 pub use list_ref::*;
+pub use nbt_impl::*;
 pub use size::*;
 pub use string_ref::*;
 pub use typed_list_mut::*;

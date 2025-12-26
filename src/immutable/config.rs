@@ -41,12 +41,11 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
 
     unsafe fn compound_get<'a, 'doc>(
         params: Self::ReadParams<'a>,
-        key: &str,
+        key: &[u8],
     ) -> Option<(crate::TagID, Self::ReadParams<'a>)>
     where
         'doc: 'a,
     {
-        let name = simd_cesu8::mutf8::encode(key);
         unsafe {
             let mut ptr = params.0;
             let mut mark = params.1;
@@ -65,7 +64,7 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
                 let name_bytes = core::slice::from_raw_parts(ptr, name_len as usize);
                 ptr = ptr.add(name_len as usize);
 
-                if name == name_bytes {
+                if key == name_bytes {
                     return Some((tag_id, (ptr, mark, params.2)));
                 }
 

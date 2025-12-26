@@ -270,7 +270,8 @@ pub trait CompoundRef<'s>:
     #[inline]
     fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'s>> {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
+            let key = simd_cesu8::mutf8::encode(key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
             Some(Self::Config::read_value(tag_id, params))
         }
     }
@@ -278,7 +279,8 @@ pub trait CompoundRef<'s>:
     #[inline]
     fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::Config>> {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
+            let key = simd_cesu8::mutf8::encode(key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
             if tag_id != T::TAG_ID {
                 cold_path();
                 return None;

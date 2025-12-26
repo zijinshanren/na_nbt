@@ -11,7 +11,7 @@ pub const SIZE_DYN: usize = SIZE_USIZE * 3;
 ///
 /// .
 #[inline]
-pub const unsafe fn mutable_tag_size(tag_id: TagID) -> usize {
+pub const fn mutable_tag_size(tag_id: TagID) -> usize {
     const TAG_SIZES: [usize; 13] = [
         0, 1, 2, 4, 8, 4, 8, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN, SIZE_DYN,
     ];

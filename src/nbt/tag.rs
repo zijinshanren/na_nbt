@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ConfigMut, ConfigRef, MutString, MutVec, NBT, NBTBase, OwnCompound, OwnList,
-    OwnString, OwnVec, OwnedTypedList, PrimitiveNBTBase, TagID,
+    OwnString, OwnTypedList, OwnVec, PrimitiveNBTBase, TagID,
 };
 
 macro_rules! define_primary_tag {
@@ -119,7 +119,7 @@ impl<T: NBT> NBTBase for TypedList<T> {
     const TAG_ID: TagID = TagID::List;
     type TypeRef<'a, Config: ConfigRef> = Config::TypedList<'a, T>;
     type TypeMut<'a, Config: ConfigMut> = Config::TypedListMut<'a, T>;
-    type Type<O: ByteOrder> = OwnedTypedList<T, O>;
+    type Type<O: ByteOrder> = OwnTypedList<O, T>;
 }
 
 macro_rules! primitive_tag {

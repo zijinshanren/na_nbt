@@ -59,22 +59,8 @@ impl<'s, O: ByteOrder> MutCompound<'s, O> {
     }
 
     #[inline]
-    pub fn insert_<T: GenericNBT>(
-        &mut self,
-        key: &str,
-        value: impl IntoNBT<O, Tag = T>,
-    ) -> Option<T::Type<O>> {
-        CompoundMut::insert_::<T>(self, key, value)
-    }
-
-    #[inline]
     pub fn remove(&mut self, key: &str) -> Option<OwnValue<O>> {
         CompoundMut::remove(self, key)
-    }
-
-    #[inline]
-    pub fn remove_<T: GenericNBT>(&mut self, key: &str) -> Option<T::Type<O>> {
-        CompoundMut::remove_::<T>(self, key)
     }
 
     #[inline]
@@ -105,6 +91,14 @@ impl<'s, O: ByteOrder> CompoundMut<'s> for MutCompound<'s, O> {
         's: 'a,
     {
         self.data.as_ptr()
+    }
+
+    #[inline]
+    fn _to_write_params<'a>(&'a mut self) -> <Self::Config as ConfigMut>::WriteParams<'a>
+    where
+        's: 'a,
+    {
+        unsafe { self.data.new_clone() }
     }
 
     #[inline]

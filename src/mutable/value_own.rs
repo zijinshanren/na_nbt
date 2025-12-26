@@ -1,8 +1,10 @@
-use std::ptr;
+use std::{marker::PhantomData, ptr};
 
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, NBTBase, OwnCompound, OwnList, OwnString, OwnVec, TagID};
+use crate::{
+    ByteOrder, NBT, NBTBase, OwnCompound, OwnList, OwnString, OwnTypedList, OwnVec, TagID,
+};
 
 pub enum OwnValue<O: ByteOrder> {
     End(()),
@@ -27,45 +29,148 @@ impl<O: ByteOrder> Default for OwnValue<O> {
     }
 }
 
-// impl<O: ByteOrder> OwnedValue<O> {
-//     unsafe fn write(self, dst: *mut u8) {
-//         unsafe {
-//             match self {
-//                 OwnedValue::End(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::Byte(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::Short(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::Int(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::Long(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::Float(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::Double(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::ByteArray(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::String(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::List(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::Compound(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::IntArray(value) => ptr::write(dst.cast(), value),
-//                 OwnedValue::LongArray(value) => ptr::write(dst.cast(), value),
-//             };
-//         }
-//     }
+// todo: impl Drop
 
-//     #[allow(clippy::unit_arg)]
-//     unsafe fn read(tag_id: TagID, src: *mut u8) -> Self {
-//         unsafe {
-//             match tag_id {
-//                 TagID::End => OwnedValue::End(ptr::read(src.cast())),
-//                 TagID::Byte => OwnedValue::Byte(ptr::read(src.cast())),
-//                 TagID::Short => OwnedValue::Short(ptr::read(src.cast())),
-//                 TagID::Int => OwnedValue::Int(ptr::read(src.cast())),
-//                 TagID::Long => OwnedValue::Long(ptr::read(src.cast())),
-//                 TagID::Float => OwnedValue::Float(ptr::read(src.cast())),
-//                 TagID::Double => OwnedValue::Double(ptr::read(src.cast())),
-//                 TagID::ByteArray => OwnedValue::ByteArray(ptr::read(src.cast())),
-//                 TagID::String => OwnedValue::String(ptr::read(src.cast())),
-//                 TagID::List => OwnedValue::List(ptr::read(src.cast())),
-//                 TagID::Compound => OwnedValue::Compound(ptr::read(src.cast())),
-//                 TagID::IntArray => OwnedValue::IntArray(ptr::read(src.cast())),
-//                 TagID::LongArray => OwnedValue::LongArray(ptr::read(src.cast())),
-//             }
-//         }
-//     }
-// }
+impl<O: ByteOrder> OwnValue<O> {
+    pub(crate) unsafe fn write(self, dst: *mut u8) {
+        unsafe {
+            match self {
+                OwnValue::End(value) => ptr::write(dst.cast(), value),
+                OwnValue::Byte(value) => ptr::write(dst.cast(), value),
+                OwnValue::Short(value) => ptr::write(dst.cast(), value),
+                OwnValue::Int(value) => ptr::write(dst.cast(), value),
+                OwnValue::Long(value) => ptr::write(dst.cast(), value),
+                OwnValue::Float(value) => ptr::write(dst.cast(), value),
+                OwnValue::Double(value) => ptr::write(dst.cast(), value),
+                OwnValue::ByteArray(value) => ptr::write(dst.cast(), value),
+                OwnValue::String(value) => ptr::write(dst.cast(), value),
+                OwnValue::List(value) => ptr::write(dst.cast(), value),
+                OwnValue::Compound(value) => ptr::write(dst.cast(), value),
+                OwnValue::IntArray(value) => ptr::write(dst.cast(), value),
+                OwnValue::LongArray(value) => ptr::write(dst.cast(), value),
+            };
+        }
+    }
+
+    #[allow(clippy::unit_arg)]
+    pub(crate) unsafe fn read(tag_id: TagID, src: *mut u8) -> Self {
+        unsafe {
+            match tag_id {
+                TagID::End => OwnValue::End(ptr::read(src.cast())),
+                TagID::Byte => OwnValue::Byte(ptr::read(src.cast())),
+                TagID::Short => OwnValue::Short(ptr::read(src.cast())),
+                TagID::Int => OwnValue::Int(ptr::read(src.cast())),
+                TagID::Long => OwnValue::Long(ptr::read(src.cast())),
+                TagID::Float => OwnValue::Float(ptr::read(src.cast())),
+                TagID::Double => OwnValue::Double(ptr::read(src.cast())),
+                TagID::ByteArray => OwnValue::ByteArray(ptr::read(src.cast())),
+                TagID::String => OwnValue::String(ptr::read(src.cast())),
+                TagID::List => OwnValue::List(ptr::read(src.cast())),
+                TagID::Compound => OwnValue::Compound(ptr::read(src.cast())),
+                TagID::IntArray => OwnValue::IntArray(ptr::read(src.cast())),
+                TagID::LongArray => OwnValue::LongArray(ptr::read(src.cast())),
+            }
+        }
+    }
+}
+
+impl<O: ByteOrder> From<()> for OwnValue<O> {
+    #[inline]
+    fn from(value: ()) -> Self {
+        OwnValue::End(value)
+    }
+}
+
+impl<O: ByteOrder> From<i8> for OwnValue<O> {
+    #[inline]
+    fn from(value: i8) -> Self {
+        OwnValue::Byte(value)
+    }
+}
+
+impl<O: ByteOrder> From<byteorder::I16<O>> for OwnValue<O> {
+    #[inline]
+    fn from(value: byteorder::I16<O>) -> Self {
+        OwnValue::Short(value)
+    }
+}
+
+impl<O: ByteOrder> From<byteorder::I32<O>> for OwnValue<O> {
+    #[inline]
+    fn from(value: byteorder::I32<O>) -> Self {
+        OwnValue::Int(value)
+    }
+}
+
+impl<O: ByteOrder> From<byteorder::I64<O>> for OwnValue<O> {
+    #[inline]
+    fn from(value: byteorder::I64<O>) -> Self {
+        OwnValue::Long(value)
+    }
+}
+
+impl<O: ByteOrder> From<byteorder::F32<O>> for OwnValue<O> {
+    #[inline]
+    fn from(value: byteorder::F32<O>) -> Self {
+        OwnValue::Float(value)
+    }
+}
+
+impl<O: ByteOrder> From<byteorder::F64<O>> for OwnValue<O> {
+    #[inline]
+    fn from(value: byteorder::F64<O>) -> Self {
+        OwnValue::Double(value)
+    }
+}
+
+impl<O: ByteOrder> From<OwnVec<i8>> for OwnValue<O> {
+    #[inline]
+    fn from(value: OwnVec<i8>) -> Self {
+        OwnValue::ByteArray(value)
+    }
+}
+
+impl<O: ByteOrder> From<OwnString> for OwnValue<O> {
+    #[inline]
+    fn from(value: OwnString) -> Self {
+        OwnValue::String(value)
+    }
+}
+
+impl<O: ByteOrder> From<OwnList<O>> for OwnValue<O> {
+    #[inline]
+    fn from(value: OwnList<O>) -> Self {
+        OwnValue::List(value)
+    }
+}
+
+impl<O: ByteOrder> From<OwnCompound<O>> for OwnValue<O> {
+    #[inline]
+    fn from(value: OwnCompound<O>) -> Self {
+        OwnValue::Compound(value)
+    }
+}
+
+impl<O: ByteOrder> From<OwnVec<byteorder::I32<O>>> for OwnValue<O> {
+    #[inline]
+    fn from(value: OwnVec<byteorder::I32<O>>) -> Self {
+        OwnValue::IntArray(value)
+    }
+}
+
+impl<O: ByteOrder> From<OwnVec<byteorder::I64<O>>> for OwnValue<O> {
+    #[inline]
+    fn from(value: OwnVec<byteorder::I64<O>>) -> Self {
+        OwnValue::LongArray(value)
+    }
+}
+
+impl<O: ByteOrder, T: NBT> From<OwnTypedList<O, T>> for OwnValue<O> {
+    #[inline]
+    fn from(value: OwnTypedList<O, T>) -> Self {
+        OwnValue::List(OwnList {
+            data: value.data,
+            _marker: PhantomData,
+        })
+    }
+}

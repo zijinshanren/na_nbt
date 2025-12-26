@@ -1,5 +1,5 @@
 use crate::{
-    CompoundMut, ConfigRef, GenericNBT, ListMut, NBT, TagID, TypedListMut, ValueMut,
+    CompoundMut, ConfigRef, GenericNBT, ListMut, NBT, OwnValue, TagID, TypedListMut, ValueMut,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -17,6 +17,8 @@ pub trait ConfigMut: ConfigRef {
     type CompoundMut<'doc>: CompoundMut<'doc, Config = Self>;
     type CompoundIterMut<'doc>: Iterator<Item = (Self::String<'doc>, Self::ValueMut<'doc>)>
         + Default;
+
+    type WriteParams<'a>: Sized;
 
     /// .
     ///
@@ -64,4 +66,64 @@ pub trait ConfigMut: ConfigRef {
             }
         }
     }
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// Will NOT check if the value is of the correct type.
+    unsafe fn list_push<'a, T: NBT>(params: Self::WriteParams<'a>, value: T::Type<Self::ByteOrder>);
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// Will NOT check bounds nor if the value is of the correct type.
+    /// But will NOT pop and return None if T is TypedList and the type of the elements is not TypedList<N>
+    unsafe fn list_pop<'a, T: GenericNBT>(
+        params: Self::WriteParams<'a>,
+    ) -> Option<T::Type<Self::ByteOrder>>;
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// Will NOT check bounds nor if the value is of the correct type.
+    unsafe fn list_insert<'a, T: NBT>(
+        params: Self::WriteParams<'a>,
+        index: usize,
+        value: T::Type<Self::ByteOrder>,
+    );
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// Will NOT check bounds nor if the value is of the correct type.
+    unsafe fn list_remove<'a, T: GenericNBT>(
+        params: Self::WriteParams<'a>,
+        index: usize,
+    ) -> Option<T::Type<Self::ByteOrder>>;
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// Will NOT check if the key is already in the compound.
+    /// NEED to call compound_remove first to check if the key is already in the compound.
+    unsafe fn compound_insert<'a, T: GenericNBT>(
+        params: Self::WriteParams<'a>,
+        key: &[u8],
+        value: T::Type<Self::ByteOrder>,
+    );
+
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
+    unsafe fn compound_remove<'a>(
+        params: Self::WriteParams<'a>,
+        key: &[u8],
+    ) -> Option<OwnValue<Self::ByteOrder>>;
 }

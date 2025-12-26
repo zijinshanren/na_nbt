@@ -140,6 +140,10 @@ pub trait ListMut<'s>:
     where
         's: 'a;
 
+    fn _to_write_params<'a>(&'a mut self) -> <Self::Config as ConfigMut>::WriteParams<'a>
+    where
+        's: 'a;
+
     #[inline]
     #[allow(clippy::unit_arg)]
     fn get<'a>(&'a self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'a>>
@@ -406,18 +410,72 @@ pub trait ListMut<'s>:
     fn push<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(
         &mut self,
         value: V,
-    ) -> Option<<V::Tag as NBTBase>::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+    ) {
+        if !(self.element_is_::<V::Tag>()) {
+            cold_path();
+            return;
+        }
+
+        unsafe { Self::Config::list_push::<V::Tag>(self._to_write_params(), value.into()) }
     }
 
     #[inline]
     fn pop(&mut self) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+        if self.is_empty() {
+            cold_path();
+            return None;
+        }
+
+        unsafe {
+            Some(match self.element_tag_id() {
+                TagID::End => From::from(Self::Config::list_pop::<End>(self._to_write_params())?),
+                TagID::Byte => From::from(Self::Config::list_pop::<Byte>(self._to_write_params())?),
+                TagID::Short => {
+                    From::from(Self::Config::list_pop::<Short>(self._to_write_params())?)
+                }
+                TagID::Int => From::from(Self::Config::list_pop::<Int>(self._to_write_params())?),
+                TagID::Long => From::from(Self::Config::list_pop::<Long>(self._to_write_params())?),
+                TagID::Float => {
+                    From::from(Self::Config::list_pop::<Float>(self._to_write_params())?)
+                }
+                TagID::Double => {
+                    From::from(Self::Config::list_pop::<Double>(self._to_write_params())?)
+                }
+                TagID::ByteArray => From::from(Self::Config::list_pop::<ByteArray>(
+                    self._to_write_params(),
+                )?),
+                TagID::String => {
+                    From::from(Self::Config::list_pop::<String>(self._to_write_params())?)
+                }
+                TagID::List => From::from(Self::Config::list_pop::<List>(self._to_write_params())?),
+                TagID::Compound => {
+                    From::from(Self::Config::list_pop::<Compound>(self._to_write_params())?)
+                }
+                TagID::IntArray => {
+                    From::from(Self::Config::list_pop::<IntArray>(self._to_write_params())?)
+                }
+                TagID::LongArray => From::from(Self::Config::list_pop::<LongArray>(
+                    self._to_write_params(),
+                )?),
+            })
+        }
     }
 
     #[inline]
     fn pop_<T: GenericNBT>(&mut self) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+        if self.is_empty() {
+            cold_path();
+            return None;
+        }
+
+        if self.element_tag_id() != <T>::TAG_ID
+        /* || (self.element_tag_id() == TagID::End && self.is_empty()) */
+        {
+            cold_path();
+            return None;
+        }
+
+        unsafe { Self::Config::list_pop::<T>(self._to_write_params()) }
     }
 
     #[inline]
@@ -425,13 +483,83 @@ pub trait ListMut<'s>:
         &mut self,
         index: usize,
         value: V,
-    ) -> Option<<V::Tag as NBTBase>::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+    ) {
+        if index >= self.len() {
+            cold_path();
+            return;
+        }
+
+        if !(self.element_is_::<V::Tag>()) {
+            cold_path();
+            return;
+        }
+
+        unsafe { Self::Config::list_insert::<V::Tag>(self._to_write_params(), index, value.into()) }
     }
 
     #[inline]
     fn remove(&mut self, index: usize) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+        if index >= self.len() {
+            cold_path();
+            return None;
+        }
+
+        unsafe {
+            Some(match self.element_tag_id() {
+                TagID::End => From::from(Self::Config::list_remove::<End>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::Byte => From::from(Self::Config::list_remove::<Byte>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::Short => From::from(Self::Config::list_remove::<Short>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::Int => From::from(Self::Config::list_remove::<Int>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::Long => From::from(Self::Config::list_remove::<Long>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::Float => From::from(Self::Config::list_remove::<Float>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::Double => From::from(Self::Config::list_remove::<Double>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::ByteArray => From::from(Self::Config::list_remove::<ByteArray>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::String => From::from(Self::Config::list_remove::<String>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::List => From::from(Self::Config::list_remove::<List>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::Compound => From::from(Self::Config::list_remove::<Compound>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::IntArray => From::from(Self::Config::list_remove::<IntArray>(
+                    self._to_write_params(),
+                    index,
+                )?),
+                TagID::LongArray => From::from(Self::Config::list_remove::<LongArray>(
+                    self._to_write_params(),
+                    index,
+                )?),
+            })
+        }
     }
 
     #[inline]
@@ -439,7 +567,19 @@ pub trait ListMut<'s>:
         &mut self,
         index: usize,
     ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+        if index >= self.len() {
+            cold_path();
+            return None;
+        }
+
+        if self.element_tag_id() != <T>::TAG_ID
+        /* || (self.element_tag_id() == TagID::End && self.is_empty()) */
+        {
+            cold_path();
+            return None;
+        }
+
+        unsafe { Self::Config::list_remove::<T>(self._to_write_params(), index) }
     }
 
     fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigMut>::TypedListMut<'s, T>>;
@@ -463,6 +603,10 @@ pub trait TypedListMut<'s, T: NBT>:
     type Config: ConfigMut;
 
     fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
+    where
+        's: 'a;
+
+    fn _to_write_params<'a>(&'a mut self) -> <Self::Config as ConfigMut>::WriteParams<'a>
     where
         's: 'a;
 
@@ -500,13 +644,18 @@ pub trait TypedListMut<'s, T: NBT>:
     fn push(
         &mut self,
         value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+    ) {
+        unsafe { Self::Config::list_push::<T>(self._to_write_params(), value.into()) }
     }
 
     #[inline]
     fn pop(&mut self) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+        if self.is_empty() {
+            cold_path();
+            return None;
+        }
+
+        unsafe { Self::Config::list_pop::<T>(self._to_write_params()) }
     }
 
     #[inline]
@@ -514,13 +663,23 @@ pub trait TypedListMut<'s, T: NBT>:
         &mut self,
         index: usize,
         value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+    ) {
+        if index >= self.len() {
+            cold_path();
+            return;
+        }
+
+        unsafe { Self::Config::list_insert::<T>(self._to_write_params(), index, value.into()) }
     }
 
     #[inline]
     fn remove(&mut self, index: usize) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+        if index >= self.len() {
+            cold_path();
+            return None;
+        }
+
+        unsafe { Self::Config::list_remove::<T>(self._to_write_params(), index) }
     }
 
     fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::TypedListIter<'a, T>
@@ -548,13 +707,18 @@ pub trait CompoundMut<'s>:
     where
         's: 'a;
 
+    fn _to_write_params<'a>(&'a mut self) -> <Self::Config as ConfigMut>::WriteParams<'a>
+    where
+        's: 'a;
+
     #[inline]
     fn get<'a>(&'a self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'a>>
     where
         's: 'a,
     {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
+            let key = simd_cesu8::mutf8::encode(key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
             Some(Self::Config::read_value(tag_id, params))
         }
     }
@@ -565,7 +729,8 @@ pub trait CompoundMut<'s>:
         's: 'a,
     {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
+            let key = simd_cesu8::mutf8::encode(key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
             if tag_id != T::TAG_ID {
                 cold_path();
                 return None;
@@ -580,7 +745,8 @@ pub trait CompoundMut<'s>:
         's: 'a,
     {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
+            let key = simd_cesu8::mutf8::encode(key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
             Some(Self::Config::read_value_mut(tag_id, params))
         }
     }
@@ -591,7 +757,8 @@ pub trait CompoundMut<'s>:
         's: 'a,
     {
         unsafe {
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
+            let key = simd_cesu8::mutf8::encode(key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
             if tag_id != T::TAG_ID {
                 cold_path();
                 return None;
@@ -601,33 +768,25 @@ pub trait CompoundMut<'s>:
     }
 
     #[inline]
-    fn insert(
-        &mut self,
-        key: &str,
-        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder>,
-    ) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
-    }
-
-    #[inline]
-    fn insert_<T: GenericNBT>(
+    fn insert<T: NBT>(
         &mut self,
         key: &str,
         value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+    ) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
+        unsafe {
+            let key = simd_cesu8::mutf8::encode(key);
+            let old = Self::Config::compound_remove(self._to_write_params(), &key);
+            Self::Config::compound_insert::<T>(self._to_write_params(), &key, value.into());
+            old
+        }
     }
 
     #[inline]
     fn remove(&mut self, key: &str) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
-    }
-
-    fn remove_<T: GenericNBT>(
-        &mut self,
-        key: &str,
-    ) -> Option<T::Type<<Self::Config as ConfigRef>::ByteOrder>> {
-        todo!()
+        unsafe {
+            let key = simd_cesu8::mutf8::encode(key);
+            Self::Config::compound_remove(self._to_write_params(), &key)
+        }
     }
 
     fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::CompoundIter<'a>

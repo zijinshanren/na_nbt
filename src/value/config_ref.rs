@@ -50,7 +50,7 @@ pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     /// .
     unsafe fn compound_get<'a, 'doc>(
         value: Self::ReadParams<'a>,
-        key: &str,
+        key: &[u8],
     ) -> Option<(TagID, Self::ReadParams<'a>)>
     where
         'doc: 'a;
