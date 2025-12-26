@@ -1,6 +1,6 @@
 use crate::{
     CompoundBase, ConfigMut, ConfigRef, GenericNBT, Index, IntoNBT, ListBase, MapMut, NBT, NBTBase,
-    OwnValue, TagID, TypedListBase, ValueBase, VisitMut, cold_path,
+    OwnValue, TagID, TypedListBase, ValueBase, VisitMut, VisitMutShared, cold_path,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -43,7 +43,7 @@ pub trait ValueMut<'s>:
     where
         's: 'a,
     {
-        todo!()
+        T::mut_shared_(self)
     }
 
     #[inline]
@@ -112,6 +112,13 @@ pub trait ValueMut<'s>:
             |value, key| value.mut_::<Compound>()?.get_mut_::<T>(key),
         )
     }
+
+    fn visit_shared<'a, R>(
+        &'a self,
+        match_fn: impl FnOnce(VisitMutShared<'a, 's, Self::Config>) -> R,
+    ) -> R
+    where
+        's: 'a;
 
     fn visit<'a, R>(&'a mut self, match_fn: impl FnOnce(VisitMut<'a, 's, Self::Config>) -> R) -> R
     where

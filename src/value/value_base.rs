@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crate::{
     ByteOrder, ListMut, ListRef, MapMut, MapRef, NBT, NBTBase, Result, TagID, ValueMut, ValueRef,
-    VisitMut, VisitRef,
+    VisitMut, VisitMutShared, VisitRef,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -66,6 +66,10 @@ pub trait NBTRef: NBTBase {
     fn mut_<'a, 's: 'a, V: ValueMut<'s>>(
         value: &'a mut V,
     ) -> Option<&'a mut Self::TypeMut<'s, V::Config>>;
+
+    fn mut_shared_<'a, 's: 'a, V: ValueMut<'s>>(
+        value: &'a V,
+    ) -> Option<&'a Self::TypeMut<'s, V::Config>>;
 }
 
 macro_rules! impl_value_ref_dispatch {
@@ -105,6 +109,14 @@ macro_rules! impl_value_ref_dispatch {
                         _ => None,
                     })
                 }
+
+                #[inline]
+                fn mut_shared_<'a, 's: 'a, V: ValueMut<'s>>(value: &'a V) -> Option<&'a Self::TypeMut<'s, V::Config>> {
+                    value.visit_shared(|value| match value {
+                        VisitMutShared::$t(v) => Some(v),
+                        _ => None,
+                    })
+                }
             }
         )*
     };
@@ -116,6 +128,7 @@ impl_value_ref_dispatch!(
 );
 
 impl<T: NBT> NBTInto for TypedList<T> {
+    #[inline]
     fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::Config>> {
         value.map(|value| match value {
             MapRef::List(v) => v.typed_::<T>(),
@@ -123,6 +136,7 @@ impl<T: NBT> NBTInto for TypedList<T> {
         })
     }
 
+    #[inline]
     fn mut_into_<'s, V: ValueMut<'s>>(value: V) -> Option<Self::TypeMut<'s, V::Config>> {
         value.map(|value| match value {
             MapMut::List(v) => v.typed_::<T>(),

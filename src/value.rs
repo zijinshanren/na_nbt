@@ -47,6 +47,22 @@ pub enum MapRef<'s, C: ConfigRef> {
     LongArray(C::LongArray<'s>),
 }
 
+pub enum VisitMutShared<'a, 's: 'a, C: ConfigMut> {
+    End(&'a &'s mut ()),
+    Byte(&'a &'s mut i8),
+    Short(&'a &'s mut byteorder::I16<C::ByteOrder>),
+    Int(&'a &'s mut byteorder::I32<C::ByteOrder>),
+    Long(&'a &'s mut byteorder::I64<C::ByteOrder>),
+    Float(&'a &'s mut byteorder::F32<C::ByteOrder>),
+    Double(&'a &'s mut byteorder::F64<C::ByteOrder>),
+    ByteArray(&'a MutVec<'s, i8>),
+    String(&'a MutString<'s>),
+    List(&'a C::ListMut<'s>),
+    Compound(&'a C::CompoundMut<'s>),
+    IntArray(&'a MutVec<'s, byteorder::I32<C::ByteOrder>>),
+    LongArray(&'a MutVec<'s, byteorder::I64<C::ByteOrder>>),
+}
+
 pub enum VisitMut<'a, 's: 'a, C: ConfigMut> {
     End(&'a mut &'s mut ()),
     Byte(&'a mut &'s mut i8),

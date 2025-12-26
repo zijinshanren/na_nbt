@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, MapMut, MutCompound, MutList, MutString, MutTypedList, MutVec, MutableConfig, NBT,
-    TagID, ValueBase, ValueMut, VisitMut,
+    TagID, ValueBase, ValueMut, VisitMut, VisitMutShared,
 };
 
 pub enum MutValue<'s, O: ByteOrder> {
@@ -53,6 +53,30 @@ impl<'s, O: ByteOrder> ValueBase for MutValue<'s, O> {
 
 impl<'s, O: ByteOrder> ValueMut<'s> for MutValue<'s, O> {
     type Config = MutableConfig<O>;
+
+    fn visit_shared<'a, R>(
+        &'a self,
+        match_fn: impl FnOnce(VisitMutShared<'a, 's, Self::Config>) -> R,
+    ) -> R
+    where
+        's: 'a,
+    {
+        match self {
+            MutValue::End(value) => match_fn(VisitMutShared::End(value)),
+            MutValue::Byte(value) => match_fn(VisitMutShared::Byte(value)),
+            MutValue::Short(value) => match_fn(VisitMutShared::Short(value)),
+            MutValue::Int(value) => match_fn(VisitMutShared::Int(value)),
+            MutValue::Long(value) => match_fn(VisitMutShared::Long(value)),
+            MutValue::Float(value) => match_fn(VisitMutShared::Float(value)),
+            MutValue::Double(value) => match_fn(VisitMutShared::Double(value)),
+            MutValue::ByteArray(value) => match_fn(VisitMutShared::ByteArray(value)),
+            MutValue::String(value) => match_fn(VisitMutShared::String(value)),
+            MutValue::List(value) => match_fn(VisitMutShared::List(value)),
+            MutValue::Compound(value) => match_fn(VisitMutShared::Compound(value)),
+            MutValue::IntArray(value) => match_fn(VisitMutShared::IntArray(value)),
+            MutValue::LongArray(value) => match_fn(VisitMutShared::LongArray(value)),
+        }
+    }
 
     fn visit<'a, R>(&'a mut self, match_fn: impl FnOnce(VisitMut<'a, 's, Self::Config>) -> R) -> R
     where
