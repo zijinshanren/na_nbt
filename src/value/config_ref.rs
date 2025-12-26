@@ -10,7 +10,6 @@ use crate::{
     },
 };
 
-// todo: ConfigBase with logic provider ( can be unimplemented )
 pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     type ByteOrder: ByteOrder;
     type Value<'doc>: ValueRef<'doc, Config = Self>;
@@ -32,22 +31,25 @@ pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
 
     type ReadParams<'a>: Sized;
 
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     unsafe fn list_get<'a, 'doc, T: GenericNBT>(
-        value: &'a Self::List<'doc>,
+        value: Self::ReadParams<'a>,
         index: usize,
     ) -> Self::ReadParams<'a>
     where
         'doc: 'a;
 
-    unsafe fn typed_list_get<'a, 'doc, T: NBT>(
-        value: &'a Self::TypedList<'doc, T>,
-        index: usize,
-    ) -> Self::ReadParams<'a>
-    where
-        'doc: 'a;
-
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// .
     unsafe fn compound_get<'a, 'doc>(
-        value: &'a Self::Compound<'doc>,
+        value: Self::ReadParams<'a>,
         key: &str,
     ) -> Option<(TagID, Self::ReadParams<'a>)>
     where

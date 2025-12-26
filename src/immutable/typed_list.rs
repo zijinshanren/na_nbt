@@ -88,8 +88,15 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListRef<'doc, T>
 {
     type Config = ImmutableConfig<O, D>;
 
-    fn _transform(&self) -> &<Self::Config as ConfigRef>::TypedList<'doc, T> {
-        self
+    fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
+    where
+        'doc: 'a,
+    {
+        (
+            unsafe { self.data.as_ptr().add(1 + 4) },
+            self.mark,
+            &self.doc,
+        )
     }
 
     #[inline]

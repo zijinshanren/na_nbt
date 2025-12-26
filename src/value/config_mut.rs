@@ -9,40 +9,14 @@ use crate::{
 pub trait ConfigMut: ConfigRef {
     type ValueMut<'doc>: ValueMut<'doc, Config = Self>;
     type ListMut<'doc>: ListMut<'doc, Config = Self>;
-    type ListIterMut<'doc>: Iterator<Item = Self::ValueMut<'doc>>
-        + ExactSizeIterator
-        + Clone
-        + Default;
+    type ListIterMut<'doc>: Iterator<Item = Self::ValueMut<'doc>> + ExactSizeIterator + Default;
     type TypedListMut<'doc, T: NBT>: TypedListMut<'doc, T, Config = Self>;
     type TypedListIterMut<'doc, T: NBT>: Iterator<Item = T::TypeMut<'doc, Self>>
         + ExactSizeIterator
-        + Clone
         + Default;
     type CompoundMut<'doc>: CompoundMut<'doc, Config = Self>;
     type CompoundIterMut<'doc>: Iterator<Item = (Self::String<'doc>, Self::ValueMut<'doc>)>
-        + Clone
         + Default;
-
-    unsafe fn list_get_mut<'a, 'doc, T: GenericNBT>(
-        value: &'a Self::ListMut<'doc>,
-        index: usize,
-    ) -> Self::ReadParams<'a>
-    where
-        'doc: 'a;
-
-    unsafe fn typed_list_get_mut<'a, 'doc, T: NBT>(
-        value: &'a Self::TypedListMut<'doc, T>,
-        index: usize,
-    ) -> Self::ReadParams<'a>
-    where
-        'doc: 'a;
-
-    unsafe fn compound_get_mut<'a, 'doc>(
-        value: &'a Self::CompoundMut<'doc>,
-        key: &str,
-    ) -> Option<(TagID, Self::ReadParams<'a>)>
-    where
-        'doc: 'a;
 
     /// .
     ///

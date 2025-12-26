@@ -30,37 +30,17 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
     type ReadParams<'a> = (*const u8, *const Mark, &'a D);
 
     unsafe fn list_get<'a, 'doc, T: GenericNBT>(
-        value: &'a Self::List<'doc>,
+        params: Self::ReadParams<'a>,
         index: usize,
     ) -> Self::ReadParams<'a>
     where
         'doc: 'a,
     {
-        unsafe {
-            T::list_get_immutable_impl::<O, D>(
-                (value.data.as_ptr().add(1 + 4), value.mark, &value.doc),
-                index,
-            )
-        }
-    }
-
-    unsafe fn typed_list_get<'a, 'doc, T: NBT>(
-        value: &'a Self::TypedList<'doc, T>,
-        index: usize,
-    ) -> Self::ReadParams<'a>
-    where
-        'doc: 'a,
-    {
-        unsafe {
-            T::list_get_immutable_impl::<O, D>(
-                (value.data.as_ptr().add(1 + 4), value.mark, &value.doc),
-                index,
-            )
-        }
+        unsafe { T::list_get_immutable_impl::<O, D>(params, index) }
     }
 
     unsafe fn compound_get<'a, 'doc>(
-        value: &'a Self::Compound<'doc>,
+        params: Self::ReadParams<'a>,
         key: &str,
     ) -> Option<(crate::TagID, Self::ReadParams<'a>)>
     where
@@ -68,8 +48,8 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
     {
         let name = simd_cesu8::mutf8::encode(key);
         unsafe {
-            let mut ptr = value.data.as_ptr();
-            let mut mark = value.mark;
+            let mut ptr = params.0;
+            let mut mark = params.1;
             loop {
                 let tag_id = *ptr.cast();
                 ptr = ptr.add(1);
@@ -86,7 +66,7 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
                 ptr = ptr.add(name_len as usize);
 
                 if name == name_bytes {
-                    return Some((tag_id, (ptr, mark, &value.doc)));
+                    return Some((tag_id, (ptr, mark, params.2)));
                 }
 
                 let (data_advance, mark_advance) = ReadonlyValue::<O, D>::size(tag_id, ptr, mark);

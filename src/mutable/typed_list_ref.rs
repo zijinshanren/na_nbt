@@ -67,37 +67,34 @@ impl<'s, O: ByteOrder, T: NBT> RefTypedList<'s, O, T> {
 }
 
 impl<'s, O: ByteOrder, T: NBT> TypedListBase<T> for RefTypedList<'s, O, T> {
-    type ConfigRef = MutableConfig<O>;
-
     #[inline]
     fn len(&self) -> usize {
         self.len()
     }
-
-    fn typed_list_get_impl<'a>(
-        &'a self,
-        index: usize,
-    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a> {
-        unsafe {
-            self.data
-                .add(1 + 4)
-                .add(index * mutable_tag_size(T::TAG_ID))
-        }
-    }
 }
 
 impl<'s, O: ByteOrder, T: NBT> TypedListRef<'s, T> for RefTypedList<'s, O, T> {
+    type Config = MutableConfig<O>;
+
     #[inline]
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::TypedListIter<'s, T> {
+    fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
+    where
+        's: 'a,
+    {
+        unsafe { self.data.add(1 + 4) }
+    }
+
+    #[inline]
+    fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'s, T> {
         self.iter()
     }
 }
 
 #[derive(Clone)]
 pub struct RefTypedListIter<'s, O: ByteOrder, T: NBT> {
-    remaining: u32,
-    data: *const u8,
-    _marker: PhantomData<(&'s (), O, T)>,
+    pub(crate) remaining: u32,
+    pub(crate) data: *const u8,
+    pub(crate) _marker: PhantomData<(&'s (), O, T)>,
 }
 
 impl<'s, O: ByteOrder, T: NBT> Default for RefTypedListIter<'s, O, T> {
@@ -132,6 +129,7 @@ impl<'s, O: ByteOrder, T: NBT> Iterator for RefTypedListIter<'s, O, T> {
         value
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.remaining as usize;
         (remaining, Some(remaining))

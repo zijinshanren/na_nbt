@@ -5,6 +5,11 @@ use crate::TagID;
 pub const SIZE_USIZE: usize = std::mem::size_of::<usize>();
 pub const SIZE_DYN: usize = SIZE_USIZE * 3;
 
+/// .
+///
+/// # Safety
+///
+/// .
 #[inline]
 pub const unsafe fn mutable_tag_size(tag_id: TagID) -> usize {
     const TAG_SIZES: [usize; 13] = [

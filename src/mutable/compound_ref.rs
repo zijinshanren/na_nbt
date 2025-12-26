@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundRef, EMPTY_COMPOUND, MutableConfig, NBT, RefString, RefValue,
-    TagID, cold_path, mutable_tag_size,
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, EMPTY_COMPOUND, MutableConfig, NBT, RefString,
+    RefValue, TagID, cold_path, mutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -59,53 +59,29 @@ impl<'s, O: ByteOrder> RefCompound<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> CompoundBase<'s> for RefCompound<'s, O> {
-    type ConfigRef = MutableConfig<O>;
-
-    fn compound_get_impl<'a>(
-        &'a self,
-        key: &str,
-    ) -> Option<(TagID, <Self::ConfigRef as crate::ConfigRef>::ReadParams<'a>)> {
-        let name = simd_cesu8::mutf8::encode(key);
-
-        unsafe {
-            let mut ptr = self.data;
-            loop {
-                let tag_id = *ptr.cast();
-                ptr = ptr.add(1);
-
-                if tag_id == TagID::End {
-                    cold_path();
-                    return None;
-                }
-
-                let name_len = byteorder::U16::<O>::from_bytes(*ptr.cast()).get();
-                ptr = ptr.add(2);
-
-                let name_bytes = slice::from_raw_parts(ptr, name_len as usize);
-                ptr = ptr.add(name_len as usize);
-
-                if name == name_bytes {
-                    return Some((tag_id, ptr));
-                }
-
-                ptr = ptr.add(mutable_tag_size(tag_id));
-            }
-        }
-    }
-}
+impl<'s, O: ByteOrder> CompoundBase for RefCompound<'s, O> {}
 
 impl<'s, O: ByteOrder> CompoundRef<'s> for RefCompound<'s, O> {
+    type Config = MutableConfig<O>;
+
     #[inline]
-    fn iter(&self) -> <Self::ConfigRef as crate::ConfigRef>::CompoundIter<'s> {
+    fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
+    where
+        's: 'a,
+    {
+        self.data
+    }
+
+    #[inline]
+    fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'s> {
         self.iter()
     }
 }
 
 #[derive(Clone)]
 pub struct RefCompoundIter<'s, O: ByteOrder> {
-    data: *const u8,
-    _marker: PhantomData<(&'s (), O)>,
+    pub(crate) data: *const u8,
+    pub(crate) _marker: PhantomData<(&'s (), O)>,
 }
 
 impl<'s, O: ByteOrder> Default for RefCompoundIter<'s, O> {

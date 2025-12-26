@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, EMPTY_LIST, GenericNBT, ListBase, ListRef, MutableConfig, NBT,
-    RefTypedList, RefValue, TagID, cold_path, mutable_tag_size,
+    ByteOrder, ConfigRef, EMPTY_LIST, ListBase, ListRef, MutableConfig, NBT, RefTypedList,
+    RefValue, TagID, cold_path, mutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -92,8 +92,6 @@ impl<'s, O: ByteOrder> RefList<'s, O> {
 }
 
 impl<'s, O: ByteOrder> ListBase for RefList<'s, O> {
-    type ConfigRef = MutableConfig<O>;
-
     #[inline]
     fn element_tag_id(&self) -> TagID {
         self.element_tag_id()
@@ -103,38 +101,36 @@ impl<'s, O: ByteOrder> ListBase for RefList<'s, O> {
     fn len(&self) -> usize {
         self.len()
     }
-
-    #[inline]
-    fn list_get_impl<'a, T: GenericNBT>(
-        &'a self,
-        index: usize,
-    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a> {
-        unsafe {
-            self.data
-                .add(1 + 4)
-                .add(index * mutable_tag_size(T::TAG_ID))
-        }
-    }
 }
 
 impl<'s, O: ByteOrder> ListRef<'s> for RefList<'s, O> {
+    type Config = MutableConfig<O>;
+
     #[inline]
-    fn typed_<T: NBT>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'s, T>> {
+    fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
+    where
+        's: 'a,
+    {
+        unsafe { self.data.add(1 + 4) }
+    }
+
+    #[inline]
+    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>> {
         self.typed_::<T>()
     }
 
     #[inline]
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::ListIter<'s> {
+    fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'s> {
         self.iter()
     }
 }
 
 #[derive(Clone)]
 pub struct RefListIter<'s, O: ByteOrder> {
-    tag_id: TagID,
-    remaining: u32,
-    data: *const u8,
-    _marker: PhantomData<(&'s (), O)>,
+    pub(crate) tag_id: TagID,
+    pub(crate) remaining: u32,
+    pub(crate) data: *const u8,
+    pub(crate) _marker: PhantomData<(&'s (), O)>,
 }
 
 impl<'s, O: ByteOrder> Default for RefListIter<'s, O> {
@@ -170,6 +166,7 @@ impl<'s, O: ByteOrder> Iterator for RefListIter<'s, O> {
         Some(value)
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = self.remaining as usize;
         (remaining, Some(remaining))

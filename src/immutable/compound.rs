@@ -76,8 +76,11 @@ impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'do
     type Config = ImmutableConfig<O, D>;
 
     #[inline]
-    fn _transform(&self) -> &<Self::Config as ConfigRef>::Compound<'doc> {
-        self
+    fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
+    where
+        'doc: 'a,
+    {
+        (self.data.as_ptr(), self.mark, &self.doc)
     }
 
     #[inline]
