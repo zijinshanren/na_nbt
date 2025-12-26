@@ -4,9 +4,9 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ConfigMut, ConfigRef, GenericNBT, MutCompound, MutCompoundIter, MutList,
-    MutListIter, MutTypedList, MutTypedListIter, MutValue, MutVec, NBT, NBTBase, OwnValue,
+    MutListIter, MutTypedList, MutTypedListIter, MutValue, MutVec, NBT, NBTBase, OwnList, OwnValue,
     RefCompound, RefCompoundIter, RefList, RefListIter, RefString, RefTypedList, RefTypedListIter,
-    RefValue, TagID, cold_path, list_increase, mutable_tag_size,
+    RefValue, TagID, cold_path, list_decrease, list_increase, mutable_tag_size, tag::List,
 };
 
 #[derive(Clone)]
@@ -114,7 +114,36 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
     unsafe fn list_pop<'a, T: GenericNBT>(
         params: Self::WriteParams<'a>,
     ) -> Option<T::Type<Self::ByteOrder>> {
-        unsafe { T::list_pop_impl(params) }
+        T::dispatch(
+            params,
+            |mut params| unsafe {
+                list_decrease::<O>(&mut params);
+                Some(Default::default())
+            },
+            |mut params| unsafe {
+                let tag_size = mutable_tag_size(T::TAG_ID);
+                let len_bytes = params.len();
+                let value = ptr::read(params.as_mut_ptr().add(len_bytes - tag_size).cast());
+                params.set_len(len_bytes - tag_size);
+                list_decrease::<O>(&mut params);
+                Some(value)
+            },
+            |mut params| unsafe {
+                let tag_size = mutable_tag_size(T::TAG_ID);
+                let len_bytes = params.len();
+                let value = todo!();
+                // let value = ptr::read(
+                //     params
+                //         .as_mut_ptr()
+                //         .add(len_bytes - tag_size)
+                //         .cast::<OwnList<O>>(),
+                // )
+                // .typed_()?;
+                params.set_len(len_bytes - tag_size);
+                list_decrease::<O>(&mut params);
+                Some(value)
+            },
+        )
     }
 
     unsafe fn list_insert<'a, T: NBT>(
@@ -139,7 +168,37 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
         params: Self::WriteParams<'a>,
         index: usize,
     ) -> Option<T::Type<Self::ByteOrder>> {
-        unsafe { T::list_remove_impl(params, index) }
+        T::dispatch(
+            params,
+            |mut params| unsafe {
+                list_decrease::<O>(&mut params);
+                Some(Default::default())
+            },
+            |mut params| unsafe {
+                let tag_size = mutable_tag_size(T::TAG_ID);
+                let pos_bytes = index * tag_size + 1 + 4;
+                let len_bytes = params.len();
+                let value = ptr::read(params.as_mut_ptr().add(pos_bytes).cast());
+                let start = params.as_mut_ptr().add(pos_bytes);
+                ptr::copy(start.add(tag_size), start, len_bytes - pos_bytes - tag_size);
+                params.set_len(len_bytes - tag_size);
+                list_decrease::<O>(&mut params);
+                Some(value)
+            },
+            |mut params| unsafe {
+                let tag_size = mutable_tag_size(T::TAG_ID);
+                let pos_bytes = index * tag_size + 1 + 4;
+                let len_bytes = params.len();
+                let value = todo!();
+                // let value =
+                // ptr::read(params.as_mut_ptr().add(pos_bytes).cast::<OwnList<O>>()).typed_()?;
+                let start = params.as_mut_ptr().add(pos_bytes);
+                ptr::copy(start.add(tag_size), start, len_bytes - pos_bytes - tag_size);
+                params.set_len(len_bytes - tag_size);
+                list_decrease::<O>(&mut params);
+                Some(value)
+            },
+        )
     }
 
     unsafe fn compound_insert<'a, T: GenericNBT>(
@@ -147,7 +206,36 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
         key: &[u8],
         value: T::Type<Self::ByteOrder>,
     ) {
-        unsafe { T::compound_insert_impl(params, key, value) }
+        T::dispatch(
+            (params, key, value),
+            |_| panic!("End cannot be inserted into a compound"),
+            |(mut params, key, value)| unsafe {
+                let name_bytes = key;
+                let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
+                let tag_size = mutable_tag_size(T::TAG_ID);
+                let old_len = params.len();
+
+                params.reserve(1 + 2 + name_bytes.len() + tag_size);
+
+                let mut write_ptr = params.as_mut_ptr().add(old_len);
+                ptr::write(write_ptr.cast(), T::TAG_ID as u8);
+                write_ptr = write_ptr.add(1);
+                ptr::write(write_ptr.cast(), name_len);
+                write_ptr = write_ptr.add(2);
+                ptr::copy_nonoverlapping(name_bytes.as_ptr(), write_ptr.cast(), name_bytes.len());
+                write_ptr = write_ptr.add(name_bytes.len());
+                ptr::write(write_ptr.cast(), value);
+                write_ptr = write_ptr.add(tag_size);
+                ptr::write(write_ptr.cast(), TagID::End as u8);
+
+                params.set_len(old_len + 1 + 2 + name_bytes.len() + tag_size);
+            },
+            |(params, key, value)| unsafe {
+                let list = ptr::read(&value as *const _ as *const _);
+                std::mem::forget(value);
+                MutableConfig::<O>::compound_insert::<List>(params, key, list);
+            },
+        )
     }
 
     unsafe fn compound_remove<'a>(
@@ -209,36 +297,6 @@ pub trait MutableGenericImpl: NBTBase {
     unsafe fn read_mutable_mut_impl<'a, 'doc, O: ByteOrder>(
         params: <MutableConfig<O> as ConfigRef>::ReadParams<'a>,
     ) -> Option<Self::TypeMut<'doc, MutableConfig<O>>>;
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn list_pop_impl<'a, O: ByteOrder>(
-        params: <MutableConfig<O> as ConfigMut>::WriteParams<'a>,
-    ) -> Option<Self::Type<O>>;
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn list_remove_impl<'a, O: ByteOrder>(
-        params: <MutableConfig<O> as ConfigMut>::WriteParams<'a>,
-        index: usize,
-    ) -> Option<Self::Type<O>>;
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn compound_insert_impl<'a, O: ByteOrder>(
-        params: <MutableConfig<O> as ConfigMut>::WriteParams<'a>,
-        key: &[u8],
-        value: Self::Type<O>,
-    );
 }
 
 pub trait MutableImpl: MutableGenericImpl {}

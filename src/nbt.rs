@@ -125,6 +125,13 @@ pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'stati
     type TypeRef<'a, Config: ConfigRef>: Clone;
     type TypeMut<'a, Config: ConfigMut>;
     type Type<O: ByteOrder>: Default;
+
+    fn dispatch<A, R>(
+        a: A,
+        end: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        typed_list: impl FnOnce(A) -> R,
+    ) -> R;
 }
 
 pub trait PrimitiveNBTBase: NBTBase {}

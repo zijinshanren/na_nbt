@@ -26,6 +26,16 @@ impl NBTBase for End {
     type TypeRef<'a, Config: ConfigRef> = ();
     type TypeMut<'a, Config: ConfigMut> = &'a mut ();
     type Type<O: ByteOrder> = ();
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        end: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        end(a)
+    }
 }
 
 impl NBTBase for Byte {
@@ -33,6 +43,16 @@ impl NBTBase for Byte {
     type TypeRef<'a, Config: ConfigRef> = i8;
     type TypeMut<'a, Config: ConfigMut> = &'a mut i8;
     type Type<O: ByteOrder> = i8;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for Short {
@@ -40,6 +60,16 @@ impl NBTBase for Short {
     type TypeRef<'a, Config: ConfigRef> = i16;
     type TypeMut<'a, Config: ConfigMut> = &'a mut byteorder::I16<Config::ByteOrder>;
     type Type<O: ByteOrder> = byteorder::I16<O>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for Int {
@@ -47,6 +77,16 @@ impl NBTBase for Int {
     type TypeRef<'a, Config: ConfigRef> = i32;
     type TypeMut<'a, Config: ConfigMut> = &'a mut byteorder::I32<Config::ByteOrder>;
     type Type<O: ByteOrder> = byteorder::I32<O>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for Long {
@@ -54,6 +94,16 @@ impl NBTBase for Long {
     type TypeRef<'a, Config: ConfigRef> = i64;
     type TypeMut<'a, Config: ConfigMut> = &'a mut byteorder::I64<Config::ByteOrder>;
     type Type<O: ByteOrder> = byteorder::I64<O>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for Float {
@@ -61,6 +111,16 @@ impl NBTBase for Float {
     type TypeRef<'a, Config: ConfigRef> = f32;
     type TypeMut<'a, Config: ConfigMut> = &'a mut byteorder::F32<Config::ByteOrder>;
     type Type<O: ByteOrder> = byteorder::F32<O>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for Double {
@@ -68,6 +128,16 @@ impl NBTBase for Double {
     type TypeRef<'a, Config: ConfigRef> = f64;
     type TypeMut<'a, Config: ConfigMut> = &'a mut byteorder::F64<Config::ByteOrder>;
     type Type<O: ByteOrder> = byteorder::F64<O>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for ByteArray {
@@ -75,6 +145,16 @@ impl NBTBase for ByteArray {
     type TypeRef<'a, Config: ConfigRef> = Config::ByteArray<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutVec<'a, i8>;
     type Type<O: ByteOrder> = OwnVec<i8>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for String {
@@ -82,6 +162,16 @@ impl NBTBase for String {
     type TypeRef<'a, Config: ConfigRef> = Config::String<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutString<'a>;
     type Type<O: ByteOrder> = OwnString;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for List {
@@ -89,6 +179,16 @@ impl NBTBase for List {
     type TypeRef<'a, Config: ConfigRef> = Config::List<'a>;
     type TypeMut<'a, Config: ConfigMut> = Config::ListMut<'a>;
     type Type<O: ByteOrder> = OwnList<O>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for Compound {
@@ -96,6 +196,16 @@ impl NBTBase for Compound {
     type TypeRef<'a, Config: ConfigRef> = Config::Compound<'a>;
     type TypeMut<'a, Config: ConfigMut> = Config::CompoundMut<'a>;
     type Type<O: ByteOrder> = OwnCompound<O>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for IntArray {
@@ -103,6 +213,16 @@ impl NBTBase for IntArray {
     type TypeRef<'a, Config: ConfigRef> = Config::IntArray<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutVec<'a, byteorder::I32<Config::ByteOrder>>;
     type Type<O: ByteOrder> = OwnVec<byteorder::I32<O>>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 impl NBTBase for LongArray {
@@ -110,6 +230,16 @@ impl NBTBase for LongArray {
     type TypeRef<'a, Config: ConfigRef> = Config::LongArray<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutVec<'a, byteorder::I64<Config::ByteOrder>>;
     type Type<O: ByteOrder> = OwnVec<byteorder::I64<O>>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        normal: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+    ) -> R {
+        normal(a)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -120,6 +250,16 @@ impl<T: NBT> NBTBase for TypedList<T> {
     type TypeRef<'a, Config: ConfigRef> = Config::TypedList<'a, T>;
     type TypeMut<'a, Config: ConfigMut> = Config::TypedListMut<'a, T>;
     type Type<O: ByteOrder> = OwnTypedList<O, T>;
+
+    #[inline]
+    fn dispatch<A, R>(
+        a: A,
+        _: impl FnOnce(A) -> R,
+        _: impl FnOnce(A) -> R,
+        typed_list: impl FnOnce(A) -> R,
+    ) -> R {
+        typed_list(a)
+    }
 }
 
 macro_rules! primitive_tag {
