@@ -10,19 +10,20 @@ use crate::{
     },
 };
 
+// todo: ConfigBase with logic provider ( can be unimplemented )
 pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     type ByteOrder: ByteOrder;
-    type Value<'doc>: ValueRef<'doc, ConfigRef = Self>;
+    type Value<'doc>: ValueRef<'doc, Config = Self>;
     type ByteArray<'doc>: Deref<Target = [i8]> + Clone + Default;
     type String<'doc>: StringRef<'doc>;
-    type List<'doc>: ListRef<'doc, ConfigRef = Self>;
+    type List<'doc>: ListRef<'doc, Config = Self>;
     type ListIter<'doc>: Iterator<Item = Self::Value<'doc>> + ExactSizeIterator + Clone + Default;
-    type TypedList<'doc, T: NBT>: TypedListRef<'doc, T, ConfigRef = Self>;
+    type TypedList<'doc, T: NBT>: TypedListRef<'doc, T, Config = Self>;
     type TypedListIter<'doc, T: NBT>: Iterator<Item = T::TypeRef<'doc, Self>>
         + ExactSizeIterator
         + Clone
         + Default;
-    type Compound<'doc>: CompoundRef<'doc, ConfigRef = Self>;
+    type Compound<'doc>: CompoundRef<'doc, Config = Self>;
     type CompoundIter<'doc>: Iterator<Item = (Self::String<'doc>, Self::Value<'doc>)>
         + Clone
         + Default;
@@ -30,6 +31,27 @@ pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     type LongArray<'doc>: Deref<Target = [byteorder::I64<Self::ByteOrder>]> + Clone + Default;
 
     type ReadParams<'a>: Sized;
+
+    unsafe fn list_get<'a, 'doc, T: GenericNBT>(
+        value: &'a Self::List<'doc>,
+        index: usize,
+    ) -> Self::ReadParams<'a>
+    where
+        'doc: 'a;
+
+    unsafe fn typed_list_get<'a, 'doc, T: NBT>(
+        value: &'a Self::TypedList<'doc, T>,
+        index: usize,
+    ) -> Self::ReadParams<'a>
+    where
+        'doc: 'a;
+
+    unsafe fn compound_get<'a, 'doc>(
+        value: &'a Self::Compound<'doc>,
+        key: &str,
+    ) -> Option<(TagID, Self::ReadParams<'a>)>
+    where
+        'doc: 'a;
 
     /// .
     ///

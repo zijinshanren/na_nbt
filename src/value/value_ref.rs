@@ -11,35 +11,37 @@ pub trait ValueRef<'s>:
     ValueBase
     + Clone
     + Default
-    + From<<End as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<Byte as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<Short as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<Int as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<Long as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<Float as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<Double as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<ByteArray as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<String as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<List as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<Compound as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<IntArray as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<LongArray as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<End> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<Byte> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<Short> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<Int> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<Long> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<Float> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<Double> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<ByteArray> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<String> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<List> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<Compound> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<IntArray> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
-    + From<<TypedList<LongArray> as NBTBase>::TypeRef<'s, Self::ConfigRef>>
+    + From<<End as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<Byte as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<Short as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<Int as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<Long as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<Float as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<Double as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<ByteArray as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<String as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<List as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<Compound as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<IntArray as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<LongArray as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<End> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<Byte> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<Short> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<Int> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<Long> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<Float> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<Double> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<ByteArray> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<String> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<List> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<Compound> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<IntArray> as NBTBase>::TypeRef<'s, Self::Config>>
+    + From<<TypedList<LongArray> as NBTBase>::TypeRef<'s, Self::Config>>
 {
+    type Config: ConfigRef<Value<'s> = Self>;
+
     #[inline]
-    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'s, Self::ConfigRef>>
+    fn ref_<'a, T: NBT>(&'a self) -> Option<&'a T::TypeRef<'s, Self::Config>>
     where
         's: 'a,
     {
@@ -47,12 +49,12 @@ pub trait ValueRef<'s>:
     }
 
     #[inline]
-    fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
+    fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'s, Self::Config>> {
         T::ref_into_(self)
     }
 
     #[inline]
-    fn get(&self, index: impl Index) -> Option<<Self::ConfigRef as ConfigRef>::Value<'s>> {
+    fn get(&self, index: impl Index) -> Option<<Self::Config as ConfigRef>::Value<'s>> {
         index.index_dispatch(
             self,
             |value, index| value.ref_::<List>()?.get(index),
@@ -61,7 +63,7 @@ pub trait ValueRef<'s>:
     }
 
     #[inline]
-    fn get_<T: GenericNBT>(&self, index: impl Index) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
+    fn get_<T: GenericNBT>(&self, index: impl Index) -> Option<T::TypeRef<'s, Self::Config>> {
         index.index_dispatch(
             self,
             |value, index| value.ref_::<List>()?.get_::<T>(index),
@@ -69,19 +71,25 @@ pub trait ValueRef<'s>:
         )
     }
 
-    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 's, Self::ConfigRef>) -> R) -> R
+    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 's, Self::Config>) -> R) -> R
     where
         's: 'a;
 
-    fn map<R>(self, match_fn: impl FnOnce(MapRef<'s, Self::ConfigRef>) -> R) -> R;
+    fn map<R>(self, match_fn: impl FnOnce(MapRef<'s, Self::Config>) -> R) -> R;
 }
 
 pub trait ListRef<'s>:
-    ListBase + IntoIterator<Item = <Self::ConfigRef as ConfigRef>::Value<'s>> + Clone + Default
+    ListBase
+    + IntoIterator<
+        IntoIter = <Self::Config as ConfigRef>::ListIter<'s>,
+        Item = <Self::Config as ConfigRef>::Value<'s>,
+    > + Clone
+    + Default
 {
+    type Config: ConfigRef<List<'s> = Self>;
     #[inline]
     #[allow(clippy::unit_arg)]
-    fn get(&self, index: usize) -> Option<<Self::ConfigRef as ConfigRef>::Value<'s>> {
+    fn get(&self, index: usize) -> Option<<Self::Config as ConfigRef>::Value<'s>> {
         if index >= self.len() {
             cold_path();
             return None;
@@ -90,63 +98,67 @@ pub trait ListRef<'s>:
         unsafe {
             Some(match self.element_tag_id() {
                 TagID::End => From::from(
-                    Self::ConfigRef::read::<End>(self.list_get_impl::<End>(index))
+                    Self::Config::read::<End>(Self::Config::list_get::<End>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::Byte => From::from(
-                    Self::ConfigRef::read::<Byte>(self.list_get_impl::<Byte>(index))
+                    Self::Config::read::<Byte>(Self::Config::list_get::<Byte>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::Short => From::from(
-                    Self::ConfigRef::read::<Short>(self.list_get_impl::<Short>(index))
+                    Self::Config::read::<Short>(Self::Config::list_get::<Short>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::Int => From::from(
-                    Self::ConfigRef::read::<Int>(self.list_get_impl::<Int>(index))
+                    Self::Config::read::<Int>(Self::Config::list_get::<Int>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::Long => From::from(
-                    Self::ConfigRef::read::<Long>(self.list_get_impl::<Long>(index))
+                    Self::Config::read::<Long>(Self::Config::list_get::<Long>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::Float => From::from(
-                    Self::ConfigRef::read::<Float>(self.list_get_impl::<Float>(index))
+                    Self::Config::read::<Float>(Self::Config::list_get::<Float>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::Double => From::from(
-                    Self::ConfigRef::read::<Double>(self.list_get_impl::<Double>(index))
+                    Self::Config::read::<Double>(Self::Config::list_get::<Double>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::ByteArray => From::from(
-                    Self::ConfigRef::read::<ByteArray>(self.list_get_impl::<ByteArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<ByteArray>(Self::Config::list_get::<ByteArray>(
+                        self, index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
                 TagID::String => From::from(
-                    Self::ConfigRef::read::<String>(self.list_get_impl::<String>(index))
+                    Self::Config::read::<String>(Self::Config::list_get::<String>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::List => From::from(
-                    Self::ConfigRef::read::<List>(self.list_get_impl::<List>(index))
+                    Self::Config::read::<List>(Self::Config::list_get::<List>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::Compound => From::from(
-                    Self::ConfigRef::read::<Compound>(self.list_get_impl::<Compound>(index))
+                    Self::Config::read::<Compound>(Self::Config::list_get::<Compound>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::IntArray => From::from(
-                    Self::ConfigRef::read::<IntArray>(self.list_get_impl::<IntArray>(index))
+                    Self::Config::read::<IntArray>(Self::Config::list_get::<IntArray>(self, index))
                         .unwrap_unchecked(),
                 ),
                 TagID::LongArray => From::from(
-                    Self::ConfigRef::read::<LongArray>(self.list_get_impl::<LongArray>(index))
-                        .unwrap_unchecked(),
+                    Self::Config::read::<LongArray>(Self::Config::list_get::<LongArray>(
+                        self, index,
+                    ))
+                    .unwrap_unchecked(),
                 ),
             })
         }
     }
 
     #[inline]
-    fn get_<T: GenericNBT>(&self, index: usize) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
+    fn get_<T: GenericNBT>(&self, index: usize) -> Option<T::TypeRef<'s, Self::Config>> {
         if index >= self.len() {
             cold_path();
             return None;
@@ -159,55 +171,67 @@ pub trait ListRef<'s>:
             return None;
         }
 
-        unsafe { Self::ConfigRef::read::<T>(self.list_get_impl::<T>(index)) }
+        unsafe { Self::Config::read::<T>(Self::Config::list_get::<T>(self, index)) }
     }
 
-    fn typed_<T: NBT>(self) -> Option<<Self::ConfigRef as ConfigRef>::TypedList<'s, T>>;
+    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>>;
 
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::ListIter<'s>;
+    fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'s>;
 }
 
 pub trait TypedListRef<'s, T: NBT>:
-    TypedListBase<T> + IntoIterator<Item = T::TypeRef<'s, Self::ConfigRef>> + Clone + Default
+    TypedListBase<T>
+    + IntoIterator<
+        IntoIter = <Self::Config as ConfigRef>::TypedListIter<'s, T>,
+        Item = T::TypeRef<'s, Self::Config>,
+    > + Clone
+    + Default
 {
+    type Config: ConfigRef<TypedList<'s, T> = Self>;
     #[inline]
-    fn get(&self, index: usize) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
+    fn get(&self, index: usize) -> Option<T::TypeRef<'s, Self::Config>> {
         if index >= self.len() {
             cold_path();
             return None;
         }
 
-        unsafe { Self::ConfigRef::read::<T>(self.typed_list_get_impl(index)) }
+        unsafe { Self::Config::read::<T>(Self::Config::typed_list_get::<T>(self, index)) }
     }
 
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::TypedListIter<'s, T>;
+    fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'s, T>;
 }
 
 pub trait CompoundRef<'s>:
-    CompoundBase<'s>
+    CompoundBase
     + IntoIterator<
+        IntoIter = <Self::Config as ConfigRef>::CompoundIter<'s>,
         Item = (
-            <Self::ConfigRef as ConfigRef>::String<'s>,
-            <Self::ConfigRef as ConfigRef>::Value<'s>,
+            <Self::Config as ConfigRef>::String<'s>,
+            <Self::Config as ConfigRef>::Value<'s>,
         ),
     > + Clone
     + Default
 {
+    type Config: ConfigRef<Compound<'s> = Self>;
     #[inline]
-    fn get(&self, key: &str) -> Option<<Self::ConfigRef as ConfigRef>::Value<'s>> {
-        let (tag_id, params) = self.compound_get_impl(key)?;
-        unsafe { Some(Self::ConfigRef::read_value(tag_id, params)) }
-    }
-
-    #[inline]
-    fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::ConfigRef>> {
-        let (tag_id, params) = self.compound_get_impl(key)?;
-        if tag_id != T::TAG_ID {
-            cold_path();
-            return None;
+    fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'s>> {
+        unsafe {
+            let (tag_id, params) = Self::Config::compound_get(self, key)?;
+            Some(Self::Config::read_value(tag_id, params))
         }
-        unsafe { Self::ConfigRef::read::<T>(params) }
     }
 
-    fn iter(&self) -> <Self::ConfigRef as ConfigRef>::CompoundIter<'s>;
+    #[inline]
+    fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::Config>> {
+        unsafe {
+            let (tag_id, params) = Self::Config::compound_get(self, key)?;
+            if tag_id != T::TAG_ID {
+                cold_path();
+                return None;
+            }
+            Self::Config::read::<T>(params)
+        }
+    }
+
+    fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'s>;
 }

@@ -16,8 +16,6 @@ pub trait Writable {
 }
 
 pub trait ValueBase: Send + Sync + Sized {
-    type ConfigRef: ConfigRef;
-
     fn tag_id(&self) -> TagID;
 
     #[inline]
@@ -27,8 +25,6 @@ pub trait ValueBase: Send + Sync + Sized {
 }
 
 pub trait ListBase: Send + Sync + Sized {
-    type ConfigRef: ConfigRef;
-
     fn element_tag_id(&self) -> TagID;
 
     #[inline]
@@ -43,16 +39,9 @@ pub trait ListBase: Send + Sync + Sized {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
-
-    fn list_get_impl<'a, T: GenericNBT>(
-        &'a self,
-        index: usize,
-    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a>;
 }
 
 pub trait TypedListBase<T: NBT>: Send + Sync + Sized {
-    type ConfigRef: ConfigRef;
-
     const ELEMENT_TAG_ID: TagID = T::TAG_ID;
 
     fn len(&self) -> usize;
@@ -61,24 +50,12 @@ pub trait TypedListBase<T: NBT>: Send + Sync + Sized {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
-
-    fn typed_list_get_impl<'a>(
-        &'a self,
-        index: usize,
-    ) -> <Self::ConfigRef as ConfigRef>::ReadParams<'a>;
 }
 
-pub trait CompoundBase<'s>: Send + Sync + Sized {
-    type ConfigRef: ConfigRef<Compound<'s> = Self>;
-
-    fn compound_get_impl<'a>(
-        &'a self,
-        key: &str,
-    ) -> Option<(TagID, <Self::ConfigRef as ConfigRef>::ReadParams<'a>)>;
-}
+pub trait CompoundBase: Send + Sync + Sized {}
 
 pub trait NBTInto: NBTBase {
-    fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>>;
+    fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::Config>>;
 
     fn mut_into_<'s, V: ValueMut<'s>>(value: V) -> Option<Self::TypeMut<'s, V::ConfigMut>>;
 }
@@ -86,7 +63,7 @@ pub trait NBTInto: NBTBase {
 pub trait NBTRef: NBTBase {
     fn ref_<'a, 's: 'a, V: ValueRef<'s>>(
         value: &'a V,
-    ) -> Option<&'a Self::TypeRef<'s, V::ConfigRef>>;
+    ) -> Option<&'a Self::TypeRef<'s, V::Config>>;
 
     fn mut_<'a, 's: 'a, V: ValueMut<'s>>(
         value: &'a mut V,
@@ -98,7 +75,7 @@ macro_rules! impl_value_ref_dispatch {
         $(
             impl NBTInto for $t {
                 #[inline]
-                fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>> {
+                fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::Config>> {
                     value.map(|value| match value {
                         MapRef::$t(v) => Some(v),
                         _ => None,
@@ -116,7 +93,7 @@ macro_rules! impl_value_ref_dispatch {
 
             impl NBTRef for $t {
                 #[inline]
-                fn ref_<'a, 's: 'a, V:ValueRef<'s>>(value: &'a V) -> Option<&'a Self::TypeRef<'s, V::ConfigRef>> {
+                fn ref_<'a, 's: 'a, V:ValueRef<'s>>(value: &'a V) -> Option<&'a Self::TypeRef<'s, V::Config>> {
                     value.visit(|value| match value {
                         VisitRef::$t(v) => Some(v),
                         _ => None,
@@ -141,7 +118,7 @@ impl_value_ref_dispatch!(
 );
 
 impl<T: NBT> NBTInto for TypedList<T> {
-    fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::ConfigRef>> {
+    fn ref_into_<'s, V: ValueRef<'s>>(value: V) -> Option<Self::TypeRef<'s, V::Config>> {
         value.map(|value| match value {
             MapRef::List(v) => v.typed_::<T>(),
             _ => None,
