@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use na_nbt::{
-    ReadableString, ScopedReadableList, ScopedReadableValue, ValueScoped, from_slice_be,
-    read_borrowed, to_vec_be,
+    CompoundRef, ListBase, ListRef, ValueRef, VisitRef, from_slice_be, read_borrowed, to_vec_be,
 };
 use serde::{Deserialize, Serialize};
 use zerocopy::BigEndian;
@@ -42,36 +41,36 @@ enum Data {
     LongArray(Vec<i64>),
 }
 
-fn dump<'doc>(value: &impl ScopedReadableValue<'doc>) -> String {
+fn dump<'doc>(value: &impl ValueRef<'doc>) -> String {
     dump_inner(value, 0)
 }
 
-fn dump_inner<'doc>(value: &impl ScopedReadableValue<'doc>, indent: usize) -> String {
+fn dump_inner<'doc>(value: &impl ValueRef<'doc>, indent: usize) -> String {
     let pad = "  ".repeat(indent);
-    value.visit_scoped(|v| match v {
-        ValueScoped::End => format!("{pad}End"),
-        ValueScoped::Byte(v) => format!("{pad}Byte({v})"),
-        ValueScoped::Short(v) => format!("{pad}Short({v})"),
-        ValueScoped::Int(v) => format!("{pad}Int({v})"),
-        ValueScoped::Long(v) => format!("{pad}Long({v})"),
-        ValueScoped::Float(v) => format!("{pad}Float({v})"),
-        ValueScoped::Double(v) => format!("{pad}Double({v})"),
-        ValueScoped::ByteArray(v) => format!("{pad}ByteArray({} bytes)", v.len()),
-        ValueScoped::String(v) => format!("{pad}String({:?})", v.decode()),
-        ValueScoped::IntArray(v) => format!("{pad}IntArray({} ints)", v.len()),
-        ValueScoped::LongArray(v) => format!("{pad}LongArray({} longs)", v.len()),
-        ValueScoped::List(list) => {
+    value.visit(|v| match v {
+        VisitRef::End(_) => format!("{pad}End"),
+        VisitRef::Byte(v) => format!("{pad}Byte({v})"),
+        VisitRef::Short(v) => format!("{pad}Short({v})"),
+        VisitRef::Int(v) => format!("{pad}Int({v})"),
+        VisitRef::Long(v) => format!("{pad}Long({v})"),
+        VisitRef::Float(v) => format!("{pad}Float({v})"),
+        VisitRef::Double(v) => format!("{pad}Double({v})"),
+        VisitRef::ByteArray(v) => format!("{pad}ByteArray({} bytes)", v.len()),
+        VisitRef::String(v) => format!("{pad}String({:?})", v.decode()),
+        VisitRef::IntArray(v) => format!("{pad}IntArray({} ints)", v.len()),
+        VisitRef::LongArray(v) => format!("{pad}LongArray({} longs)", v.len()),
+        VisitRef::List(list) => {
             let mut out = format!("{pad}List[{}] {{\n", list.len());
-            for item in list {
+            for item in list.iter() {
                 out.push_str(&dump_inner(&item, indent + 1));
                 out.push('\n');
             }
             out.push_str(&format!("{pad}}}"));
             out
         }
-        ValueScoped::Compound(compound) => {
+        VisitRef::Compound(compound) => {
             let mut out = format!("{pad}Compound {{\n");
-            for (key, val) in compound {
+            for (key, val) in compound.iter() {
                 let nested = dump_inner(&val, indent + 1);
                 out.push_str(&format!(
                     "{}  {:?}: {}\n",
