@@ -25,16 +25,6 @@ impl<O: ByteOrder> ListBuildGuard<O> {
         }
     }
 
-    #[inline]
-    fn set_len(&mut self, len: usize) {
-        unsafe { self.data.set_len(len) };
-    }
-
-    #[inline]
-    fn len(&self) -> usize {
-        self.data.len()
-    }
-
     unsafe fn finalize(mut self) -> Vec<u8> {
         unsafe {
             let data = ManuallyDrop::take(&mut self.data);
@@ -265,11 +255,12 @@ unsafe fn read_list<O: ByteOrder>(
             })
         } else {
             check_bounds!(len); // one non-primitive tag is at least 1 byte (empty Tag::Compound)
-            let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+            let mut guard: ListBuildGuard<O> =
+                ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+            let list_data = &mut guard.data;
             ptr::copy_nonoverlapping((*current_pos).sub(1 + 4), list_data.as_mut_ptr(), 1 + 4);
-            let mut guard: ListBuildGuard<O> = ListBuildGuard::new(list_data, tag_id);
-            guard.set_len(5);
-            let mut write_ptr = guard.data.as_mut_ptr().add(5);
+            list_data.set_len(5);
+            let mut write_ptr = list_data.as_mut_ptr().add(5);
             match tag_id {
                 7 => {
                     for _ in 0..len {
@@ -282,7 +273,8 @@ unsafe fn read_list<O: ByteOrder>(
                         *current_pos = current_pos.add(arr_len);
                         ptr::write(write_ptr.cast::<OwnVec<i8>>(), value.into());
                         write_ptr = write_ptr.add(SIZE_DYN);
-                        guard.set_len(guard.len() + SIZE_DYN);
+                        let len = list_data.len();
+                        list_data.set_len(len + SIZE_DYN);
                     }
                 }
                 8 => {
@@ -296,7 +288,8 @@ unsafe fn read_list<O: ByteOrder>(
                         *current_pos = current_pos.add(str_len);
                         ptr::write(write_ptr.cast::<OwnString>(), value.into());
                         write_ptr = write_ptr.add(SIZE_DYN);
-                        guard.set_len(guard.len() + SIZE_DYN);
+                        let len = list_data.len();
+                        list_data.set_len(len + SIZE_DYN);
                     }
                 }
                 9 => {
@@ -306,7 +299,8 @@ unsafe fn read_list<O: ByteOrder>(
                             read_list::<O>(current_pos, end_pos)?,
                         );
                         write_ptr = write_ptr.add(SIZE_DYN);
-                        guard.set_len(guard.len() + SIZE_DYN);
+                        let len = list_data.len();
+                        list_data.set_len(len + SIZE_DYN);
                     }
                 }
                 10 => {
@@ -316,7 +310,8 @@ unsafe fn read_list<O: ByteOrder>(
                             read_compound::<O>(current_pos, end_pos)?,
                         );
                         write_ptr = write_ptr.add(SIZE_DYN);
-                        guard.set_len(guard.len() + SIZE_DYN);
+                        let len = list_data.len();
+                        list_data.set_len(len + SIZE_DYN);
                     }
                 }
                 11 => {
@@ -331,7 +326,8 @@ unsafe fn read_list<O: ByteOrder>(
                         *current_pos = current_pos.add(arr_len * 4);
                         ptr::write(write_ptr.cast::<OwnVec<byteorder::I32<O>>>(), value.into());
                         write_ptr = write_ptr.add(SIZE_DYN);
-                        guard.set_len(guard.len() + SIZE_DYN);
+                        let len = list_data.len();
+                        list_data.set_len(len + SIZE_DYN);
                     }
                 }
                 12 => {
@@ -346,7 +342,8 @@ unsafe fn read_list<O: ByteOrder>(
                         *current_pos = current_pos.add(arr_len * 8);
                         ptr::write(write_ptr.cast::<OwnVec<byteorder::I64<O>>>(), value.into());
                         write_ptr = write_ptr.add(SIZE_DYN);
-                        guard.set_len(guard.len() + SIZE_DYN);
+                        let len = list_data.len();
+                        list_data.set_len(len + SIZE_DYN);
                     }
                 }
                 _ => {
@@ -774,16 +771,17 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             }
             7 => {
                 check_bounds!(4 * len); // one Tag::ByteArray is at least 4 bytes (empty Tag::ByteArray)
-                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let mut guard: ListBuildGuard<R> =
+                    ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+                let list_data = &mut guard.data;
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
                 ptr::write(
                     hdr_ptr.add(1).cast(),
                     byteorder::U32::<R>::new(len as u32).to_bytes(),
                 );
-                let mut guard: ListBuildGuard<R> = ListBuildGuard::new(list_data, tag_id);
-                guard.set_len(5);
-                let mut write_ptr = guard.data.as_mut_ptr().add(5);
+                list_data.set_len(5);
+                let mut write_ptr = list_data.as_mut_ptr().add(5);
                 for _ in 0..len {
                     check_bounds!(4);
                     let arr_len =
@@ -794,7 +792,8 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                     *current_pos = current_pos.add(arr_len);
                     ptr::write(write_ptr.cast::<OwnVec<_>>(), value.into());
                     write_ptr = write_ptr.add(SIZE_DYN);
-                    guard.set_len(guard.len() + SIZE_DYN);
+                    let len = list_data.len();
+                    list_data.set_len(len + SIZE_DYN);
                 }
                 Ok(OwnList {
                     data: guard.finalize().into(),
@@ -803,16 +802,17 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             }
             8 => {
                 check_bounds!(2 * len); // one Tag::String is at least 2 bytes (empty Tag::String)
-                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let mut guard: ListBuildGuard<R> =
+                    ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+                let list_data = &mut guard.data;
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
                 ptr::write(
                     hdr_ptr.add(1).cast(),
                     byteorder::U32::<R>::new(len as u32).to_bytes(),
                 );
-                let mut guard: ListBuildGuard<R> = ListBuildGuard::new(list_data, tag_id);
-                guard.set_len(5);
-                let mut write_ptr = guard.data.as_mut_ptr().add(5);
+                list_data.set_len(5);
+                let mut write_ptr = list_data.as_mut_ptr().add(5);
                 for _ in 0..len {
                     check_bounds!(2);
                     let str_len =
@@ -823,7 +823,8 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                     *current_pos = current_pos.add(str_len);
                     ptr::write(write_ptr.cast::<OwnString>(), value.into());
                     write_ptr = write_ptr.add(SIZE_DYN);
-                    guard.set_len(guard.len() + SIZE_DYN);
+                    let len = list_data.len();
+                    list_data.set_len(len + SIZE_DYN);
                 }
                 Ok(OwnList {
                     data: guard.finalize().into(),
@@ -832,23 +833,25 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             }
             9 => {
                 check_bounds!((1 + 4) * len); // one Tag::List is at least 5 bytes (empty Tag::List)
-                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let mut guard: ListBuildGuard<R> =
+                    ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+                let list_data = &mut guard.data;
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
                 ptr::write(
                     hdr_ptr.add(1).cast(),
                     byteorder::U32::<R>::new(len as u32).to_bytes(),
                 );
-                let mut guard: ListBuildGuard<R> = ListBuildGuard::new(list_data, tag_id);
-                guard.set_len(5);
-                let mut write_ptr = guard.data.as_mut_ptr().add(5);
+                list_data.set_len(5);
+                let mut write_ptr = list_data.as_mut_ptr().add(5);
                 for _ in 0..len {
                     ptr::write(
                         write_ptr.cast::<OwnList<R>>(),
                         read_list_fallback::<O, R>(current_pos, end_pos)?,
                     );
                     write_ptr = write_ptr.add(SIZE_DYN);
-                    guard.set_len(guard.len() + SIZE_DYN);
+                    let len = list_data.len();
+                    list_data.set_len(len + SIZE_DYN);
                 }
                 Ok(OwnList {
                     data: guard.finalize().into(),
@@ -857,23 +860,25 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             }
             10 => {
                 check_bounds!(len); // one Tag::Compound is at least 1 bytes (empty Tag::Compound)
-                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let mut guard: ListBuildGuard<R> =
+                    ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+                let list_data = &mut guard.data;
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
                 ptr::write(
                     hdr_ptr.add(1).cast(),
                     byteorder::U32::<R>::new(len as u32).to_bytes(),
                 );
-                let mut guard: ListBuildGuard<R> = ListBuildGuard::new(list_data, tag_id);
-                guard.set_len(5);
-                let mut write_ptr = guard.data.as_mut_ptr().add(5);
+                list_data.set_len(5);
+                let mut write_ptr = list_data.as_mut_ptr().add(5);
                 for _ in 0..len {
                     ptr::write(
                         write_ptr.cast::<OwnCompound<R>>(),
                         read_compound_fallback::<O, R>(current_pos, end_pos)?,
                     );
                     write_ptr = write_ptr.add(SIZE_DYN);
-                    guard.set_len(guard.len() + SIZE_DYN);
+                    let len = list_data.len();
+                    list_data.set_len(len + SIZE_DYN);
                 }
                 Ok(OwnList {
                     data: guard.finalize().into(),
@@ -882,16 +887,17 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             }
             11 => {
                 check_bounds!(4 * len); // one Tag::IntArray is at least 4 bytes (empty Tag::IntArray)
-                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let mut guard: ListBuildGuard<R> =
+                    ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+                let list_data = &mut guard.data;
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
                 ptr::write(
                     hdr_ptr.add(1).cast(),
                     byteorder::U32::<R>::new(len as u32).to_bytes(),
                 );
-                let mut guard: ListBuildGuard<R> = ListBuildGuard::new(list_data, tag_id);
-                guard.set_len(5);
-                let mut write_ptr = guard.data.as_mut_ptr().add(5);
+                list_data.set_len(5);
+                let mut write_ptr = list_data.as_mut_ptr().add(5);
                 for _ in 0..len {
                     check_bounds!(4);
                     let arr_len =
@@ -906,7 +912,8 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                     *current_pos = current_pos.add(arr_len * 4);
                     ptr::write(write_ptr.cast::<OwnVec<_>>(), value.into());
                     write_ptr = write_ptr.add(SIZE_DYN);
-                    guard.set_len(guard.len() + SIZE_DYN);
+                    let len = list_data.len();
+                    list_data.set_len(len + SIZE_DYN);
                 }
                 Ok(OwnList {
                     data: guard.finalize().into(),
@@ -915,16 +922,17 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
             }
             12 => {
                 check_bounds!(4 * len); // one Tag::LongArray is at least 4 bytes (empty Tag::LongArray)
-                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let mut guard: ListBuildGuard<R> =
+                    ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+                let list_data = &mut guard.data;
                 let hdr_ptr = list_data.as_mut_ptr();
                 ptr::write(hdr_ptr, tag_id);
                 ptr::write(
                     hdr_ptr.add(1).cast(),
                     byteorder::U32::<R>::new(len as u32).to_bytes(),
                 );
-                let mut guard: ListBuildGuard<R> = ListBuildGuard::new(list_data, tag_id);
-                guard.set_len(5);
-                let mut write_ptr = guard.data.as_mut_ptr().add(5);
+                list_data.set_len(5);
+                let mut write_ptr = list_data.as_mut_ptr().add(5);
                 for _ in 0..len {
                     check_bounds!(4);
                     let arr_len =
@@ -939,7 +947,8 @@ unsafe fn read_list_fallback<O: ByteOrder, R: ByteOrder>(
                     *current_pos = current_pos.add(arr_len * 8);
                     ptr::write(write_ptr.cast::<OwnVec<_>>(), value.into());
                     write_ptr = write_ptr.add(SIZE_DYN);
-                    guard.set_len(guard.len() + SIZE_DYN);
+                    let len = list_data.len();
+                    list_data.set_len(len + SIZE_DYN);
                 }
                 Ok(OwnList {
                     data: guard.finalize().into(),
@@ -1088,33 +1097,52 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
     reader: &mut impl BufRead,
 ) -> Result<OwnCompound<R>> {
     unsafe {
-        let mut compound_data = Vec::with_capacity(128);
+        let mut comp = OwnCompound {
+            data: Vec::<u8>::with_capacity(128).into(),
+            _marker: PhantomData,
+        };
 
         loop {
             let mut tag_id = [0u8];
-            reader.read_exact(&mut tag_id).map_err(Error::IO)?;
+            reader.read_exact(&mut tag_id).map_err(|e| {
+                cold_path();
+                comp.data.push(0);
+                Error::IO(e)
+            })?;
             let tag_id = tag_id[0];
 
             if tag_id == 0 {
                 cold_path();
-                compound_data.push(0);
-                return Ok(OwnCompound {
-                    data: compound_data.into(),
-                    _marker: PhantomData,
-                });
+                comp.data.push(0);
+                return Ok(comp);
             }
 
             let mut name_len = [0u8; 2];
-            reader.read_exact(&mut name_len).map_err(Error::IO)?;
+            reader.read_exact(&mut name_len).map_err(|e| {
+                cold_path();
+                comp.data.push(0);
+                Error::IO(e)
+            })?;
             let name_len = byteorder::U16::<O>::from_bytes(name_len).get() as usize;
 
             let header_len = 1 + 2 + name_len;
-            let old_len = compound_data.len();
+            let old_len = comp.data.len();
+
+            macro_rules! map_err {
+                ($pos:expr) => {
+                    |e| {
+                        cold_path();
+                        ptr::write($pos, 0);
+                        comp.data.set_len(old_len + 1);
+                        Error::IO(e)
+                    }
+                };
+            }
 
             macro_rules! case {
                 ($size:expr, $type:ident) => {{
-                    compound_data.reserve(header_len + $size);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + $size);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1125,19 +1153,19 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                             write_ptr.add(1 + 2),
                             name_len + $size,
                         ))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr))?;
                     ptr::write(
                         write_ptr.add(header_len).cast(),
                         change_endian!(*write_ptr.add(header_len).cast(), $type, O, R).to_bytes(),
                     );
-                    compound_data.set_len(old_len + header_len + $size);
+                    comp.data.set_len(old_len + header_len + $size);
                 }};
             }
 
             match tag_id {
                 1 => {
-                    compound_data.reserve(header_len + 1);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + 1);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1148,8 +1176,8 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                             write_ptr.add(1 + 2),
                             name_len + 1,
                         ))
-                        .map_err(Error::IO)?;
-                    compound_data.set_len(old_len + header_len + 1);
+                        .map_err(map_err!(write_ptr))?;
+                    comp.data.set_len(old_len + header_len + 1);
                 }
                 2 => {
                     case!(2, U16)
@@ -1161,8 +1189,8 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     case!(8, U64)
                 }
                 7 => {
-                    compound_data.reserve(header_len + SIZE_DYN);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1170,25 +1198,27 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     );
                     reader
                         .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr))?;
                     let write_ptr = write_ptr.add(header_len);
 
                     let mut len = [0u8; 4];
-                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    reader
+                        .read_exact(&mut len)
+                        .map_err(map_err!(write_ptr.sub(header_len)))?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
 
                     let mut value = Vec::<u8>::with_capacity(len);
                     reader
                         .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr(), len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr.sub(header_len)))?;
                     value.set_len(len);
 
                     ptr::write(write_ptr.cast::<OwnVec<_>>(), value.into());
-                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                    comp.data.set_len(old_len + header_len + SIZE_DYN);
                 }
                 8 => {
-                    compound_data.reserve(header_len + SIZE_DYN);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1196,25 +1226,27 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     );
                     reader
                         .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr))?;
                     let write_ptr = write_ptr.add(header_len);
 
                     let mut len = [0u8; 2];
-                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    reader
+                        .read_exact(&mut len)
+                        .map_err(map_err!(write_ptr.sub(header_len)))?;
                     let len = byteorder::U16::<O>::from_bytes(len).get() as usize;
 
                     let mut value = Vec::<u8>::with_capacity(len);
                     reader
                         .read_exact(slice::from_raw_parts_mut(value.as_mut_ptr(), len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr.sub(header_len)))?;
                     value.set_len(len);
 
                     ptr::write(write_ptr.cast::<OwnString>(), value.into());
-                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                    comp.data.set_len(old_len + header_len + SIZE_DYN);
                 }
                 9 => {
-                    compound_data.reserve(header_len + SIZE_DYN);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1222,18 +1254,21 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     );
                     reader
                         .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr))?;
                     let write_ptr = write_ptr.add(header_len);
                     ptr::write(
                         write_ptr.cast::<OwnList<R>>(),
-                        read_list_from_reader::<O, R>(reader)?,
+                        read_list_from_reader::<O, R>(reader).inspect_err(|_| {
+                            cold_path();
+                            ptr::write(write_ptr.sub(header_len), 0);
+                            comp.data.set_len(old_len + 1);
+                        })?,
                     );
-
-                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                    comp.data.set_len(old_len + header_len + SIZE_DYN);
                 }
                 10 => {
-                    compound_data.reserve(header_len + SIZE_DYN);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1241,18 +1276,21 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     );
                     reader
                         .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr))?;
                     let write_ptr = write_ptr.add(header_len);
                     ptr::write(
                         write_ptr.cast::<OwnCompound<R>>(),
-                        read_compound_from_reader::<O, R>(reader)?,
+                        read_compound_from_reader::<O, R>(reader).inspect_err(|_| {
+                            cold_path();
+                            ptr::write(write_ptr.sub(header_len), 0);
+                            comp.data.set_len(old_len + 1);
+                        })?,
                     );
-
-                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                    comp.data.set_len(old_len + header_len + SIZE_DYN);
                 }
                 11 => {
-                    compound_data.reserve(header_len + SIZE_DYN);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1260,11 +1298,13 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     );
                     reader
                         .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr))?;
                     let write_ptr = write_ptr.add(header_len);
 
                     let mut len = [0u8; 4];
-                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    reader
+                        .read_exact(&mut len)
+                        .map_err(map_err!(write_ptr.sub(header_len)))?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<byteorder::I32<R>>::with_capacity(len);
                     reader
@@ -1272,7 +1312,7 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                             value.as_mut_ptr().cast(),
                             len * 4,
                         ))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr.sub(header_len)))?;
                     value.set_len(len);
                     if TypeId::of::<R>() != TypeId::of::<O>() {
                         let s =
@@ -1282,11 +1322,11 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                         }
                     }
                     ptr::write(write_ptr.cast::<OwnVec<_>>(), value.into());
-                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                    comp.data.set_len(old_len + header_len + SIZE_DYN);
                 }
                 12 => {
-                    compound_data.reserve(header_len + SIZE_DYN);
-                    let write_ptr = compound_data.as_mut_ptr().add(old_len);
+                    comp.data.reserve(header_len + SIZE_DYN);
+                    let write_ptr = comp.data.as_mut_ptr().add(old_len);
                     ptr::write(write_ptr, tag_id);
                     ptr::write(
                         write_ptr.add(1).cast(),
@@ -1294,11 +1334,11 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                     );
                     reader
                         .read_exact(slice::from_raw_parts_mut(write_ptr.add(1 + 2), name_len))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr))?;
                     let write_ptr = write_ptr.add(header_len);
 
                     let mut len = [0u8; 4];
-                    reader.read_exact(&mut len).map_err(Error::IO)?;
+                    reader.read_exact(&mut len).map_err(map_err!(write_ptr))?;
                     let len = byteorder::U32::<O>::from_bytes(len).get() as usize;
                     let mut value = Vec::<byteorder::I64<R>>::with_capacity(len);
                     reader
@@ -1306,7 +1346,7 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                             value.as_mut_ptr().cast(),
                             len * 8,
                         ))
-                        .map_err(Error::IO)?;
+                        .map_err(map_err!(write_ptr.sub(header_len)))?;
                     value.set_len(len);
                     if TypeId::of::<R>() != TypeId::of::<O>() {
                         let s =
@@ -1316,10 +1356,11 @@ unsafe fn read_compound_from_reader<O: ByteOrder, R: ByteOrder>(
                         }
                     }
                     ptr::write(write_ptr.cast::<OwnVec<_>>(), value.into());
-                    compound_data.set_len(old_len + header_len + SIZE_DYN);
+                    comp.data.set_len(old_len + header_len + SIZE_DYN);
                 }
                 _ => {
                     cold_path();
+                    comp.data.push(0);
                     return Err(Error::INVALID(tag_id));
                 }
             }
@@ -1365,7 +1406,9 @@ unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
                 })
             }};
             ($parse:block) => {{
-                let mut list_data = Vec::with_capacity(1 + 4 + len * SIZE_DYN);
+                let mut guard: ListBuildGuard<R> =
+                    ListBuildGuard::new(Vec::with_capacity(1 + 4 + len * SIZE_DYN), tag_id);
+                let list_data = &mut guard.data;
                 let write_ptr = list_data.as_mut_ptr();
                 ptr::write(write_ptr, tag_id);
                 ptr::write(
@@ -1379,7 +1422,7 @@ unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
                 }
                 list_data.set_len(1 + 4 + len * SIZE_DYN);
                 Ok(OwnList {
-                    data: list_data.into(),
+                    data: guard.finalize().into(),
                     _marker: PhantomData,
                 })
             }};
@@ -1453,14 +1496,12 @@ unsafe fn read_list_from_reader<O: ByteOrder, R: ByteOrder>(
             }
             9 => {
                 case!({
-                    let list = ManuallyDrop::new(read_list_from_reader::<O, R>(reader)?);
-                    ptr::read(&list.data)
+                    read_list_from_reader::<O, R>(reader)?;
                 })
             }
             10 => {
                 case!({
-                    let compound = ManuallyDrop::new(read_compound_from_reader::<O, R>(reader)?);
-                    ptr::read(&compound.data)
+                    read_compound_from_reader::<O, R>(reader)?;
                 })
             }
             11 => {
