@@ -101,7 +101,7 @@ impl<'s, O: ByteOrder> Iterator for RefCompoundIter<'s, O> {
                 )),
             };
 
-            let value = <MutableConfig<O> as crate::ConfigRef>::read_value(
+            let value = <MutableConfig<O> as ConfigRef>::read_value(
                 tag_id,
                 self.data.add(3 + name_len as usize),
             );

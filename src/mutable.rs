@@ -6,7 +6,6 @@ mod into_nbt;
 mod list_mut;
 mod list_own;
 mod list_ref;
-mod nbt_impl;
 mod read;
 mod size;
 mod string_ref;

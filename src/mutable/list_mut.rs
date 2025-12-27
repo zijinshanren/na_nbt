@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ListBase, ListMut, MutTypedList, MutValue, MutVec, MutableConfig, NBT,
-    RefListIter, TagID, cold_path, mutable_tag_size,
+    ByteOrder, ConfigMut, ConfigRef, ListBase, ListMut, MutTypedList, MutValue, MutVec,
+    MutableConfig, NBT, RefListIter, TagID, cold_path, mutable_tag_size,
 };
 
 #[repr(transparent)]
@@ -49,7 +49,7 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
     }
 
     #[inline]
-    fn _to_read_params<'a>(&'a self) -> <Self::Config as crate::ConfigRef>::ReadParams<'a>
+    fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
     where
         's: 'a,
     {
@@ -64,7 +64,7 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
     }
 
     #[inline]
-    fn typed_<T: NBT>(self) -> Option<<Self::Config as crate::ConfigMut>::TypedListMut<'s, T>> {
+    fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigMut>::TypedListMut<'s, T>> {
         self.element_is_::<T>().then(|| {
             let mut new = MutTypedList {
                 data: self.data,
@@ -76,7 +76,7 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
     }
 
     #[inline]
-    fn iter<'a>(&'a self) -> <Self::Config as crate::ConfigRef>::ListIter<'a>
+    fn iter<'a>(&'a self) -> <Self::Config as ConfigRef>::ListIter<'a>
     where
         's: 'a,
     {
@@ -89,7 +89,7 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
     }
 
     #[inline]
-    fn iter_mut<'a>(&'a mut self) -> <Self::Config as crate::ConfigMut>::ListIterMut<'a>
+    fn iter_mut<'a>(&'a mut self) -> <Self::Config as ConfigMut>::ListIterMut<'a>
     where
         's: 'a,
     {

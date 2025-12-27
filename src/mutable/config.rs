@@ -66,7 +66,7 @@ impl<O: ByteOrder> ConfigRef for MutableConfig<O> {
     unsafe fn compound_get<'a, 'doc>(
         params: Self::ReadParams<'a>,
         key: &MUTF8Str,
-    ) -> Option<(crate::TagID, Self::ReadParams<'a>)>
+    ) -> Option<(TagID, Self::ReadParams<'a>)>
     where
         'doc: 'a,
     {
