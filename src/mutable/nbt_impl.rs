@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, MUTF8Str, MutCompound, MutList, MutString, MutVec, MutableConfig,
-    MutableGenericImpl, MutableImpl, NBT, RefCompound, RefList, RefString, SIZE_USIZE,
+    MutableGenericImpl, NBT, RefCompound, RefList, RefString, SIZE_USIZE,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -27,8 +27,6 @@ impl MutableGenericImpl for End {
     }
 }
 
-impl MutableImpl for End {}
-
 impl MutableGenericImpl for Byte {
     #[inline]
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
@@ -44,8 +42,6 @@ impl MutableGenericImpl for Byte {
         Some(unsafe { &mut *data.cast_mut().cast() })
     }
 }
-
-impl MutableImpl for Byte {}
 
 impl MutableGenericImpl for Short {
     #[inline]
@@ -63,8 +59,6 @@ impl MutableGenericImpl for Short {
     }
 }
 
-impl MutableImpl for Short {}
-
 impl MutableGenericImpl for Int {
     #[inline]
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
@@ -80,8 +74,6 @@ impl MutableGenericImpl for Int {
         Some(unsafe { &mut *data.cast_mut().cast() })
     }
 }
-
-impl MutableImpl for Int {}
 
 impl MutableGenericImpl for Long {
     #[inline]
@@ -99,8 +91,6 @@ impl MutableGenericImpl for Long {
     }
 }
 
-impl MutableImpl for Long {}
-
 impl MutableGenericImpl for Float {
     #[inline]
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
@@ -117,8 +107,6 @@ impl MutableGenericImpl for Float {
     }
 }
 
-impl MutableImpl for Float {}
-
 impl MutableGenericImpl for Double {
     #[inline]
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
@@ -134,8 +122,6 @@ impl MutableGenericImpl for Double {
         Some(unsafe { &mut *data.cast_mut().cast() })
     }
 }
-
-impl MutableImpl for Double {}
 
 impl MutableGenericImpl for ByteArray {
     #[inline]
@@ -162,8 +148,6 @@ impl MutableGenericImpl for ByteArray {
         }
     }
 }
-
-impl MutableImpl for ByteArray {}
 
 impl MutableGenericImpl for String {
     #[inline]
@@ -192,8 +176,6 @@ impl MutableGenericImpl for String {
         }
     }
 }
-
-impl MutableImpl for String {}
 
 impl MutableGenericImpl for List {
     #[inline]
@@ -226,8 +208,6 @@ impl MutableGenericImpl for List {
     }
 }
 
-impl MutableImpl for List {}
-
 impl MutableGenericImpl for Compound {
     #[inline]
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
@@ -259,8 +239,6 @@ impl MutableGenericImpl for Compound {
     }
 }
 
-impl MutableImpl for Compound {}
-
 impl MutableGenericImpl for IntArray {
     #[inline]
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
@@ -287,8 +265,6 @@ impl MutableGenericImpl for IntArray {
     }
 }
 
-impl MutableImpl for IntArray {}
-
 impl MutableGenericImpl for LongArray {
     #[inline]
     unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
@@ -314,8 +290,6 @@ impl MutableGenericImpl for LongArray {
         }
     }
 }
-
-impl MutableImpl for LongArray {}
 
 impl<T: NBT> MutableGenericImpl for TypedList<T> {
     #[inline]

@@ -1,6 +1,6 @@
-use std::borrow::Cow;
+use std::ops::Deref;
 
-use crate::{MUTF8Str, StringRef};
+use crate::MUTF8Str;
 
 #[derive(Clone)]
 pub struct RefString<'s> {
@@ -16,36 +16,11 @@ impl<'s> Default for RefString<'s> {
     }
 }
 
-impl<'s> RefString<'s> {
+impl<'s> Deref for RefString<'s> {
+    type Target = MUTF8Str;
+
     #[inline]
-    pub fn raw_bytes(&self) -> &MUTF8Str {
+    fn deref(&self) -> &Self::Target {
         self.data
-    }
-
-    #[inline]
-    pub fn decode<'a>(&'a self) -> Cow<'a, str> {
-        simd_cesu8::mutf8::decode_lossy(self.data.as_bytes())
-    }
-
-    #[inline]
-    pub fn to_utf8_string(&self) -> String {
-        self.decode().into_owned()
-    }
-}
-
-impl<'s> StringRef<'s> for RefString<'s> {
-    #[inline]
-    fn raw_bytes(&self) -> &MUTF8Str {
-        self.raw_bytes()
-    }
-
-    #[inline]
-    fn decode(&self) -> Cow<'_, str> {
-        self.decode()
-    }
-
-    #[inline]
-    fn to_utf8_string(&self) -> String {
-        self.to_utf8_string()
     }
 }

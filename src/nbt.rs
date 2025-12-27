@@ -1,6 +1,6 @@
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, Error, ImmutableGenericImpl, ImmutableImpl,
-    MutableGenericImpl, MutableImpl, NBTInto, NBTRef, cold_path,
+    ByteOrder, ConfigMut, ConfigRef, Error, ImmutableGenericImpl, MutableGenericImpl, NBTInto,
+    NBTRef, cold_path,
 };
 
 pub mod tag;
@@ -174,6 +174,6 @@ macro_rules! define_trait {
 
 define_trait!(GenericNBT: NBTBase, NBTInto, ImmutableGenericImpl, MutableGenericImpl);
 
-define_trait!(NBT: GenericNBT, NBTRef, ImmutableImpl, MutableImpl);
+define_trait!(NBT: GenericNBT, NBTRef);
 
 define_trait!(PrimitiveNBT: NBTBase, PrimitiveNBTBase);

@@ -1,49 +1,28 @@
-use std::borrow::Cow;
+use std::ops::Deref;
 
-use crate::{Document, MUTF8Str, ReadonlyArray, StringRef};
+use crate::{Document, MUTF8Str};
 
-pub type ReadonlyString<'doc, D> = ReadonlyArray<'doc, u8, D>;
+#[derive(Clone)]
+pub struct ReadonlyString<'doc, D> {
+    pub(crate) data: &'doc MUTF8Str,
+    pub(crate) _doc: D,
+}
 
-impl<'doc, D: Document> ReadonlyString<'doc, D> {
-    /// Returns the raw MUTF-8 bytes of the string.
-    ///
-    /// For most ASCII strings, this is identical to UTF-8. Use [`decode`](Self::decode)
-    /// for proper string conversion.
+impl<'doc, D: Document> Default for ReadonlyString<'doc, D> {
     #[inline]
-    pub fn raw_bytes(&self) -> &MUTF8Str {
-        unsafe { MUTF8Str::from_mutf8_unchecked(self.data) }
-    }
-
-    /// Decodes the MUTF-8 string to a Rust string.
-    ///
-    /// Returns a [`Cow<str>`](std::borrow::Cow) - borrowed if the string is valid UTF-8,
-    /// owned if conversion was needed.
-    ///
-    /// Invalid sequences are replaced with the Unicode replacement character (U+FFFD).
-    #[inline]
-    pub fn decode<'a>(&'a self) -> Cow<'a, str> {
-        simd_cesu8::mutf8::decode_lossy(self.data)
-    }
-
-    #[inline]
-    pub fn to_utf8_string(&self) -> String {
-        self.decode().into_owned()
+    fn default() -> Self {
+        Self {
+            data: Default::default(),
+            _doc: unsafe { D::never() },
+        }
     }
 }
 
-impl<'doc, D: Document> StringRef<'doc> for ReadonlyString<'doc, D> {
-    #[inline]
-    fn raw_bytes(&self) -> &MUTF8Str {
-        self.raw_bytes()
-    }
+impl<'doc, D: Document> Deref for ReadonlyString<'doc, D> {
+    type Target = MUTF8Str;
 
     #[inline]
-    fn decode(&self) -> std::borrow::Cow<'_, str> {
-        self.decode()
-    }
-
-    #[inline]
-    fn to_utf8_string(&self) -> String {
-        self.to_utf8_string()
+    fn deref(&self) -> &Self::Target {
+        self.data
     }
 }

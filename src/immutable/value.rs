@@ -3,13 +3,9 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, GenericNBT, ImmutableConfig, ImmutableImpl, Index, MapRef, Mark, NBT,
-    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString, ReadonlyTypedList, TagID,
-    ValueBase, ValueRef, VisitRef,
-    tag::{
-        Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
-        String,
-    },
+    ByteOrder, Document, GenericNBT, ImmutableConfig, Index, MapRef, Mark, NBT, ReadonlyArray,
+    ReadonlyCompound, ReadonlyList, ReadonlyString, ReadonlyTypedList, TagID, ValueBase, ValueRef,
+    VisitRef,
 };
 
 #[derive(Clone)]
@@ -38,22 +34,42 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyValue<'doc, O, D> {
 
 impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
     pub(crate) unsafe fn size(tag_id: TagID, data: *const u8, mark: *const Mark) -> (usize, usize) {
-        unsafe {
-            match tag_id {
-                TagID::End => End::size_immutable_impl::<O>(data, mark),
-                TagID::Byte => Byte::size_immutable_impl::<O>(data, mark),
-                TagID::Short => Short::size_immutable_impl::<O>(data, mark),
-                TagID::Int => Int::size_immutable_impl::<O>(data, mark),
-                TagID::Long => Long::size_immutable_impl::<O>(data, mark),
-                TagID::Float => Float::size_immutable_impl::<O>(data, mark),
-                TagID::Double => Double::size_immutable_impl::<O>(data, mark),
-                TagID::ByteArray => ByteArray::size_immutable_impl::<O>(data, mark),
-                TagID::String => String::size_immutable_impl::<O>(data, mark),
-                TagID::List => List::size_immutable_impl::<O>(data, mark),
-                TagID::Compound => Compound::size_immutable_impl::<O>(data, mark),
-                TagID::IntArray => IntArray::size_immutable_impl::<O>(data, mark),
-                TagID::LongArray => LongArray::size_immutable_impl::<O>(data, mark),
-            }
+        match tag_id {
+            TagID::End => (0, 0),
+            TagID::Byte => (1, 0),
+            TagID::Short => (2, 0),
+            TagID::Int => (4, 0),
+            TagID::Long => (8, 0),
+            TagID::Float => (4, 0),
+            TagID::Double => (8, 0),
+            TagID::ByteArray => (
+                4 + byteorder::U32::<O>::from_bytes(unsafe { *data.cast() }).get() as usize,
+                0,
+            ),
+            TagID::String => (
+                2 + byteorder::U16::<O>::from_bytes(unsafe { *data.cast() }).get() as usize,
+                0,
+            ),
+            TagID::List => unsafe {
+                (
+                    (*mark).store.end_pointer.byte_offset_from_unsigned(data),
+                    (*mark).store.flat_next_mark as usize,
+                )
+            },
+            TagID::Compound => unsafe {
+                (
+                    (*mark).store.end_pointer.byte_offset_from_unsigned(data),
+                    (*mark).store.flat_next_mark as usize,
+                )
+            },
+            TagID::IntArray => (
+                4 + byteorder::U32::<O>::from_bytes(unsafe { *data.cast() }).get() as usize * 4,
+                0,
+            ),
+            TagID::LongArray => (
+                4 + byteorder::U32::<O>::from_bytes(unsafe { *data.cast() }).get() as usize * 8,
+                0,
+            ),
         }
     }
 }

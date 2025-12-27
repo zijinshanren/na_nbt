@@ -3,17 +3,18 @@ use std::ops::Deref;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundRef, GenericNBT, ListRef, MUTF8Str, NBT, StringRef, TagID, TypedListRef, ValueRef, tag::{
+    ByteOrder, CompoundRef, GenericNBT, ListRef, MUTF8Str, NBT, TagID, TypedListRef, ValueRef,
+    tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
-    }
+    },
 };
 
 pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     type ByteOrder: ByteOrder;
     type Value<'doc>: ValueRef<'doc, Config = Self>;
     type ByteArray<'doc>: Deref<Target = [i8]> + Clone + Default;
-    type String<'doc>: StringRef<'doc>;
+    type String<'doc>: Deref<Target = MUTF8Str> + Clone + Default;
     type List<'doc>: ListRef<'doc, Config = Self>;
     type ListIter<'doc>: Iterator<Item = Self::Value<'doc>> + ExactSizeIterator + Clone + Default;
     type TypedList<'doc, T: NBT>: TypedListRef<'doc, T, Config = Self>;

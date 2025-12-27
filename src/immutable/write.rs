@@ -680,12 +680,14 @@ impl Writable for MUTF8Str {
 }
 
 impl<'doc, D: Document> Writable for ReadonlyString<'doc, D> {
+    #[inline]
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
-        self.raw_bytes().write_to_vec::<TARGET>()
+        self.data.write_to_vec::<TARGET>()
     }
 
+    #[inline]
     fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
-        self.raw_bytes().write_to_writer::<TARGET>(writer)
+        self.data.write_to_writer::<TARGET>(writer)
     }
 }
 

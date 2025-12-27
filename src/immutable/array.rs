@@ -9,6 +9,7 @@ pub struct ReadonlyArray<'doc, T, D: Document> {
 }
 
 impl<'doc, T, D: Document> Default for ReadonlyArray<'doc, T, D> {
+    #[inline]
     fn default() -> Self {
         Self {
             data: &[],
@@ -22,16 +23,6 @@ impl<'doc, T, D: Document> Deref for ReadonlyArray<'doc, T, D> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.data
-    }
-}
-
-impl<'doc, T, D: Document> ReadonlyArray<'doc, T, D> {
-    #[inline]
-    pub fn as_slice<'a>(&'a self) -> &'a [T]
-    where
-        'doc: 'a,
-    {
         self.data
     }
 }

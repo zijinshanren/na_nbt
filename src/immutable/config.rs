@@ -9,9 +9,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct ImmutableConfig<O: ByteOrder, D: Document> {
-    _marker: PhantomData<(O, D)>,
-}
+pub struct ImmutableConfig<O: ByteOrder, D: Document>(PhantomData<(O, D)>);
 
 impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
     type ByteOrder = O;
@@ -29,6 +27,7 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
 
     type ReadParams<'a> = (*const u8, *const Mark, &'a D);
 
+    #[inline]
     unsafe fn list_get<'a, 'doc, T: GenericNBT>(
         params: Self::ReadParams<'a>,
         index: usize,
@@ -42,7 +41,7 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
     unsafe fn compound_get<'a, 'doc>(
         params: Self::ReadParams<'a>,
         key: &MUTF8Str,
-    ) -> Option<(crate::TagID, Self::ReadParams<'a>)>
+    ) -> Option<(TagID, Self::ReadParams<'a>)>
     where
         'doc: 'a,
     {
@@ -103,16 +102,4 @@ pub trait ImmutableGenericImpl: NBTBase {
         params: <ImmutableConfig<O, D> as ConfigRef>::ReadParams<'a>,
         index: usize,
     ) -> <ImmutableConfig<O, D> as ConfigRef>::ReadParams<'a>;
-}
-
-pub trait ImmutableImpl: ImmutableGenericImpl {
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        payload: *const u8,
-        mark: *const Mark,
-    ) -> (usize, usize);
 }

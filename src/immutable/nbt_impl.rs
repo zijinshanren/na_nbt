@@ -3,8 +3,8 @@ use std::{marker::PhantomData, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, ImmutableConfig, ImmutableGenericImpl, ImmutableImpl, Mark,
-    NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
+    ByteOrder, ConfigRef, Document, ImmutableConfig, ImmutableGenericImpl, MUTF8Str, NBT,
+    ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -169,10 +169,10 @@ impl ImmutableGenericImpl for String {
     ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>> {
         Some(ReadonlyString {
             data: unsafe {
-                slice::from_raw_parts(
+                MUTF8Str::from_mutf8_unchecked(slice::from_raw_parts(
                     params.0.add(2).cast(),
                     byteorder::U16::<O>::from_bytes(*params.0.cast()).get() as usize,
-                )
+                ))
             },
             _doc: params.2.clone(),
         })
@@ -347,157 +347,5 @@ impl<T: NBT> ImmutableGenericImpl for TypedList<T> {
         index: usize,
     ) -> <ImmutableConfig<O, D> as ConfigRef>::ReadParams<'a> {
         unsafe { List::list_get_immutable_impl::<O, D>(params, index) }
-    }
-}
-
-impl ImmutableImpl for End {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        _payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (0, 0)
-    }
-}
-
-impl ImmutableImpl for Byte {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        _payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (1, 0)
-    }
-}
-
-impl ImmutableImpl for Short {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        _payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (2, 0)
-    }
-}
-
-impl ImmutableImpl for Int {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        _payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (4, 0)
-    }
-}
-
-impl ImmutableImpl for Long {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        _payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (8, 0)
-    }
-}
-
-impl ImmutableImpl for Float {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        _payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (4, 0)
-    }
-}
-
-impl ImmutableImpl for Double {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        _payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (8, 0)
-    }
-}
-
-impl ImmutableImpl for ByteArray {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (
-            4 + byteorder::U32::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize,
-            0,
-        )
-    }
-}
-
-impl ImmutableImpl for String {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (
-            2 + byteorder::U16::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize,
-            0,
-        )
-    }
-}
-
-impl ImmutableImpl for List {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        payload: *const u8,
-        mark: *const Mark,
-    ) -> (usize, usize) {
-        unsafe {
-            (
-                (*mark).store.end_pointer.byte_offset_from_unsigned(payload),
-                (*mark).store.flat_next_mark as usize,
-            )
-        }
-    }
-}
-
-impl ImmutableImpl for Compound {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        payload: *const u8,
-        mark: *const Mark,
-    ) -> (usize, usize) {
-        unsafe {
-            (
-                (*mark).store.end_pointer.byte_offset_from_unsigned(payload),
-                (*mark).store.flat_next_mark as usize,
-            )
-        }
-    }
-}
-
-impl ImmutableImpl for IntArray {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (
-            4 + byteorder::U32::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize * 4,
-            0,
-        )
-    }
-}
-
-impl ImmutableImpl for LongArray {
-    #[inline]
-    unsafe fn size_immutable_impl<O: ByteOrder>(
-        payload: *const u8,
-        _mark: *const Mark,
-    ) -> (usize, usize) {
-        (
-            4 + byteorder::U32::<O>::from_bytes(unsafe { *payload.cast() }).get() as usize * 8,
-            0,
-        )
     }
 }

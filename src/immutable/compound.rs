@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, GenericNBT,
-    ImmutableConfig, Mark, Never, ReadonlyString, ReadonlyValue, TagID, cold_path,
+    ImmutableConfig, MUTF8Str, Mark, Never, ReadonlyString, ReadonlyValue, TagID, cold_path,
 };
 
 #[derive(Clone)]
@@ -126,7 +126,10 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyCompoundIter<'doc, O,
 
             let name_len = byteorder::U16::<O>::from_bytes(*self.data.add(1).cast()).get();
             let name = ReadonlyString {
-                data: slice::from_raw_parts(self.data.add(3), name_len as usize),
+                data: MUTF8Str::from_mutf8_unchecked(slice::from_raw_parts(
+                    self.data.add(3),
+                    name_len as usize,
+                )),
                 _doc: self.doc.clone(),
             };
 

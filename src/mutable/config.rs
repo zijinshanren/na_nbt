@@ -324,5 +324,3 @@ pub trait MutableGenericImpl: NBTBase {
         params: <MutableConfig<O> as ConfigRef>::ReadParams<'a>,
     ) -> Option<Self::TypeMut<'doc, MutableConfig<O>>>;
 }
-
-pub trait MutableImpl: MutableGenericImpl {}
