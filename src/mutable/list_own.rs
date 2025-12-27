@@ -29,8 +29,8 @@ impl<O: ByteOrder> Default for OwnList<O> {
 
 impl<O: ByteOrder> OwnList<O> {
     #[inline]
-    pub fn _to_read_params<'a>(&'a self) -> <MutableConfig<O> as ConfigRef>::ReadParams<'a> {
-        self.data.as_ptr()
+    fn _to_read_params<'a>(&'a self) -> <MutableConfig<O> as ConfigRef>::ReadParams<'a> {
+        unsafe { self.data.as_ptr().add(1 + 4) }
     }
 
     #[inline]
