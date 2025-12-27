@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Index, MapRef, MutableConfig, NBT, RefCompound, RefList, RefString, RefTypedList,
-    TagID, ValueBase, ValueRef, VisitRef,
+    ByteOrder, MapRef, MutableConfig, NBT, RefCompound, RefList, RefString, RefTypedList, TagID,
+    ValueBase, ValueRef, VisitRef,
 };
 
 #[derive(Clone)]
@@ -31,9 +31,9 @@ impl<'s, O: ByteOrder> Default for RefValue<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> RefValue<'s, O> {
+impl<'s, O: ByteOrder> ValueBase for RefValue<'s, O> {
     #[inline]
-    pub fn tag_id(&self) -> TagID {
+    fn tag_id(&self) -> TagID {
         match self {
             RefValue::End(_) => TagID::End,
             RefValue::Byte(_) => TagID::Byte,
@@ -50,47 +50,12 @@ impl<'s, O: ByteOrder> RefValue<'s, O> {
             RefValue::LongArray(_) => TagID::LongArray,
         }
     }
-
-    #[inline]
-    pub fn is_<T: NBT>(&self) -> bool {
-        ValueBase::is_::<T>(self)
-    }
-
-    #[inline]
-    pub fn ref_<T: NBT>(&self) -> Option<&T::TypeRef<'s, MutableConfig<O>>> {
-        ValueRef::ref_::<T>(self)
-    }
-
-    #[inline]
-    pub fn into_<T: NBT>(self) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        ValueRef::into_::<T>(self)
-    }
-
-    #[inline]
-    pub fn get(&self, index: impl Index) -> Option<RefValue<'s, O>> {
-        ValueRef::get(self, index)
-    }
-
-    #[inline]
-    pub fn get_<T: NBT>(&self, index: impl Index) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        ValueRef::get_::<T>(self, index)
-    }
-}
-
-impl<'s, O: ByteOrder> ValueBase for RefValue<'s, O> {
-    #[inline]
-    fn tag_id(&self) -> TagID {
-        self.tag_id()
-    }
 }
 
 impl<'s, O: ByteOrder> ValueRef<'s> for RefValue<'s, O> {
     type Config = MutableConfig<O>;
 
-    fn visit<'a, R>(
-        &'a self,
-        match_fn: impl FnOnce(VisitRef<'a, 's, Self::Config>) -> R,
-    ) -> R
+    fn visit<'a, R>(&'a self, match_fn: impl FnOnce(VisitRef<'a, 's, Self::Config>) -> R) -> R
     where
         's: 'a,
     {

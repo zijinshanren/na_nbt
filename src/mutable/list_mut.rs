@@ -3,10 +3,11 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, GenericNBT, IntoNBT, ListBase, ListMut, MutTypedList, MutValue, MutVec,
-    MutableConfig, NBT, OwnValue, RefListIter, RefValue, TagID, cold_path, mutable_tag_size,
+    ByteOrder, ConfigMut, ListBase, ListMut, MutTypedList, MutValue, MutVec, MutableConfig, NBT,
+    RefListIter, TagID, cold_path, mutable_tag_size,
 };
 
+#[repr(transparent)]
 pub struct MutList<'s, O: ByteOrder> {
     pub(crate) data: MutVec<'s, u8>,
     pub(crate) _marker: PhantomData<O>,
@@ -27,115 +28,15 @@ impl<'s, O: ByteOrder> IntoIterator for MutList<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> MutList<'s, O> {
+impl<'s, O: ByteOrder> ListBase for MutList<'s, O> {
     #[inline]
-    pub fn element_tag_id(&self) -> TagID {
+    fn element_tag_id(&self) -> TagID {
         unsafe { *self.data.as_ptr().cast() }
     }
 
     #[inline]
-    pub fn element_is_<T: NBT>(&self) -> bool {
-        ListBase::element_is_::<T>(self)
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        ListBase::is_empty(self)
-    }
-
-    #[inline]
-    pub fn get<'a>(&'a self, index: usize) -> Option<RefValue<'a, O>> {
-        ListMut::get(self, index)
-    }
-
-    #[inline]
-    pub fn get_<'a, T: NBT>(&'a self, index: usize) -> Option<T::TypeRef<'a, MutableConfig<O>>> {
-        ListMut::get_::<T>(self, index)
-    }
-
-    #[inline]
-    pub fn get_mut<'a>(&'a mut self, index: usize) -> Option<MutValue<'a, O>> {
-        ListMut::get_mut(self, index)
-    }
-
-    #[inline]
-    pub fn get_mut_<'a, T: NBT>(
-        &'a mut self,
-        index: usize,
-    ) -> Option<T::TypeMut<'a, MutableConfig<O>>> {
-        ListMut::get_mut_::<T>(self, index)
-    }
-
-    #[inline]
-    pub fn push<V: IntoNBT<O>>(&mut self, value: V) {
-        ListMut::push(self, value)
-    }
-
-    #[inline]
-    pub fn pop(&mut self) -> Option<OwnValue<O>> {
-        ListMut::pop(self)
-    }
-
-    #[inline]
-    pub fn pop_<T: GenericNBT>(&mut self) -> Option<T::Type<O>> {
-        ListMut::pop_::<T>(self)
-    }
-
-    #[inline]
-    pub fn insert<V: IntoNBT<O>>(&mut self, index: usize, value: V) {
-        ListMut::insert(self, index, value)
-    }
-
-    #[inline]
-    pub fn remove(&mut self, index: usize) -> Option<OwnValue<O>> {
-        ListMut::remove(self, index)
-    }
-
-    #[inline]
-    pub fn remove_<T: GenericNBT>(&mut self, index: usize) -> Option<T::Type<O>> {
-        ListMut::remove_::<T>(self, index)
-    }
-
-    #[inline]
-    pub fn typed_<T: NBT>(self) -> Option<MutTypedList<'s, O, T>> {
-        ListMut::typed_::<T>(self)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> RefListIter<'s, O> {
-        RefListIter {
-            tag_id: self.element_tag_id(),
-            remaining: self.len() as u32,
-            data: self.data.as_ptr(),
-            _marker: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> MutListIter<'s, O> {
-        MutListIter {
-            tag_id: self.element_tag_id(),
-            remaining: self.len() as u32,
-            data: self.data.as_mut_ptr(),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'s, O: ByteOrder> ListBase for MutList<'s, O> {
-    #[inline]
-    fn element_tag_id(&self) -> TagID {
-        self.element_tag_id()
-    }
-
-    #[inline]
     fn len(&self) -> usize {
-        self.len()
+        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
     }
 }
 
@@ -179,7 +80,12 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
     where
         's: 'a,
     {
-        self.iter()
+        RefListIter {
+            tag_id: self.element_tag_id(),
+            remaining: self.len() as u32,
+            data: self.data.as_ptr(),
+            _marker: PhantomData,
+        }
     }
 
     #[inline]
@@ -187,7 +93,12 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
     where
         's: 'a,
     {
-        self.iter_mut()
+        MutListIter {
+            tag_id: self.element_tag_id(),
+            remaining: self.len() as u32,
+            data: self.data.as_mut_ptr(),
+            _marker: PhantomData,
+        }
     }
 }
 

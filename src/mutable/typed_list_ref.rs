@@ -8,6 +8,7 @@ use crate::{
 };
 
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct RefTypedList<'s, O: ByteOrder, T: NBT> {
     pub(crate) data: *const u8,
     pub(crate) _marker: PhantomData<(&'s (), O, T)>,
@@ -40,36 +41,10 @@ impl<'s, O: ByteOrder, T: NBT> IntoIterator for RefTypedList<'s, O, T> {
     }
 }
 
-impl<'s, O: ByteOrder, T: NBT> RefTypedList<'s, O, T> {
-    #[inline]
-    pub fn len(&self) -> usize {
-        unsafe { byteorder::U32::<O>::from_bytes(*self.data.add(1).cast()).get() as usize }
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        TypedListBase::is_empty(self)
-    }
-
-    #[inline]
-    pub fn get(&self, index: usize) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        TypedListRef::get(self, index)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> RefTypedListIter<'s, O, T> {
-        RefTypedListIter {
-            remaining: self.len() as u32,
-            data: unsafe { self.data.add(1 + 4) },
-            _marker: PhantomData,
-        }
-    }
-}
-
 impl<'s, O: ByteOrder, T: NBT> TypedListBase<T> for RefTypedList<'s, O, T> {
     #[inline]
     fn len(&self) -> usize {
-        self.len()
+        unsafe { byteorder::U32::<O>::from_bytes(*self.data.add(1).cast()).get() as usize }
     }
 }
 
@@ -86,7 +61,11 @@ impl<'s, O: ByteOrder, T: NBT> TypedListRef<'s, T> for RefTypedList<'s, O, T> {
 
     #[inline]
     fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'s, T> {
-        self.iter()
+        RefTypedListIter {
+            remaining: self.len() as u32,
+            data: unsafe { self.data.add(1 + 4) },
+            _marker: PhantomData,
+        }
     }
 }
 

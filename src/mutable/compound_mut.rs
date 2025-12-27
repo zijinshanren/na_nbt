@@ -3,11 +3,11 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundMut, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MUTF8Str,
-    MutValue, MutVec, MutableConfig, OwnValue, RefCompoundIter, RefString, RefValue, TagID,
-    cold_path, mutable_tag_size,
+    ByteOrder, CompoundBase, CompoundMut, ConfigMut, ConfigRef, MUTF8Str, MutValue, MutVec,
+    MutableConfig, RefCompoundIter, RefString, TagID, cold_path, mutable_tag_size,
 };
 
+#[repr(transparent)]
 pub struct MutCompound<'s, O: ByteOrder> {
     pub(crate) data: MutVec<'s, u8>,
     pub(crate) _marker: PhantomData<O>,
@@ -19,60 +19,6 @@ impl<'s, O: ByteOrder> IntoIterator for MutCompound<'s, O> {
 
     #[inline]
     fn into_iter(mut self) -> Self::IntoIter {
-        MutCompoundIter {
-            data: self.data.as_mut_ptr(),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'s, O: ByteOrder> MutCompound<'s, O> {
-    #[inline]
-    pub fn get<'a>(&'a self, key: &str) -> Option<RefValue<'a, O>> {
-        CompoundMut::get(self, key)
-    }
-
-    #[inline]
-    pub fn get_<'a, T: GenericNBT>(
-        &'a self,
-        key: &str,
-    ) -> Option<T::TypeRef<'a, MutableConfig<O>>> {
-        CompoundMut::get_::<T>(self, key)
-    }
-
-    #[inline]
-    pub fn get_mut<'a>(&'a mut self, key: &str) -> Option<MutValue<'a, O>> {
-        CompoundMut::get_mut(self, key)
-    }
-
-    #[inline]
-    pub fn get_mut_<'a, T: GenericNBT>(
-        &'a mut self,
-        key: &str,
-    ) -> Option<T::TypeMut<'a, MutableConfig<O>>> {
-        CompoundMut::get_mut_::<T>(self, key)
-    }
-
-    #[inline]
-    pub fn insert(&mut self, key: &str, value: impl IntoNBT<O>) -> Option<OwnValue<O>> {
-        CompoundMut::insert(self, key, value)
-    }
-
-    #[inline]
-    pub fn remove(&mut self, key: &str) -> Option<OwnValue<O>> {
-        CompoundMut::remove(self, key)
-    }
-
-    #[inline]
-    pub fn iter<'a>(&'a self) -> RefCompoundIter<'a, O> {
-        RefCompoundIter {
-            data: self.data.as_ptr(),
-            _marker: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub fn iter_mut<'a>(&'a mut self) -> MutCompoundIter<'a, O> {
         MutCompoundIter {
             data: self.data.as_mut_ptr(),
             _marker: PhantomData,
@@ -106,7 +52,10 @@ impl<'s, O: ByteOrder> CompoundMut<'s> for MutCompound<'s, O> {
     where
         's: 'a,
     {
-        self.iter()
+        RefCompoundIter {
+            data: self.data.as_ptr(),
+            _marker: PhantomData,
+        }
     }
 
     #[inline]
@@ -114,7 +63,10 @@ impl<'s, O: ByteOrder> CompoundMut<'s> for MutCompound<'s, O> {
     where
         's: 'a,
     {
-        self.iter_mut()
+        MutCompoundIter {
+            data: self.data.as_mut_ptr(),
+            _marker: PhantomData,
+        }
     }
 }
 pub struct MutCompoundIter<'s, O: ByteOrder> {

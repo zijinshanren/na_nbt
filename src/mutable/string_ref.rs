@@ -3,6 +3,7 @@ use std::ops::Deref;
 use crate::MUTF8Str;
 
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct RefString<'s> {
     pub(crate) data: &'s MUTF8Str,
 }

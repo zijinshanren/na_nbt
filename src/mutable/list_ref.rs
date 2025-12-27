@@ -8,6 +8,7 @@ use crate::{
 };
 
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct RefList<'s, O: ByteOrder> {
     pub(crate) data: *const u8,
     pub(crate) _marker: PhantomData<(&'s (), O)>,
@@ -41,65 +42,15 @@ impl<'s, O: ByteOrder> IntoIterator for RefList<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> RefList<'s, O> {
+impl<'s, O: ByteOrder> ListBase for RefList<'s, O> {
     #[inline]
-    pub fn element_tag_id(&self) -> TagID {
+    fn element_tag_id(&self) -> TagID {
         unsafe { *self.data.cast() }
     }
 
     #[inline]
-    pub fn element_is_<T: NBT>(&self) -> bool {
-        ListBase::element_is_::<T>(self)
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        unsafe { byteorder::U32::<O>::from_bytes(*self.data.add(1).cast()).get() as usize }
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        ListBase::is_empty(self)
-    }
-
-    #[inline]
-    pub fn get(&self, index: usize) -> Option<RefValue<'s, O>> {
-        ListRef::get(self, index)
-    }
-
-    #[inline]
-    pub fn get_<T: crate::NBT>(&self, index: usize) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        ListRef::get_::<T>(self, index)
-    }
-
-    #[inline]
-    pub fn typed_<T: crate::NBT>(self) -> Option<RefTypedList<'s, O, T>> {
-        self.element_is_::<T>().then_some(RefTypedList {
-            data: self.data,
-            _marker: PhantomData,
-        })
-    }
-
-    #[inline]
-    pub fn iter(&self) -> RefListIter<'s, O> {
-        RefListIter {
-            tag_id: self.element_tag_id(),
-            remaining: self.len() as u32,
-            data: unsafe { self.data.add(1 + 4) },
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'s, O: ByteOrder> ListBase for RefList<'s, O> {
-    #[inline]
-    fn element_tag_id(&self) -> TagID {
-        self.element_tag_id()
-    }
-
-    #[inline]
     fn len(&self) -> usize {
-        self.len()
+        unsafe { byteorder::U32::<O>::from_bytes(*self.data.add(1).cast()).get() as usize }
     }
 }
 
@@ -116,12 +67,20 @@ impl<'s, O: ByteOrder> ListRef<'s> for RefList<'s, O> {
 
     #[inline]
     fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'s, T>> {
-        self.typed_::<T>()
+        self.element_is_::<T>().then_some(RefTypedList {
+            data: self.data,
+            _marker: PhantomData,
+        })
     }
 
     #[inline]
     fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'s> {
-        self.iter()
+        RefListIter {
+            tag_id: self.element_tag_id(),
+            remaining: self.len() as u32,
+            data: unsafe { self.data.add(1 + 4) },
+            _marker: PhantomData,
+        }
     }
 }
 

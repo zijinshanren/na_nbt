@@ -3,7 +3,7 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, MUTF8Str, MutCompound, MutList, MutString, MutVec, MutableConfig,
+    ByteOrder, ListMut, ListRef, MUTF8Str, MutCompound, MutList, MutString, MutVec, MutableConfig,
     MutableGenericImpl, NBT, RefCompound, RefList, RefString, SIZE_USIZE,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,

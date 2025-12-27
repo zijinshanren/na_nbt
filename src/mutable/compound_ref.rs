@@ -3,11 +3,12 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundRef, ConfigRef, EMPTY_COMPOUND, MUTF8Str, MutableConfig, NBT,
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, EMPTY_COMPOUND, MUTF8Str, MutableConfig,
     RefString, RefValue, TagID, cold_path, mutable_tag_size,
 };
 
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct RefCompound<'s, O: ByteOrder> {
     pub(crate) data: *const u8,
     pub(crate) _marker: PhantomData<(&'s (), O)>,
@@ -39,26 +40,6 @@ impl<'s, O: ByteOrder> IntoIterator for RefCompound<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> RefCompound<'s, O> {
-    #[inline]
-    pub fn get(&self, key: &str) -> Option<RefValue<'s, O>> {
-        CompoundRef::get(self, key)
-    }
-
-    #[inline]
-    pub fn get_<T: NBT>(&self, key: &str) -> Option<T::TypeRef<'s, MutableConfig<O>>> {
-        CompoundRef::get_::<T>(self, key)
-    }
-
-    #[inline]
-    fn iter(&self) -> RefCompoundIter<'s, O> {
-        RefCompoundIter {
-            data: self.data,
-            _marker: PhantomData,
-        }
-    }
-}
-
 impl<'s, O: ByteOrder> CompoundBase for RefCompound<'s, O> {}
 
 impl<'s, O: ByteOrder> CompoundRef<'s> for RefCompound<'s, O> {
@@ -74,7 +55,10 @@ impl<'s, O: ByteOrder> CompoundRef<'s> for RefCompound<'s, O> {
 
     #[inline]
     fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'s> {
-        self.iter()
+        RefCompoundIter {
+            data: self.data,
+            _marker: PhantomData,
+        }
     }
 }
 
