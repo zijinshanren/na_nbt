@@ -490,7 +490,7 @@ pub trait ListMut<'s>:
         index: usize,
         value: V,
     ) {
-        if index >= self.len() {
+        if index > self.len() {
             cold_path();
             return;
         }
@@ -674,7 +674,7 @@ pub trait TypedListMut<'s, T: NBT>:
         index: usize,
         value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
     ) {
-        if index >= self.len() {
+        if index > self.len() {
             cold_path();
             return;
         }

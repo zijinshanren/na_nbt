@@ -83,7 +83,7 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
         RefListIter {
             tag_id: self.element_tag_id(),
             remaining: self.len() as u32,
-            data: self.data.as_ptr(),
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
             _marker: PhantomData,
         }
     }
@@ -96,7 +96,7 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
         MutListIter {
             tag_id: self.element_tag_id(),
             remaining: self.len() as u32,
-            data: self.data.as_mut_ptr(),
+            data: unsafe { self.data.as_mut_ptr().add(1 + 4) },
             _marker: PhantomData,
         }
     }

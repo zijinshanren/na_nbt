@@ -90,7 +90,7 @@ impl<O: ByteOrder, T: NBT> OwnTypedList<O, T> {
 
     #[inline]
     pub fn insert(&mut self, index: usize, value: impl IntoNBT<O, Tag = T>) {
-        if index >= self.len() {
+        if index > self.len() {
             cold_path();
             return;
         }

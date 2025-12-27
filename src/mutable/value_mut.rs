@@ -111,6 +111,7 @@ impl<'s, O: ByteOrder> ValueMut<'s> for MutValue<'s, O> {
         }
     }
 
+    #[allow(clippy::unit_arg)]
     fn to_ref<'a>(&'a self) -> RefValue<'a, O> {
         match self {
             MutValue::End(value) => RefValue::End(**value),
@@ -120,7 +121,7 @@ impl<'s, O: ByteOrder> ValueMut<'s> for MutValue<'s, O> {
             MutValue::Long(value) => RefValue::Long(value.get()),
             MutValue::Float(value) => RefValue::Float(value.get()),
             MutValue::Double(value) => RefValue::Double(value.get()),
-            MutValue::ByteArray(value) => RefValue::ByteArray(&*value),
+            MutValue::ByteArray(value) => RefValue::ByteArray(value),
             MutValue::String(value) => RefValue::String(RefString {
                 data: value.as_mutf8_str(),
             }),
@@ -132,8 +133,8 @@ impl<'s, O: ByteOrder> ValueMut<'s> for MutValue<'s, O> {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             }),
-            MutValue::IntArray(value) => RefValue::IntArray(&*value),
-            MutValue::LongArray(value) => RefValue::LongArray(&*value),
+            MutValue::IntArray(value) => RefValue::IntArray(value),
+            MutValue::LongArray(value) => RefValue::LongArray(value),
         }
     }
 }

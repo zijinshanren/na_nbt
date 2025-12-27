@@ -28,7 +28,7 @@ impl<O: ByteOrder> IntoNBT<O> for i16 {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::I16::<O>::new(self).into()
+        byteorder::I16::<O>::new(self)
     }
 }
 
@@ -37,7 +37,7 @@ impl<O: ByteOrder, R: ByteOrder> IntoNBT<O> for byteorder::I16<R> {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::I16::<O>::new(self.get()).into()
+        byteorder::I16::<O>::new(self.get())
     }
 }
 
@@ -46,7 +46,7 @@ impl<O: ByteOrder> IntoNBT<O> for i32 {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::I32::<O>::new(self).into()
+        byteorder::I32::<O>::new(self)
     }
 }
 
@@ -55,7 +55,7 @@ impl<O: ByteOrder, R: ByteOrder> IntoNBT<O> for byteorder::I32<R> {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::I32::<O>::new(self.get()).into()
+        byteorder::I32::<O>::new(self.get())
     }
 }
 
@@ -64,7 +64,7 @@ impl<O: ByteOrder> IntoNBT<O> for i64 {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::I64::<O>::new(self).into()
+        byteorder::I64::<O>::new(self)
     }
 }
 
@@ -73,7 +73,7 @@ impl<O: ByteOrder, R: ByteOrder> IntoNBT<O> for byteorder::I64<R> {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::I64::<O>::new(self.get()).into()
+        byteorder::I64::<O>::new(self.get())
     }
 }
 
@@ -82,7 +82,7 @@ impl<O: ByteOrder> IntoNBT<O> for f32 {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::F32::<O>::new(self).into()
+        byteorder::F32::<O>::new(self)
     }
 }
 
@@ -91,7 +91,7 @@ impl<O: ByteOrder, R: ByteOrder> IntoNBT<O> for byteorder::F32<R> {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::F32::<O>::new(self.get()).into()
+        byteorder::F32::<O>::new(self.get())
     }
 }
 
@@ -100,7 +100,7 @@ impl<O: ByteOrder> IntoNBT<O> for f64 {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::F64::<O>::new(self).into()
+        byteorder::F64::<O>::new(self)
     }
 }
 
@@ -109,7 +109,7 @@ impl<O: ByteOrder, R: ByteOrder> IntoNBT<O> for byteorder::F64<R> {
 
     #[inline]
     fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
-        byteorder::F64::<O>::new(self.get()).into()
+        byteorder::F64::<O>::new(self.get())
     }
 }
 

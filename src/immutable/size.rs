@@ -2,6 +2,11 @@ use zerocopy::byteorder;
 
 use crate::{ByteOrder, Mark, TagID};
 
+/// .
+///
+/// # Safety
+///
+/// .
 pub const unsafe fn immutable_tag_size<O: ByteOrder>(
     tag_id: TagID,
     data: *const u8,

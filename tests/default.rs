@@ -1,11 +1,12 @@
 use na_nbt::{
     BigEndian, BorrowedValue, LittleEndian, OwnValue, RefCompound, RefList, RefValue, SharedValue,
     ValueBase, ValueRef,
-    tag::{Compound, End, Int, IntArray, List, TypedList},
+    tag::{Compound, End, Int, IntArray, List, String, TypedList},
 };
 
 #[test]
-fn default() {
+#[allow(clippy::never_loop)]
+fn test_default() {
     assert!(SharedValue::<LittleEndian>::default().is_::<End>());
     assert!(SharedValue::<BigEndian>::default().is_::<End>());
     assert!(BorrowedValue::<LittleEndian>::default().is_::<End>());
@@ -15,6 +16,22 @@ fn default() {
     assert!(OwnValue::<LittleEndian>::default().is_::<End>());
     assert!(OwnValue::<BigEndian>::default().is_::<End>());
 
+    assert!(
+        SharedValue::<LittleEndian>::default()
+            .into_::<String>()
+            .unwrap_or_default()
+            .as_bytes()
+            .is_empty()
+    );
+
+    assert!(
+        SharedValue::<BigEndian>::default()
+            .into_::<String>()
+            .unwrap_or_default()
+            .as_bytes()
+            .is_empty()
+    );
+
     for _ in SharedValue::<LittleEndian>::default()
         .into_::<List>()
         .unwrap_or_default()
@@ -50,7 +67,7 @@ fn default() {
     for _ in SharedValue::<LittleEndian>::default()
         .into_::<IntArray>()
         .unwrap_or_default()
-        .into_iter()
+        .iter()
     {
         panic!("IntArray is not empty");
     }
@@ -58,7 +75,7 @@ fn default() {
     for _ in SharedValue::<BigEndian>::default()
         .into_::<IntArray>()
         .unwrap_or_default()
-        .into_iter()
+        .iter()
     {
         panic!("IntArray is not empty");
     }

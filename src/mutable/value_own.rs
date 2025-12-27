@@ -145,6 +145,7 @@ impl<O: ByteOrder> OwnValue<O> {
     }
 
     #[inline]
+    #[allow(clippy::unit_arg)]
     pub fn to_ref<'a>(&'a self) -> RefValue<'a, O> {
         match self {
             OwnValue::End(value) => RefValue::End(*value),
@@ -154,7 +155,7 @@ impl<O: ByteOrder> OwnValue<O> {
             OwnValue::Long(value) => RefValue::Long(value.get()),
             OwnValue::Float(value) => RefValue::Float(value.get()),
             OwnValue::Double(value) => RefValue::Double(value.get()),
-            OwnValue::ByteArray(value) => RefValue::ByteArray(&*value),
+            OwnValue::ByteArray(value) => RefValue::ByteArray(value),
             OwnValue::String(value) => RefValue::String(RefString {
                 data: value.as_mutf8_str(),
             }),
@@ -166,8 +167,8 @@ impl<O: ByteOrder> OwnValue<O> {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             }),
-            OwnValue::IntArray(value) => RefValue::IntArray(&*value),
-            OwnValue::LongArray(value) => RefValue::LongArray(&*value),
+            OwnValue::IntArray(value) => RefValue::IntArray(value),
+            OwnValue::LongArray(value) => RefValue::LongArray(value),
         }
     }
 

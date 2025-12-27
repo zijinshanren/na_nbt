@@ -99,6 +99,7 @@ impl<O: ByteOrder> ConfigRef for MutableConfig<O> {
 
     #[allow(forgetting_copy_types)]
     #[allow(forgetting_references)]
+    #[allow(clippy::forget_non_drop)]
     unsafe fn read<'a, 'doc, T: GenericNBT>(
         params: Self::ReadParams<'a>,
     ) -> Option<T::TypeRef<'doc, Self>> {
@@ -154,6 +155,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
     type WriteParams<'a> = MutVec<'a, u8>;
 
     #[allow(forgetting_references)]
+    #[allow(clippy::forget_non_drop)]
     unsafe fn read_mut<'a, 'doc, T: GenericNBT>(
         params: Self::ReadParams<'a>,
     ) -> Option<T::TypeMut<'doc, Self>> {

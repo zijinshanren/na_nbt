@@ -693,20 +693,20 @@ impl<'a> MutString<'a> {
 
     /// Returns a byte slice of this String's contents (mutf8 encoded).
     #[inline]
-    pub fn as_mutf8_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
     }
 
     #[inline]
     pub fn as_mutf8_str(&self) -> &MUTF8Str {
-        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_mutf8_bytes()) }
+        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_bytes()) }
     }
 
     /// Decodes the mutf8 content and returns the decoded string.
     #[inline]
     pub fn decode(&self) -> std::borrow::Cow<'_, str> {
-        simd_cesu8::mutf8::decode_lossy(self.as_mutf8_bytes())
+        simd_cesu8::mutf8::decode_lossy(self.as_bytes())
     }
 
     /// Returns a raw pointer to the String's buffer.
@@ -878,7 +878,7 @@ impl fmt::Display for MutString<'_> {
 
 impl PartialEq for MutString<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_mutf8_bytes() == other.as_mutf8_bytes()
+        self.as_bytes() == other.as_bytes()
     }
 }
 
@@ -910,19 +910,19 @@ impl PartialOrd for MutString<'_> {
 
 impl Ord for MutString<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.as_mutf8_bytes().cmp(other.as_mutf8_bytes())
+        self.as_bytes().cmp(other.as_bytes())
     }
 }
 
 impl Hash for MutString<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_mutf8_bytes().hash(state);
+        self.as_bytes().hash(state);
     }
 }
 
 impl AsRef<[u8]> for MutString<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.as_mutf8_bytes()
+        self.as_bytes()
     }
 }
 

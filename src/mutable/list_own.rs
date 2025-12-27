@@ -409,7 +409,7 @@ impl<O: ByteOrder> OwnList<O> {
 
     #[inline]
     pub fn insert<V: IntoNBT<O>>(&mut self, index: usize, value: V) {
-        if index >= self.len() {
+        if index > self.len() {
             cold_path();
             return;
         }

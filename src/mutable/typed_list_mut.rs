@@ -60,7 +60,7 @@ impl<'s, O: ByteOrder, T: NBT> TypedListMut<'s, T> for MutTypedList<'s, O, T> {
     {
         RefTypedListIter {
             remaining: self.len() as u32,
-            data: self.data.as_ptr(),
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
             _marker: PhantomData,
         }
     }
@@ -72,7 +72,7 @@ impl<'s, O: ByteOrder, T: NBT> TypedListMut<'s, T> for MutTypedList<'s, O, T> {
     {
         MutTypedListIter {
             remaining: self.len() as u32,
-            data: self.data.as_mut_ptr(),
+            data: unsafe { self.data.as_mut_ptr().add(1 + 4) },
             _marker: PhantomData,
         }
     }
