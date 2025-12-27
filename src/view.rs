@@ -12,6 +12,7 @@ use std::{
     slice::{self, SliceIndex},
 };
 
+use simd_cesu8::DecodingError;
 use zerocopy::Unalign;
 
 use crate::MUTF8Str;
@@ -705,8 +706,23 @@ impl<'a> MutString<'a> {
 
     /// Decodes the mutf8 content and returns the decoded string.
     #[inline]
-    pub fn decode(&self) -> std::borrow::Cow<'_, str> {
+    pub fn decode_lossy(&self) -> std::borrow::Cow<'_, str> {
         simd_cesu8::mutf8::decode_lossy(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_strict(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode_strict(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_lossy_strict(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy_strict(self.as_bytes())
     }
 
     /// Returns a raw pointer to the String's buffer.
@@ -866,13 +882,13 @@ impl<'a> MutString<'a> {
 
 impl fmt::Debug for MutString<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&*self.decode(), f)
+        fmt::Debug::fmt(&*self.decode_lossy(), f)
     }
 }
 
 impl fmt::Display for MutString<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&*self.decode(), f)
+        fmt::Display::fmt(&*self.decode_lossy(), f)
     }
 }
 
@@ -884,19 +900,19 @@ impl PartialEq for MutString<'_> {
 
 impl PartialEq<String> for MutString<'_> {
     fn eq(&self, other: &String) -> bool {
-        &*self.decode() == other.as_str()
+        &*self.decode_lossy() == other.as_str()
     }
 }
 
 impl PartialEq<str> for MutString<'_> {
     fn eq(&self, other: &str) -> bool {
-        &*self.decode() == other
+        &*self.decode_lossy() == other
     }
 }
 
 impl PartialEq<&str> for MutString<'_> {
     fn eq(&self, other: &&str) -> bool {
-        &*self.decode() == *other
+        &*self.decode_lossy() == *other
     }
 }
 
@@ -1662,20 +1678,35 @@ impl OwnString {
 
     /// Returns a byte slice of this String's contents (mutf8 encoded).
     #[inline]
-    pub fn as_mutf8_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
     }
 
     #[inline]
     pub fn as_mutf8_str(&self) -> &MUTF8Str {
-        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_mutf8_bytes()) }
+        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_bytes()) }
     }
 
     /// Decodes the mutf8 content and returns the decoded string.
     #[inline]
-    pub fn decode(&self) -> std::borrow::Cow<'_, str> {
-        simd_cesu8::mutf8::decode_lossy(self.as_mutf8_bytes())
+    pub fn decode_lossy(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_strict(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode_strict(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_lossy_strict(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy_strict(self.as_bytes())
     }
 
     /// Returns a raw pointer to the String's buffer.
@@ -1830,37 +1861,37 @@ impl OwnString {
 
 impl fmt::Debug for OwnString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&*self.decode(), f)
+        fmt::Debug::fmt(&*self.decode_lossy(), f)
     }
 }
 
 impl fmt::Display for OwnString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&*self.decode(), f)
+        fmt::Display::fmt(&*self.decode_lossy(), f)
     }
 }
 
 impl PartialEq for OwnString {
     fn eq(&self, other: &Self) -> bool {
-        self.as_mutf8_bytes() == other.as_mutf8_bytes()
+        self.as_bytes() == other.as_bytes()
     }
 }
 
 impl PartialEq<String> for OwnString {
     fn eq(&self, other: &String) -> bool {
-        &*self.decode() == other.as_str()
+        &*self.decode_lossy() == other.as_str()
     }
 }
 
 impl PartialEq<str> for OwnString {
     fn eq(&self, other: &str) -> bool {
-        &*self.decode() == other
+        &*self.decode_lossy() == other
     }
 }
 
 impl PartialEq<&str> for OwnString {
     fn eq(&self, other: &&str) -> bool {
-        &*self.decode() == *other
+        &*self.decode_lossy() == *other
     }
 }
 
@@ -1874,19 +1905,19 @@ impl PartialOrd for OwnString {
 
 impl Ord for OwnString {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.as_mutf8_bytes().cmp(other.as_mutf8_bytes())
+        self.as_bytes().cmp(other.as_bytes())
     }
 }
 
 impl Hash for OwnString {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_mutf8_bytes().hash(state);
+        self.as_bytes().hash(state);
     }
 }
 
 impl AsRef<[u8]> for OwnString {
     fn as_ref(&self) -> &[u8] {
-        self.as_mutf8_bytes()
+        self.as_bytes()
     }
 }
 
