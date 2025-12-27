@@ -4,7 +4,8 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, MapMut, MutCompound, MutList, MutString, MutTypedList, MutVec, MutableConfig, NBT,
-    TagID, ValueBase, ValueMut, VisitMut, VisitMutShared,
+    RefCompound, RefList, RefString, RefValue, TagID, ValueBase, ValueMut, VisitMut,
+    VisitMutShared,
 };
 
 pub enum MutValue<'s, O: ByteOrder> {
@@ -107,6 +108,32 @@ impl<'s, O: ByteOrder> ValueMut<'s> for MutValue<'s, O> {
             MutValue::Compound(value) => match_fn(MapMut::Compound(value)),
             MutValue::IntArray(value) => match_fn(MapMut::IntArray(value)),
             MutValue::LongArray(value) => match_fn(MapMut::LongArray(value)),
+        }
+    }
+
+    fn to_ref<'a>(&'a self) -> RefValue<'a, O> {
+        match self {
+            MutValue::End(value) => RefValue::End(**value),
+            MutValue::Byte(value) => RefValue::Byte(**value),
+            MutValue::Short(value) => RefValue::Short(value.get()),
+            MutValue::Int(value) => RefValue::Int(value.get()),
+            MutValue::Long(value) => RefValue::Long(value.get()),
+            MutValue::Float(value) => RefValue::Float(value.get()),
+            MutValue::Double(value) => RefValue::Double(value.get()),
+            MutValue::ByteArray(value) => RefValue::ByteArray(&*value),
+            MutValue::String(value) => RefValue::String(RefString {
+                data: value.as_mutf8_str(),
+            }),
+            MutValue::List(value) => RefValue::List(RefList {
+                data: value.data.as_ptr(),
+                _marker: PhantomData,
+            }),
+            MutValue::Compound(value) => RefValue::Compound(RefCompound {
+                data: value.data.as_ptr(),
+                _marker: PhantomData,
+            }),
+            MutValue::IntArray(value) => RefValue::IntArray(&*value),
+            MutValue::LongArray(value) => RefValue::LongArray(&*value),
         }
     }
 }

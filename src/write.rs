@@ -268,6 +268,18 @@ impl Writable for [i8] {
     }
 }
 
+impl<const N: usize> Writable for [i8; N] {
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        self.as_slice().write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.as_slice().write_to_writer::<TARGET>(writer)
+    }
+}
+
 impl Writable for MUTF8Str {
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
@@ -366,6 +378,18 @@ impl<O: ByteOrder> Writable for [byteorder::I32<O>] {
     }
 }
 
+impl<O: ByteOrder, const N: usize> Writable for [byteorder::I32<O>; N] {
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        self.as_slice().write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.as_slice().write_to_writer::<TARGET>(writer)
+    }
+}
+
 impl<O: ByteOrder> Writable for [byteorder::I64<O>] {
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
@@ -424,5 +448,17 @@ impl<O: ByteOrder> Writable for [byteorder::I64<O>] {
             }
             Ok(())
         }
+    }
+}
+
+impl<O: ByteOrder, const N: usize> Writable for [byteorder::I64<O>; N] {
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        self.as_slice().write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.as_slice().write_to_writer::<TARGET>(writer)
     }
 }

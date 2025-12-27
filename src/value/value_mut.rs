@@ -125,6 +125,8 @@ pub trait ValueMut<'s>:
         's: 'a;
 
     fn map<R>(self, match_fn: impl FnOnce(MapMut<'s, Self::Config>) -> R) -> R;
+
+    fn to_ref<'a>(&'a self) -> <Self::Config as ConfigRef>::Value<'a>;
 }
 
 pub trait ListMut<'s>:

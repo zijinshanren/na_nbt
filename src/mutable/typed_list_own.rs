@@ -3,8 +3,8 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, IntoNBT, MutVec, MutableConfig, NBT, OwnCompound, OwnList,
-    OwnString, OwnVec, TagID, cold_path, mutable_tag_size,
+    ByteOrder, ConfigMut, ConfigRef, IntoNBT, MutableConfig, NBT, OwnCompound, OwnList, OwnString,
+    OwnVec, TagID, cold_path, mutable_tag_size,
 };
 
 #[repr(transparent)]
@@ -30,7 +30,7 @@ impl<O: ByteOrder, T: NBT> OwnTypedList<O, T> {
 
     #[inline]
     pub fn _to_write_params<'a>(&'a mut self) -> <MutableConfig<O> as ConfigMut>::WriteParams<'a> {
-        unsafe { MutVec::from_own(&mut self.data) }
+        self.data.to_mut()
     }
 
     #[inline]

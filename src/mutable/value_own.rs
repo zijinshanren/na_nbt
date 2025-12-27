@@ -3,8 +3,8 @@ use std::{marker::PhantomData, mem::ManuallyDrop, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, GenericNBT, Index, MutValue, MutableConfig, NBT, OwnCompound, OwnList, OwnString,
-    OwnTypedList, OwnVec, RefValue, TagID,
+    ByteOrder, GenericNBT, Index, MutCompound, MutList, MutValue, MutableConfig, NBT, OwnCompound,
+    OwnList, OwnString, OwnTypedList, OwnVec, RefCompound, RefList, RefString, RefValue, TagID,
 };
 
 pub enum OwnValue<O: ByteOrder> {
@@ -142,6 +142,58 @@ impl<O: ByteOrder> OwnValue<O> {
                 _ => None,
             },
         )
+    }
+
+    #[inline]
+    pub fn to_ref<'a>(&'a self) -> RefValue<'a, O> {
+        match self {
+            OwnValue::End(value) => RefValue::End(*value),
+            OwnValue::Byte(value) => RefValue::Byte(*value),
+            OwnValue::Short(value) => RefValue::Short(value.get()),
+            OwnValue::Int(value) => RefValue::Int(value.get()),
+            OwnValue::Long(value) => RefValue::Long(value.get()),
+            OwnValue::Float(value) => RefValue::Float(value.get()),
+            OwnValue::Double(value) => RefValue::Double(value.get()),
+            OwnValue::ByteArray(value) => RefValue::ByteArray(&*value),
+            OwnValue::String(value) => RefValue::String(RefString {
+                data: value.as_mutf8_str(),
+            }),
+            OwnValue::List(value) => RefValue::List(RefList {
+                data: value.data.as_ptr(),
+                _marker: PhantomData,
+            }),
+            OwnValue::Compound(value) => RefValue::Compound(RefCompound {
+                data: value.data.as_ptr(),
+                _marker: PhantomData,
+            }),
+            OwnValue::IntArray(value) => RefValue::IntArray(&*value),
+            OwnValue::LongArray(value) => RefValue::LongArray(&*value),
+        }
+    }
+
+    #[inline]
+    pub fn to_mut<'a>(&'a mut self) -> MutValue<'a, O> {
+        match self {
+            OwnValue::End(value) => MutValue::End(&mut *value),
+            OwnValue::Byte(value) => MutValue::Byte(&mut *value),
+            OwnValue::Short(value) => MutValue::Short(&mut *value),
+            OwnValue::Int(value) => MutValue::Int(&mut *value),
+            OwnValue::Long(value) => MutValue::Long(&mut *value),
+            OwnValue::Float(value) => MutValue::Float(&mut *value),
+            OwnValue::Double(value) => MutValue::Double(&mut *value),
+            OwnValue::ByteArray(value) => MutValue::ByteArray(value.to_mut()),
+            OwnValue::String(value) => MutValue::String(value.to_mut()),
+            OwnValue::List(value) => MutValue::List(MutList {
+                data: value.data.to_mut(),
+                _marker: PhantomData,
+            }),
+            OwnValue::Compound(value) => MutValue::Compound(MutCompound {
+                data: value.data.to_mut(),
+                _marker: PhantomData,
+            }),
+            OwnValue::IntArray(value) => MutValue::IntArray(value.to_mut()),
+            OwnValue::LongArray(value) => MutValue::LongArray(value.to_mut()),
+        }
     }
 }
 

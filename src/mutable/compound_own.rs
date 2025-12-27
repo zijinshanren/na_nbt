@@ -3,9 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MUTF8Str, MutValue, MutVec,
-    MutableConfig, NBT, OwnList, OwnString, OwnValue, OwnVec, RefValue, TagID, cold_path,
-    mutable_tag_size,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MUTF8Str, MutValue, MutableConfig, NBT,
+    OwnList, OwnString, OwnValue, OwnVec, RefValue, TagID, cold_path, mutable_tag_size,
 };
 
 #[repr(transparent)]
@@ -31,7 +30,7 @@ impl<O: ByteOrder> OwnCompound<O> {
 
     #[inline]
     fn _to_write_params<'a>(&'a mut self) -> <MutableConfig<O> as ConfigMut>::WriteParams<'a> {
-        unsafe { MutVec::from_own(&mut self.data) }
+        self.data.to_mut()
     }
 
     #[inline]

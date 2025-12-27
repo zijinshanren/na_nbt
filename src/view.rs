@@ -88,21 +88,6 @@ impl<'a, T> MutVec<'a, T> {
         }
     }
 
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    #[inline]
-    pub unsafe fn from_own(own: &'a mut OwnVec<T>) -> Self {
-        MutVec {
-            ptr: &mut own.ptr,
-            len: &mut own.len,
-            cap: &mut own.cap,
-            _marker: PhantomData,
-        }
-    }
-
     // ============ Basic accessors ============
 
     /// Returns the number of elements in the vector.
@@ -1013,6 +998,16 @@ impl<T> OwnVec<T> {
         }
     }
 
+    #[inline]
+    pub const fn to_mut<'a>(&'a mut self) -> MutVec<'a, T> {
+        MutVec {
+            ptr: &mut self.ptr,
+            len: &mut self.len,
+            cap: &mut self.cap,
+            _marker: PhantomData,
+        }
+    }
+
     /// Temporarily reconstructs a Vec, calls a closure on it, then writes back the fields.
     #[inline]
     fn with_vec<R>(&mut self, f: impl FnOnce(&mut Vec<T>) -> R) -> R {
@@ -1580,6 +1575,15 @@ impl OwnString {
     pub unsafe fn new(ptr: Unalign<usize>, len: Unalign<usize>, cap: Unalign<usize>) -> Self {
         debug_assert!(len.get() <= cap.get());
         Self { ptr, len, cap }
+    }
+
+    #[inline]
+    pub const fn to_mut<'a>(&'a mut self) -> MutString<'a> {
+        MutString {
+            ptr: &mut self.ptr,
+            len: &mut self.len,
+            cap: &mut self.cap,
+        }
     }
 
     /// Temporarily decodes mutf8 to a String, calls a closure on it, then encodes back to mutf8.
