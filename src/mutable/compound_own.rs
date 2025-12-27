@@ -98,7 +98,11 @@ impl<O: ByteOrder> OwnCompound<O> {
             let key = simd_cesu8::mutf8::encode(key);
             let key = MUTF8Str::from_mutf8_unchecked(&key);
             let old = MutableConfig::<O>::compound_remove(self._to_write_params(), key);
-            MutableConfig::<O>::compound_insert::<T>(self._to_write_params(), key, value.into());
+            MutableConfig::<O>::compound_insert::<T>(
+                self._to_write_params(),
+                key,
+                value.into_nbt(),
+            );
             old
         }
     }

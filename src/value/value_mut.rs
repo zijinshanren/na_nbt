@@ -420,7 +420,7 @@ pub trait ListMut<'s>:
             }
         }
 
-        unsafe { Self::Config::list_push::<V::Tag>(self._to_write_params(), value.into()) }
+        unsafe { Self::Config::list_push::<V::Tag>(self._to_write_params(), value.into_nbt()) }
     }
 
     #[inline]
@@ -503,7 +503,9 @@ pub trait ListMut<'s>:
             }
         }
 
-        unsafe { Self::Config::list_insert::<V::Tag>(self._to_write_params(), index, value.into()) }
+        unsafe {
+            Self::Config::list_insert::<V::Tag>(self._to_write_params(), index, value.into_nbt())
+        }
     }
 
     #[inline]
@@ -651,7 +653,7 @@ pub trait TypedListMut<'s, T: NBT>:
 
     #[inline]
     fn push(&mut self, value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>) {
-        unsafe { Self::Config::list_push::<T>(self._to_write_params(), value.into()) }
+        unsafe { Self::Config::list_push::<T>(self._to_write_params(), value.into_nbt()) }
     }
 
     #[inline]
@@ -675,7 +677,7 @@ pub trait TypedListMut<'s, T: NBT>:
             return;
         }
 
-        unsafe { Self::Config::list_insert::<T>(self._to_write_params(), index, value.into()) }
+        unsafe { Self::Config::list_insert::<T>(self._to_write_params(), index, value.into_nbt()) }
     }
 
     #[inline]
@@ -795,7 +797,7 @@ pub trait CompoundMut<'s>:
             let key = simd_cesu8::mutf8::encode(key);
             let key = MUTF8Str::from_mutf8_unchecked(&key);
             let old = Self::Config::compound_remove(self._to_write_params(), key);
-            Self::Config::compound_insert::<T>(self._to_write_params(), key, value.into());
+            Self::Config::compound_insert::<T>(self._to_write_params(), key, value.into_nbt());
             old
         }
     }

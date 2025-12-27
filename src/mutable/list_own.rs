@@ -331,7 +331,9 @@ impl<O: ByteOrder> OwnList<O> {
             }
         }
 
-        unsafe { MutableConfig::<O>::list_push::<V::Tag>(self._to_write_params(), value.into()) }
+        unsafe {
+            MutableConfig::<O>::list_push::<V::Tag>(self._to_write_params(), value.into_nbt())
+        }
     }
 
     #[inline]
@@ -423,7 +425,11 @@ impl<O: ByteOrder> OwnList<O> {
         }
 
         unsafe {
-            MutableConfig::<O>::list_insert::<V::Tag>(self._to_write_params(), index, value.into())
+            MutableConfig::<O>::list_insert::<V::Tag>(
+                self._to_write_params(),
+                index,
+                value.into_nbt(),
+            )
         }
     }
 

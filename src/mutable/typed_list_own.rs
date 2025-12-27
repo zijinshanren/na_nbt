@@ -75,7 +75,7 @@ impl<O: ByteOrder, T: NBT> OwnTypedList<O, T> {
 
     #[inline]
     pub fn push(&mut self, value: impl IntoNBT<O, Tag = T>) {
-        unsafe { MutableConfig::<O>::list_push::<T>(self._to_write_params(), value.into()) }
+        unsafe { MutableConfig::<O>::list_push::<T>(self._to_write_params(), value.into_nbt()) }
     }
 
     #[inline]
@@ -96,7 +96,7 @@ impl<O: ByteOrder, T: NBT> OwnTypedList<O, T> {
         }
 
         unsafe {
-            MutableConfig::<O>::list_insert::<T>(self._to_write_params(), index, value.into())
+            MutableConfig::<O>::list_insert::<T>(self._to_write_params(), index, value.into_nbt())
         }
     }
 
