@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, GenericNBT,
-    ImmutableConfig, MUTF8Str, Mark, Never, ReadonlyString, ReadonlyValue, TagID, cold_path,
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, Document, EMPTY_COMPOUND, ImmutableConfig,
+    MUTF8Str, Mark, ReadonlyString, ReadonlyValue, TagID, cold_path, immutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyCompound<'doc, O, D> {
         Self {
             data: &EMPTY_COMPOUND,
             mark: ptr::null(),
-            doc: unsafe { Never::never() },
+            doc: D::empty(),
             _marker: PhantomData,
         }
     }
@@ -45,31 +45,6 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyCompound<'doc, O,
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadonlyCompound<'doc, O, D> {
-    #[inline]
-    pub fn get(&self, key: &str) -> Option<ReadonlyValue<'doc, O, D>> {
-        CompoundRef::get(self, key)
-    }
-
-    #[inline]
-    pub fn get_<T: GenericNBT>(
-        &self,
-        key: &str,
-    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        CompoundRef::get_::<T>(self, key)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> ReadonlyCompoundIter<'doc, O, D> {
-        ReadonlyCompoundIter {
-            data: self.data.as_ptr(),
-            mark: self.mark,
-            doc: self.doc.clone(),
-            _marker: PhantomData,
-        }
-    }
-}
-
 impl<'doc, O: ByteOrder, D: Document> CompoundBase for ReadonlyCompound<'doc, O, D> {}
 
 impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'doc, O, D> {
@@ -85,7 +60,12 @@ impl<'doc, O: ByteOrder, D: Document> CompoundRef<'doc> for ReadonlyCompound<'do
 
     #[inline]
     fn iter(&self) -> <Self::Config as ConfigRef>::CompoundIter<'doc> {
-        self.iter()
+        ReadonlyCompoundIter {
+            data: self.data.as_ptr(),
+            mark: self.mark,
+            doc: self.doc.clone(),
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -103,7 +83,7 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyCompoundIter<'doc, O, 
         Self {
             data: EMPTY_COMPOUND.as_ptr(),
             mark: ptr::null(),
-            doc: unsafe { Never::never() },
+            doc: D::empty(),
             _marker: PhantomData,
         }
     }
@@ -141,7 +121,7 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyCompoundIter<'doc, O,
             self.data = self.data.add(1 + 2 + name_len as usize);
 
             let (data_advance, mark_advance) =
-                ReadonlyValue::<O, D>::size(tag_id, self.data, self.mark);
+                immutable_tag_size::<O>(tag_id, self.data, self.mark);
             self.data = self.data.add(data_advance);
             self.mark = self.mark.add(mark_advance);
 

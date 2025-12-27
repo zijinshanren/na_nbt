@@ -13,7 +13,7 @@ impl<'doc, T, D: Document> Default for ReadonlyArray<'doc, T, D> {
     fn default() -> Self {
         Self {
             data: &[],
-            _doc: unsafe { D::never() },
+            _doc: D::empty(),
         }
     }
 }

@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, Mark, NBT, Never, ReadonlyValue,
-    TypedListBase, TypedListRef, cold_path,
+    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, Mark, NBT, TypedListBase,
+    TypedListRef, cold_path, immutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedList<'doc
         Self {
             data: &EMPTY_LIST,
             mark: ptr::null(),
-            doc: unsafe { Never::never() },
+            doc: D::empty(),
             _marker: PhantomData,
         }
     }
@@ -46,40 +46,12 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> IntoIterator for ReadonlyTypedList
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document, T: NBT> ReadonlyTypedList<'doc, O, D, T> {
-    #[inline]
-    pub fn len(&self) -> usize {
-        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        TypedListBase::is_empty(self)
-    }
-
-    #[inline]
-    pub fn get(&self, index: usize) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        TypedListRef::get(self, index)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> ReadonlyTypedListIter<'doc, O, D, T> {
-        ReadonlyTypedListIter {
-            remaining: self.len() as u32,
-            data: unsafe { self.data.as_ptr().add(1 + 4) },
-            mark: self.mark,
-            doc: self.doc.clone(),
-            _marker: PhantomData,
-        }
-    }
-}
-
 impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListBase<T>
     for ReadonlyTypedList<'doc, O, D, T>
 {
     #[inline]
     fn len(&self) -> usize {
-        self.len()
+        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
     }
 }
 
@@ -101,7 +73,13 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> TypedListRef<'doc, T>
 
     #[inline]
     fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'doc, T> {
-        self.iter()
+        ReadonlyTypedListIter {
+            remaining: self.len() as u32,
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
+            mark: self.mark,
+            doc: self.doc.clone(),
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -121,7 +99,7 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Default for ReadonlyTypedListIter<
             remaining: 0,
             data: ptr::null(),
             mark: ptr::null(),
-            doc: unsafe { Never::never() },
+            doc: D::empty(),
             _marker: PhantomData,
         }
     }
@@ -141,10 +119,11 @@ impl<'doc, O: ByteOrder, D: Document, T: NBT> Iterator for ReadonlyTypedListIter
 
         self.remaining -= 1;
 
-        let value = unsafe { T::read_immutable_impl((self.data, self.mark, &self.doc)) };
+        let value =
+            unsafe { ImmutableConfig::<O, D>::read::<T>((self.data, self.mark, &self.doc)) };
 
         let (data_advance, mark_advance) =
-            unsafe { ReadonlyValue::<O, D>::size(T::TAG_ID, self.data, self.mark) };
+            unsafe { immutable_tag_size::<O>(T::TAG_ID, self.data, self.mark) };
         self.data = unsafe { self.data.add(data_advance) };
         self.mark = unsafe { self.mark.add(mark_advance) };
 

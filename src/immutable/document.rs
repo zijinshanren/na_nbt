@@ -1,12 +1,3 @@
-pub trait Document: Send + Sync + Clone + Never + 'static {}
-
-pub trait Never {
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn never() -> Self;
+pub trait Document: Send + Sync + Clone + 'static {
+    fn empty() -> Self;
 }
-
-impl<T: Send + Sync + Clone + Never + 'static> Document for T {}

@@ -13,7 +13,7 @@ impl<'doc, D: Document> Default for ReadonlyString<'doc, D> {
     fn default() -> Self {
         Self {
             data: Default::default(),
-            _doc: unsafe { D::never() },
+            _doc: D::empty(),
         }
     }
 }

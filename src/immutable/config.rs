@@ -1,11 +1,12 @@
-use std::marker::PhantomData;
+use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, GenericNBT, MUTF8Str, Mark, NBT, NBTBase, ReadonlyArray,
-    ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter, ReadonlyString,
-    ReadonlyTypedList, ReadonlyTypedListIter, ReadonlyValue, TagID, cold_path,
+    ByteOrder, ConfigRef, Document, GenericNBT, ListRef, MUTF8Str, Mark, NBT, NBTBase,
+    ReadonlyArray, ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter,
+    ReadonlyString, ReadonlyTypedList, ReadonlyTypedListIter, ReadonlyValue, TagID, cold_path,
+    immutable_tag_size, tag::List,
 };
 
 #[derive(Clone)]
@@ -27,7 +28,6 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
 
     type ReadParams<'a> = (*const u8, *const Mark, &'a D);
 
-    #[inline]
     unsafe fn list_get<'a, 'doc, T: GenericNBT>(
         params: Self::ReadParams<'a>,
         index: usize,
@@ -35,7 +35,48 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
     where
         'doc: 'a,
     {
-        unsafe { T::list_get_immutable_impl::<O, D>(params, index) }
+        const TAG_SIZE: [usize; 13] = [0, 1, 2, 4, 8, 4, 8, 1, 0, 0, 0, 4, 8];
+
+        #[inline(always)]
+        const unsafe fn tag_size(tag_id: TagID) -> usize {
+            let tag_id = tag_id as u8;
+            unsafe { assert_unchecked(tag_id < 13) };
+            TAG_SIZE[tag_id as usize]
+        }
+
+        unsafe {
+            // the cases are constant evaluated
+            if T::TAG_ID.is_primitive() {
+                (
+                    params.0.add(index * tag_size(T::TAG_ID)),
+                    params.1,
+                    params.2,
+                )
+            } else if T::TAG_ID.is_array() {
+                let mut p = params.0;
+                for _ in 0..index {
+                    let len = byteorder::U32::<O>::from_bytes(*p.cast()).get();
+                    p = p.add(4 + len as usize * tag_size(T::TAG_ID));
+                }
+                (p, params.1, params.2)
+            } else if T::TAG_ID.is_composite() {
+                let mut p = params.0;
+                let mut m = params.1;
+                for _ in 0..index {
+                    p = (*m).store.end_pointer;
+                    m = m.add((*m).store.flat_next_mark as usize);
+                }
+                (p, m, params.2)
+            } else {
+                // tag::String
+                let mut p = params.0;
+                for _ in 0..index {
+                    let len = byteorder::U16::<O>::from_bytes(*p.cast()).get();
+                    p = p.add(2 + len as usize);
+                }
+                (p, params.1, params.2)
+            }
+        }
     }
 
     unsafe fn compound_get<'a, 'doc>(
@@ -68,38 +109,94 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
                     return Some((tag_id, (ptr, mark, params.2)));
                 }
 
-                let (data_advance, mark_advance) = ReadonlyValue::<O, D>::size(tag_id, ptr, mark);
+                let (data_advance, mark_advance) = immutable_tag_size::<O>(tag_id, ptr, mark);
                 ptr = ptr.add(data_advance);
                 mark = mark.add(mark_advance);
             }
         }
     }
 
-    #[inline]
+    #[allow(forgetting_copy_types)]
     unsafe fn read<'a, 'doc, T: GenericNBT>(
         params: Self::ReadParams<'a>,
     ) -> Option<T::TypeRef<'doc, Self>> {
-        unsafe { T::read_immutable_impl(params) }
+        unsafe {
+            macro_rules! cast {
+                ($value:expr) => {{
+                    let value = $value;
+                    let result = ptr::read(&value as *const _ as *const _);
+                    std::mem::forget(value);
+                    Some(result)
+                }};
+            }
+
+            // the cases are constant evaluated
+            if T::TAG_ID != T::Element::TAG_ID {
+                // typed list
+                cast!(ImmutableConfig::<O, D>::read::<List>(params)?.typed_::<T::Element>()?)
+            } else {
+                match T::TAG_ID {
+                    TagID::End => cast!(()),
+                    TagID::Byte => cast!(*params.0),
+                    TagID::Short => cast!(byteorder::I16::<O>::from_bytes(*params.0.cast()).get()),
+                    TagID::Int => cast!(byteorder::I32::<O>::from_bytes(*params.0.cast()).get()),
+                    TagID::Long => cast!(byteorder::I64::<O>::from_bytes(*params.0.cast()).get()),
+                    TagID::Float => cast!(byteorder::F32::<O>::from_bytes(*params.0.cast()).get()),
+                    TagID::Double => cast!(byteorder::F64::<O>::from_bytes(*params.0.cast()).get()),
+                    TagID::ByteArray => cast!(ReadonlyArray {
+                        data: slice::from_raw_parts(
+                            params.0.add(4).cast::<i8>(),
+                            byteorder::U32::<O>::from_bytes(*params.0.cast()).get() as usize,
+                        ),
+                        _doc: params.2.clone(),
+                    }),
+                    TagID::String => cast!(ReadonlyString {
+                        data: MUTF8Str::from_mutf8_unchecked(slice::from_raw_parts(
+                            params.0.add(2).cast(),
+                            byteorder::U16::<O>::from_bytes(*params.0.cast()).get() as usize,
+                        )),
+                        _doc: params.2.clone(),
+                    }),
+                    TagID::List => cast!(ReadonlyList {
+                        data: slice::from_raw_parts(
+                            params.0,
+                            (*params.1)
+                                .store
+                                .end_pointer
+                                .byte_offset_from_unsigned(params.0),
+                        ),
+                        mark: params.1.add(1),
+                        doc: params.2.clone(),
+                        _marker: PhantomData::<O>,
+                    }),
+                    TagID::Compound => cast!(ReadonlyCompound {
+                        data: slice::from_raw_parts(
+                            params.0,
+                            (*params.1)
+                                .store
+                                .end_pointer
+                                .byte_offset_from_unsigned(params.0),
+                        ),
+                        mark: params.1.add(1),
+                        doc: params.2.clone(),
+                        _marker: PhantomData::<O>,
+                    }),
+                    TagID::IntArray => cast!(ReadonlyArray {
+                        data: slice::from_raw_parts(
+                            params.0.add(4).cast::<byteorder::I32<O>>(),
+                            byteorder::U32::<O>::from_bytes(*params.0.cast()).get() as usize,
+                        ),
+                        _doc: params.2.clone(),
+                    }),
+                    TagID::LongArray => cast!(ReadonlyArray {
+                        data: slice::from_raw_parts(
+                            params.0.add(4).cast::<byteorder::I64<O>>(),
+                            byteorder::U32::<O>::from_bytes(*params.0.cast()).get() as usize,
+                        ),
+                        _doc: params.2.clone(),
+                    }),
+                }
+            }
+        }
     }
-}
-
-pub trait ImmutableGenericImpl: NBTBase {
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn read_immutable_impl<'a, 'doc, O: ByteOrder, D: Document>(
-        params: <ImmutableConfig<O, D> as ConfigRef>::ReadParams<'a>,
-    ) -> Option<Self::TypeRef<'doc, ImmutableConfig<O, D>>>;
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn list_get_immutable_impl<'a, O: ByteOrder, D: Document>(
-        params: <ImmutableConfig<O, D> as ConfigRef>::ReadParams<'a>,
-        index: usize,
-    ) -> <ImmutableConfig<O, D> as ConfigRef>::ReadParams<'a>;
 }

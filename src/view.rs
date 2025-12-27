@@ -14,6 +14,8 @@ use std::{
 
 use zerocopy::Unalign;
 
+use crate::MUTF8Str;
+
 pub struct MutVec<'a, T> {
     pub(crate) ptr: &'a mut Unalign<usize>,
     pub(crate) len: &'a mut Unalign<usize>,
@@ -707,6 +709,11 @@ impl<'a> MutString<'a> {
     pub fn as_mutf8_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
+    }
+
+    #[inline]
+    pub fn as_mutf8_str(&self) -> &MUTF8Str {
+        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_mutf8_bytes()) }
     }
 
     /// Decodes the mutf8 content and returns the decoded string.
@@ -1652,6 +1659,11 @@ impl OwnString {
     pub fn as_mutf8_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
+    }
+
+    #[inline]
+    pub fn as_mutf8_str(&self) -> &MUTF8Str {
+        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_mutf8_bytes()) }
     }
 
     /// Decodes the mutf8 content and returns the decoded string.

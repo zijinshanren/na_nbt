@@ -30,7 +30,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
     ];
 
     #[inline(always)]
-    unsafe fn tag_size(tag_id: u8) -> usize {
+    const unsafe fn tag_size(tag_id: u8) -> usize {
         unsafe { assert_unchecked(tag_id < 13) };
         TAG_SIZE[tag_id as usize]
     }

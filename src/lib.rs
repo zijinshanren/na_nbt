@@ -16,6 +16,7 @@ pub mod ser;
 pub mod util;
 pub mod value;
 pub mod view;
+pub mod write;
 
 #[cfg(feature = "serde")]
 pub use array::*;

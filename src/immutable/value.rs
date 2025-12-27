@@ -3,9 +3,8 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, GenericNBT, ImmutableConfig, Index, MapRef, Mark, NBT, ReadonlyArray,
-    ReadonlyCompound, ReadonlyList, ReadonlyString, ReadonlyTypedList, TagID, ValueBase, ValueRef,
-    VisitRef,
+    ByteOrder, Document, ImmutableConfig, MapRef, NBT, ReadonlyArray, ReadonlyCompound,
+    ReadonlyList, ReadonlyString, ReadonlyTypedList, TagID, ValueBase, ValueRef, VisitRef,
 };
 
 #[derive(Clone)]
@@ -32,51 +31,9 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyValue<'doc, O, D> {
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
-    pub(crate) unsafe fn size(tag_id: TagID, data: *const u8, mark: *const Mark) -> (usize, usize) {
-        match tag_id {
-            TagID::End => (0, 0),
-            TagID::Byte => (1, 0),
-            TagID::Short => (2, 0),
-            TagID::Int => (4, 0),
-            TagID::Long => (8, 0),
-            TagID::Float => (4, 0),
-            TagID::Double => (8, 0),
-            TagID::ByteArray => (
-                4 + byteorder::U32::<O>::from_bytes(unsafe { *data.cast() }).get() as usize,
-                0,
-            ),
-            TagID::String => (
-                2 + byteorder::U16::<O>::from_bytes(unsafe { *data.cast() }).get() as usize,
-                0,
-            ),
-            TagID::List => unsafe {
-                (
-                    (*mark).store.end_pointer.byte_offset_from_unsigned(data),
-                    (*mark).store.flat_next_mark as usize,
-                )
-            },
-            TagID::Compound => unsafe {
-                (
-                    (*mark).store.end_pointer.byte_offset_from_unsigned(data),
-                    (*mark).store.flat_next_mark as usize,
-                )
-            },
-            TagID::IntArray => (
-                4 + byteorder::U32::<O>::from_bytes(unsafe { *data.cast() }).get() as usize * 4,
-                0,
-            ),
-            TagID::LongArray => (
-                4 + byteorder::U32::<O>::from_bytes(unsafe { *data.cast() }).get() as usize * 8,
-                0,
-            ),
-        }
-    }
-}
-
-impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
     #[inline]
-    pub fn tag_id(&self) -> TagID {
+    fn tag_id(&self) -> TagID {
         match self {
             ReadonlyValue::End(_) => TagID::End,
             ReadonlyValue::Byte(_) => TagID::Byte,
@@ -92,41 +49,6 @@ impl<'doc, O: ByteOrder, D: Document> ReadonlyValue<'doc, O, D> {
             ReadonlyValue::IntArray(_) => TagID::IntArray,
             ReadonlyValue::LongArray(_) => TagID::LongArray,
         }
-    }
-
-    #[inline]
-    pub fn is_<T: NBT>(&self) -> bool {
-        ValueBase::is_::<T>(self)
-    }
-
-    #[inline]
-    pub fn ref_<T: NBT>(&self) -> Option<&T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        ValueRef::ref_::<T>(self)
-    }
-
-    #[inline]
-    pub fn into_<T: GenericNBT>(self) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        ValueRef::into_::<T>(self)
-    }
-
-    #[inline]
-    pub fn get(&self, index: impl Index) -> Option<ReadonlyValue<'doc, O, D>> {
-        ValueRef::get(self, index)
-    }
-
-    #[inline]
-    pub fn get_<T: GenericNBT>(
-        &self,
-        index: impl Index,
-    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        ValueRef::get_::<T>(self, index)
-    }
-}
-
-impl<'doc, O: ByteOrder, D: Document> ValueBase for ReadonlyValue<'doc, O, D> {
-    #[inline]
-    fn tag_id(&self) -> TagID {
-        self.tag_id()
     }
 }
 

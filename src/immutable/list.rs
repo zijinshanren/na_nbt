@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, EMPTY_LIST, GenericNBT, ImmutableConfig, ListBase, ListRef,
-    Mark, NBT, Never, ReadonlyTypedList, ReadonlyValue, TagID, cold_path,
+    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, ListBase, ListRef, Mark, NBT,
+    ReadonlyTypedList, ReadonlyValue, TagID, cold_path, immutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyList<'doc, O, D> {
         Self {
             data: &EMPTY_LIST,
             mark: ptr::null(),
-            doc: unsafe { Never::never() },
+            doc: D::empty(),
             _marker: PhantomData,
         }
     }
@@ -47,74 +47,15 @@ impl<'doc, O: ByteOrder, D: Document> IntoIterator for ReadonlyList<'doc, O, D> 
     }
 }
 
-impl<'doc, O: ByteOrder, D: Document> ReadonlyList<'doc, O, D> {
+impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
     #[inline]
-    pub fn element_tag_id(&self) -> TagID {
+    fn element_tag_id(&self) -> TagID {
         unsafe { *self.data.as_ptr().cast() }
     }
 
     #[inline]
-    pub fn element_is_<T: NBT>(&self) -> bool {
-        ListBase::element_is_::<T>(self)
-    }
-
-    /// Returns the number of elements in this list.
-    #[inline]
-    pub fn len(&self) -> usize {
-        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        ListBase::is_empty(self)
-    }
-
-    #[inline]
-    pub fn get(&self, index: usize) -> Option<ReadonlyValue<'doc, O, D>> {
-        ListRef::get(self, index)
-    }
-
-    #[inline]
-    pub fn get_<T: GenericNBT>(
-        &self,
-        index: usize,
-    ) -> Option<T::TypeRef<'doc, ImmutableConfig<O, D>>> {
-        ListRef::get_::<T>(self, index)
-    }
-
-    #[inline]
-    pub fn typed_<T: NBT>(self) -> Option<ReadonlyTypedList<'doc, O, D, T>> {
-        self.element_is_::<T>().then_some(ReadonlyTypedList {
-            data: self.data,
-            mark: self.mark,
-            doc: self.doc,
-            _marker: PhantomData,
-        })
-    }
-
-    /// Returns an iterator over the elements of this list.
-    #[inline]
-    pub fn iter(&self) -> ReadonlyListIter<'doc, O, D> {
-        ReadonlyListIter {
-            tag_id: self.element_tag_id(),
-            remaining: self.len() as u32,
-            data: unsafe { self.data.as_ptr().add(1 + 4) },
-            mark: self.mark,
-            doc: self.doc.clone(),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'doc, O: ByteOrder, D: Document> ListBase for ReadonlyList<'doc, O, D> {
-    #[inline]
-    fn element_tag_id(&self) -> TagID {
-        self.element_tag_id()
-    }
-
-    #[inline]
     fn len(&self) -> usize {
-        self.len()
+        unsafe { byteorder::U32::<O>::from_bytes(*self.data.as_ptr().add(1).cast()).get() as usize }
     }
 }
 
@@ -135,12 +76,24 @@ impl<'doc, O: ByteOrder, D: Document> ListRef<'doc> for ReadonlyList<'doc, O, D>
 
     #[inline]
     fn typed_<T: NBT>(self) -> Option<<Self::Config as ConfigRef>::TypedList<'doc, T>> {
-        self.typed_::<T>()
+        self.element_is_::<T>().then_some(ReadonlyTypedList {
+            data: self.data,
+            mark: self.mark,
+            doc: self.doc,
+            _marker: PhantomData,
+        })
     }
 
     #[inline]
     fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'doc> {
-        self.iter()
+        ReadonlyListIter {
+            tag_id: self.element_tag_id(),
+            remaining: self.len() as u32,
+            data: unsafe { self.data.as_ptr().add(1 + 4) },
+            mark: self.mark,
+            doc: self.doc.clone(),
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -162,7 +115,7 @@ impl<'doc, O: ByteOrder, D: Document> Default for ReadonlyListIter<'doc, O, D> {
             remaining: 0,
             data: ptr::null(),
             mark: ptr::null(),
-            doc: unsafe { Never::never() },
+            doc: D::empty(),
             _marker: PhantomData,
         }
     }
@@ -187,7 +140,7 @@ impl<'doc, O: ByteOrder, D: Document> Iterator for ReadonlyListIter<'doc, O, D> 
         };
 
         let (data_advance, mark_advance) =
-            unsafe { ReadonlyValue::<O, D>::size(self.tag_id, self.data, self.mark) };
+            unsafe { immutable_tag_size::<O>(self.tag_id, self.data, self.mark) };
         self.data = unsafe { self.data.add(data_advance) };
         self.mark = unsafe { self.mark.add(mark_advance) };
 

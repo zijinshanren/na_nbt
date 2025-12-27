@@ -4,8 +4,8 @@ mod config;
 mod document;
 mod list;
 mod mark;
-mod nbt_impl;
 mod read;
+mod size;
 mod string;
 mod typed_list;
 mod value;
@@ -17,6 +17,7 @@ pub use config::*;
 pub use document::*;
 pub use list::*;
 pub use mark::*;
+pub use size::*;
 pub use string::*;
 pub use typed_list::*;
 pub use value::*;
@@ -29,6 +30,10 @@ mod borrowed {
     use super::*;
 
     pub type BorrowedValue<'s, O> = value::ReadonlyValue<'s, O, ()>;
+
+    impl Document for () {
+        fn empty() -> Self {}
+    }
 
     pub fn read_borrowed<'s, O: ByteOrder>(source: &'s [u8]) -> Result<BorrowedDocument<'s, O>> {
         unsafe {
@@ -44,10 +49,6 @@ mod borrowed {
         mark: Vec<mark::Mark>,
         source: *const u8,
         _marker: core::marker::PhantomData<(&'s (), O)>,
-    }
-
-    impl Never for () {
-        unsafe fn never() -> Self {}
     }
 
     impl<'s, O: ByteOrder> BorrowedDocument<'s, O> {
@@ -95,6 +96,15 @@ mod shared {
 
     pub type SharedValue<O> = value::ReadonlyValue<'static, O, Arc<SharedDocument>>;
 
+    impl Document for Arc<SharedDocument> {
+        fn empty() -> Self {
+            Arc::new(SharedDocument {
+                mark: Vec::new(),
+                source: Bytes::new(),
+            })
+        }
+    }
+
     pub fn read_shared<O: ByteOrder>(source: Bytes) -> Result<SharedValue<O>> {
         Ok(unsafe {
             read::read_unsafe::<O, _>(source.as_ptr(), source.len(), |mark| {
@@ -111,15 +121,6 @@ mod shared {
     pub struct SharedDocument {
         mark: Vec<mark::Mark>,
         source: Bytes,
-    }
-
-    impl Never for Arc<SharedDocument> {
-        unsafe fn never() -> Self {
-            Arc::new(SharedDocument {
-                mark: Vec::new(),
-                source: Bytes::new(),
-            })
-        }
     }
 
     impl SharedDocument {
