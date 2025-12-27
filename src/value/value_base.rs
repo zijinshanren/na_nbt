@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub trait Writable {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>);
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8>;
 
     fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()>;
 }

@@ -1223,8 +1223,8 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
 
 impl<'s> Writable for RefString<'s> {
     #[inline]
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
-        self.data.write_to_vec::<TARGET>(buf);
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        self.data.write_to_vec::<TARGET>()
     }
 
     #[inline]
@@ -1234,21 +1234,21 @@ impl<'s> Writable for RefString<'s> {
 }
 
 impl<'s, O: ByteOrder> Writable for RefValue<'s, O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         match self {
-            RefValue::End(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::Byte(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::Short(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::Int(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::Long(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::Float(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::Double(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::ByteArray(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::String(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::List(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::Compound(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::IntArray(v) => v.write_to_vec::<TARGET>(buf),
-            RefValue::LongArray(v) => v.write_to_vec::<TARGET>(buf),
+            RefValue::End(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Byte(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Short(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Int(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Long(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Float(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Double(v) => v.write_to_vec::<TARGET>(),
+            RefValue::ByteArray(v) => v.write_to_vec::<TARGET>(),
+            RefValue::String(v) => v.write_to_vec::<TARGET>(),
+            RefValue::List(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Compound(v) => v.write_to_vec::<TARGET>(),
+            RefValue::IntArray(v) => v.write_to_vec::<TARGET>(),
+            RefValue::LongArray(v) => v.write_to_vec::<TARGET>(),
         }
     }
 
@@ -1272,18 +1272,19 @@ impl<'s, O: ByteOrder> Writable for RefValue<'s, O> {
 }
 
 impl<'s, O: ByteOrder> Writable for RefList<'s, O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data;
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_list::<TARGET>(payload, buf);
+                write_list::<TARGET>(payload, &mut buf);
             } else {
-                write_list_fallback::<O, TARGET>(payload, buf);
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1302,18 +1303,19 @@ impl<'s, O: ByteOrder> Writable for RefList<'s, O> {
 }
 
 impl<'s, O: ByteOrder, T: NBT> Writable for RefTypedList<'s, O, T> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data;
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_list::<TARGET>(payload, buf);
+                write_list::<TARGET>(payload, &mut buf);
             } else {
-                write_list_fallback::<O, TARGET>(payload, buf);
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1332,18 +1334,19 @@ impl<'s, O: ByteOrder, T: NBT> Writable for RefTypedList<'s, O, T> {
 }
 
 impl<'s, O: ByteOrder> Writable for RefCompound<'s, O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data;
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_compound::<TARGET>(payload, buf);
+                write_compound::<TARGET>(payload, &mut buf);
             } else {
-                write_compound_fallback::<O, TARGET>(payload, buf);
+                write_compound_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1362,23 +1365,23 @@ impl<'s, O: ByteOrder> Writable for RefCompound<'s, O> {
 }
 
 impl<'s, O: ByteOrder> Writable for MutValue<'s, O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         match self {
-            MutValue::End(v) => v.write_to_vec::<TARGET>(buf),
-            MutValue::Byte(v) => v.write_to_vec::<TARGET>(buf),
-            MutValue::Short(v) => v.get().write_to_vec::<TARGET>(buf),
-            MutValue::Int(v) => v.get().write_to_vec::<TARGET>(buf),
-            MutValue::Long(v) => v.get().write_to_vec::<TARGET>(buf),
-            MutValue::Float(v) => v.get().write_to_vec::<TARGET>(buf),
-            MutValue::Double(v) => v.get().write_to_vec::<TARGET>(buf),
-            MutValue::ByteArray(v) => v.write_to_vec::<TARGET>(buf),
+            MutValue::End(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Byte(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Short(v) => v.get().write_to_vec::<TARGET>(),
+            MutValue::Int(v) => v.get().write_to_vec::<TARGET>(),
+            MutValue::Long(v) => v.get().write_to_vec::<TARGET>(),
+            MutValue::Float(v) => v.get().write_to_vec::<TARGET>(),
+            MutValue::Double(v) => v.get().write_to_vec::<TARGET>(),
+            MutValue::ByteArray(v) => v.write_to_vec::<TARGET>(),
             MutValue::String(v) => unsafe {
-                MUTF8Str::from_mutf8_unchecked(v.as_mutf8_bytes()).write_to_vec::<TARGET>(buf)
+                MUTF8Str::from_mutf8_unchecked(v.as_mutf8_bytes()).write_to_vec::<TARGET>()
             },
-            MutValue::List(v) => v.write_to_vec::<TARGET>(buf),
-            MutValue::Compound(v) => v.write_to_vec::<TARGET>(buf),
-            MutValue::IntArray(v) => v.write_to_vec::<TARGET>(buf),
-            MutValue::LongArray(v) => v.write_to_vec::<TARGET>(buf),
+            MutValue::List(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Compound(v) => v.write_to_vec::<TARGET>(),
+            MutValue::IntArray(v) => v.write_to_vec::<TARGET>(),
+            MutValue::LongArray(v) => v.write_to_vec::<TARGET>(),
         }
     }
 
@@ -1404,18 +1407,19 @@ impl<'s, O: ByteOrder> Writable for MutValue<'s, O> {
 }
 
 impl<'s, O: ByteOrder> Writable for MutList<'s, O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_list::<TARGET>(payload, buf);
+                write_list::<TARGET>(payload, &mut buf);
             } else {
-                write_list_fallback::<O, TARGET>(payload, buf);
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1434,18 +1438,19 @@ impl<'s, O: ByteOrder> Writable for MutList<'s, O> {
 }
 
 impl<'s, O: ByteOrder, T: NBT> Writable for MutTypedList<'s, O, T> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_list::<TARGET>(payload, buf);
+                write_list::<TARGET>(payload, &mut buf);
             } else {
-                write_list_fallback::<O, TARGET>(payload, buf);
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1464,18 +1469,19 @@ impl<'s, O: ByteOrder, T: NBT> Writable for MutTypedList<'s, O, T> {
 }
 
 impl<'s, O: ByteOrder> Writable for MutCompound<'s, O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_compound::<TARGET>(payload, buf);
+                write_compound::<TARGET>(payload, &mut buf);
             } else {
-                write_compound_fallback::<O, TARGET>(payload, buf);
+                write_compound_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1494,23 +1500,23 @@ impl<'s, O: ByteOrder> Writable for MutCompound<'s, O> {
 }
 
 impl<O: ByteOrder> Writable for OwnValue<O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         match self {
-            OwnValue::End(v) => v.write_to_vec::<TARGET>(buf),
-            OwnValue::Byte(v) => v.write_to_vec::<TARGET>(buf),
-            OwnValue::Short(v) => v.get().write_to_vec::<TARGET>(buf),
-            OwnValue::Int(v) => v.get().write_to_vec::<TARGET>(buf),
-            OwnValue::Long(v) => v.get().write_to_vec::<TARGET>(buf),
-            OwnValue::Float(v) => v.get().write_to_vec::<TARGET>(buf),
-            OwnValue::Double(v) => v.get().write_to_vec::<TARGET>(buf),
-            OwnValue::ByteArray(v) => v.write_to_vec::<TARGET>(buf),
+            OwnValue::End(v) => v.write_to_vec::<TARGET>(),
+            OwnValue::Byte(v) => v.write_to_vec::<TARGET>(),
+            OwnValue::Short(v) => v.get().write_to_vec::<TARGET>(),
+            OwnValue::Int(v) => v.get().write_to_vec::<TARGET>(),
+            OwnValue::Long(v) => v.get().write_to_vec::<TARGET>(),
+            OwnValue::Float(v) => v.get().write_to_vec::<TARGET>(),
+            OwnValue::Double(v) => v.get().write_to_vec::<TARGET>(),
+            OwnValue::ByteArray(v) => v.write_to_vec::<TARGET>(),
             OwnValue::String(v) => unsafe {
-                MUTF8Str::from_mutf8_unchecked(v.as_mutf8_bytes()).write_to_vec::<TARGET>(buf)
+                MUTF8Str::from_mutf8_unchecked(v.as_mutf8_bytes()).write_to_vec::<TARGET>()
             },
-            OwnValue::List(v) => v.write_to_vec::<TARGET>(buf),
-            OwnValue::Compound(v) => v.write_to_vec::<TARGET>(buf),
-            OwnValue::IntArray(v) => v.write_to_vec::<TARGET>(buf),
-            OwnValue::LongArray(v) => v.write_to_vec::<TARGET>(buf),
+            OwnValue::List(v) => v.write_to_vec::<TARGET>(),
+            OwnValue::Compound(v) => v.write_to_vec::<TARGET>(),
+            OwnValue::IntArray(v) => v.write_to_vec::<TARGET>(),
+            OwnValue::LongArray(v) => v.write_to_vec::<TARGET>(),
         }
     }
 
@@ -1536,18 +1542,19 @@ impl<O: ByteOrder> Writable for OwnValue<O> {
 }
 
 impl<O: ByteOrder> Writable for OwnList<O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_list::<TARGET>(payload, buf);
+                write_list::<TARGET>(payload, &mut buf);
             } else {
-                write_list_fallback::<O, TARGET>(payload, buf);
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1566,18 +1573,19 @@ impl<O: ByteOrder> Writable for OwnList<O> {
 }
 
 impl<O: ByteOrder, T: NBT> Writable for OwnTypedList<O, T> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_list::<TARGET>(payload, buf);
+                write_list::<TARGET>(payload, &mut buf);
             } else {
-                write_list_fallback::<O, TARGET>(payload, buf);
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
@@ -1596,18 +1604,19 @@ impl<O: ByteOrder, T: NBT> Writable for OwnTypedList<O, T> {
 }
 
 impl<O: ByteOrder> Writable for OwnCompound<O> {
-    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
-            buf.reserve(1 + 2 + 4 + 128);
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
             let buf_ptr = buf.as_mut_ptr();
             ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
             buf.set_len(1 + 2);
             if TypeId::of::<O>() == TypeId::of::<TARGET>() {
-                write_compound::<TARGET>(payload, buf);
+                write_compound::<TARGET>(payload, &mut buf);
             } else {
-                write_compound_fallback::<O, TARGET>(payload, buf);
+                write_compound_fallback::<O, TARGET>(payload, &mut buf);
             }
+            buf
         }
     }
 
