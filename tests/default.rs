@@ -1,6 +1,6 @@
 use na_nbt::{
-    BigEndian, BorrowedValue, LittleEndian, OwnValue, RefCompound, RefList, RefValue, SharedValue,
-    ValueBase, ValueRef,
+    BigEndian, BorrowedValue, LittleEndian, OwnValue, RefCompound, RefList, RefString, RefValue,
+    SharedValue, ValueBase, ValueRef,
     tag::{Compound, End, Int, IntArray, List, String, TypedList},
 };
 
@@ -31,6 +31,8 @@ fn test_default() {
             .as_bytes()
             .is_empty()
     );
+
+    assert!(RefString::default().as_bytes().is_empty());
 
     for _ in SharedValue::<LittleEndian>::default()
         .into_::<List>()
