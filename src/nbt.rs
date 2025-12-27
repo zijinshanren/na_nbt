@@ -42,12 +42,12 @@ impl TagID {
     /// # Example
     ///
     /// ```
-    /// use na_nbt::Tag;
+    /// use na_nbt::TagID;
     ///
-    /// assert!(Tag::Int.is_primitive());
-    /// assert!(Tag::Double.is_primitive());
-    /// assert!(!Tag::List.is_primitive());
-    /// assert!(!Tag::ByteArray.is_primitive());
+    /// assert!(TagID::Int.is_primitive());
+    /// assert!(TagID::Double.is_primitive());
+    /// assert!(!TagID::List.is_primitive());
+    /// assert!(!TagID::ByteArray.is_primitive());
     /// ```
     pub const fn is_primitive(self) -> bool {
         matches!(
@@ -70,12 +70,12 @@ impl TagID {
     /// # Example
     ///
     /// ```
-    /// use na_nbt::Tag;
+    /// use na_nbt::TagID;
     ///
-    /// assert!(Tag::ByteArray.is_array());
-    /// assert!(Tag::IntArray.is_array());
-    /// assert!(Tag::LongArray.is_array());
-    /// assert!(!Tag::List.is_array());
+    /// assert!(TagID::ByteArray.is_array());
+    /// assert!(TagID::IntArray.is_array());
+    /// assert!(TagID::LongArray.is_array());
+    /// assert!(!TagID::List.is_array());
     /// ```
     pub const fn is_array(self) -> bool {
         matches!(self, Self::ByteArray | Self::IntArray | Self::LongArray)
@@ -89,12 +89,12 @@ impl TagID {
     /// # Example
     ///
     /// ```
-    /// use na_nbt::Tag;
+    /// use na_nbt::TagID;
     ///
-    /// assert!(Tag::List.is_composite());
-    /// assert!(Tag::Compound.is_composite());
-    /// assert!(!Tag::Int.is_composite());
-    /// assert!(!Tag::ByteArray.is_composite());
+    /// assert!(TagID::List.is_composite());
+    /// assert!(TagID::Compound.is_composite());
+    /// assert!(!TagID::Int.is_composite());
+    /// assert!(!TagID::ByteArray.is_composite());
     /// ```
     pub const fn is_composite(self) -> bool {
         matches!(self, Self::List | Self::Compound)

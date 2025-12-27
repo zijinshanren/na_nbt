@@ -241,7 +241,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
 
                 params.reserve(1 + 2 + name_bytes.len() + tag_size);
 
-                let mut write_ptr = params.as_mut_ptr().add(old_len);
+                let mut write_ptr = params.as_mut_ptr().add(old_len - 1);
                 ptr::write(write_ptr.cast(), T::TAG_ID as u8);
                 write_ptr = write_ptr.add(1);
                 ptr::write(write_ptr.cast(), name_len);

@@ -143,6 +143,11 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
     type Config = MutableConfig<O>;
 
     #[inline]
+    fn _set_element_tag_id<T: NBT>(&mut self) {
+        *unsafe { self.data.get_unchecked_mut(0) } = T::TAG_ID as u8;
+    }
+
+    #[inline]
     fn _to_read_params<'a>(&'a self) -> <Self::Config as crate::ConfigRef>::ReadParams<'a>
     where
         's: 'a,
@@ -159,9 +164,13 @@ impl<'s, O: ByteOrder> ListMut<'s> for MutList<'s, O> {
 
     #[inline]
     fn typed_<T: NBT>(self) -> Option<<Self::Config as crate::ConfigMut>::TypedListMut<'s, T>> {
-        self.element_is_::<T>().then_some(MutTypedList {
-            data: self.data,
-            _marker: PhantomData,
+        self.element_is_::<T>().then(|| {
+            let mut new = MutTypedList {
+                data: self.data,
+                _marker: PhantomData,
+            };
+            *unsafe { new.data.get_unchecked_mut(0) } = T::TAG_ID as u8;
+            new
         })
     }
 

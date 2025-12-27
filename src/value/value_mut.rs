@@ -136,6 +136,8 @@ pub trait ListMut<'s>:
 {
     type Config: ConfigMut;
 
+    fn _set_element_tag_id<T: NBT>(&mut self);
+
     fn _to_read_params<'a>(&'a self) -> <Self::Config as ConfigRef>::ReadParams<'a>
     where
         's: 'a;
@@ -407,13 +409,15 @@ pub trait ListMut<'s>:
     }
 
     #[inline]
-    fn push<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(
-        &mut self,
-        value: V,
-    ) {
-        if !(self.element_is_::<V::Tag>()) {
+    fn push<V: IntoNBT<<Self::Config as ConfigRef>::ByteOrder>>(&mut self, value: V) {
+        if self.element_tag_id() != <V::Tag>::TAG_ID {
             cold_path();
-            return;
+            if self.element_tag_id() == TagID::End && self.is_empty() {
+                self._set_element_tag_id::<V::Tag>();
+            } else {
+                cold_path();
+                return;
+            }
         }
 
         unsafe { Self::Config::list_push::<V::Tag>(self._to_write_params(), value.into()) }
@@ -489,9 +493,14 @@ pub trait ListMut<'s>:
             return;
         }
 
-        if !(self.element_is_::<V::Tag>()) {
+        if self.element_tag_id() != <V::Tag>::TAG_ID {
             cold_path();
-            return;
+            if self.element_tag_id() == TagID::End && self.is_empty() {
+                self._set_element_tag_id::<V::Tag>();
+            } else {
+                cold_path();
+                return;
+            }
         }
 
         unsafe { Self::Config::list_insert::<V::Tag>(self._to_write_params(), index, value.into()) }
@@ -641,10 +650,7 @@ pub trait TypedListMut<'s, T: NBT>:
     }
 
     #[inline]
-    fn push(
-        &mut self,
-        value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
-    ) {
+    fn push(&mut self, value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>) {
         unsafe { Self::Config::list_push::<T>(self._to_write_params(), value.into()) }
     }
 

@@ -16,7 +16,7 @@ pub struct OwnTypedList<O: ByteOrder, T: NBT> {
 impl<O: ByteOrder, T: NBT> Default for OwnTypedList<O, T> {
     fn default() -> Self {
         Self {
-            data: Default::default(),
+            data: vec![T::TAG_ID as u8, 0, 0, 0, 0].into(),
             _marker: PhantomData,
         }
     }

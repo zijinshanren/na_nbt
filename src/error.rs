@@ -63,7 +63,7 @@ pub enum Error {
     /// // Incomplete data - compound tag but no content
     /// let truncated = [0x0a, 0x00];
     /// let result = read_borrowed::<BigEndian>(&truncated);
-    /// assert!(matches!(result, Err(Error::EndOfFile)));
+    /// assert!(matches!(result, Err(Error::EOF)));
     /// ```
     EOF,
 
@@ -84,7 +84,7 @@ pub enum Error {
     /// // Tag type 0xFF is invalid
     /// let invalid = [0xFF, 0x00, 0x00];
     /// let result = read_borrowed::<BigEndian>(&invalid);
-    /// assert!(matches!(result, Err(Error::InvalidTagType(0xFF))));
+    /// assert!(matches!(result, Err(Error::INVALID(0xFF))));
     /// ```
     INVALID(u8),
 

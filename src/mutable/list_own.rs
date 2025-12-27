@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MutValue, MutVec, MutableConfig, NBT,
-    OwnCompound, OwnString, OwnTypedList, OwnValue, OwnVec, RefValue, TagID, cold_path,
+    NBTBase, OwnCompound, OwnString, OwnTypedList, OwnValue, OwnVec, RefValue, TagID, cold_path,
     mutable_tag_size,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
@@ -21,7 +21,7 @@ pub struct OwnList<O: ByteOrder> {
 impl<O: ByteOrder> Default for OwnList<O> {
     fn default() -> Self {
         Self {
-            data: Default::default(),
+            data: vec![0, 0, 0, 0, 0].into(),
             _marker: PhantomData,
         }
     }
@@ -321,9 +321,14 @@ impl<O: ByteOrder> OwnList<O> {
 
     #[inline]
     pub fn push<V: IntoNBT<O>>(&mut self, value: V) {
-        if !(self.element_is_::<V::Tag>()) {
+        if self.element_tag_id() != <V::Tag>::TAG_ID {
             cold_path();
-            return;
+            if self.element_tag_id() == TagID::End && self.is_empty() {
+                *unsafe { self.data.get_unchecked_mut(0) } = <V::Tag>::TAG_ID as u8;
+            } else {
+                cold_path();
+                return;
+            }
         }
 
         unsafe { MutableConfig::<O>::list_push::<V::Tag>(self._to_write_params(), value.into()) }
@@ -407,9 +412,14 @@ impl<O: ByteOrder> OwnList<O> {
             return;
         }
 
-        if !(self.element_is_::<V::Tag>()) {
+        if self.element_tag_id() != <V::Tag>::TAG_ID {
             cold_path();
-            return;
+            if self.element_tag_id() == TagID::End && self.is_empty() {
+                *unsafe { self.data.get_unchecked_mut(0) } = <V::Tag>::TAG_ID as u8;
+            } else {
+                cold_path();
+                return;
+            }
         }
 
         unsafe {
@@ -502,9 +512,13 @@ impl<O: ByteOrder> OwnList<O> {
     #[inline]
     pub fn typed_<T: NBT>(self) -> Option<OwnTypedList<O, T>> {
         let me = ManuallyDrop::new(self);
-        me.element_is_::<T>().then_some(OwnTypedList {
-            data: unsafe { ptr::read(&me.data) },
-            _marker: PhantomData,
+        me.element_is_::<T>().then(|| {
+            let mut new = OwnTypedList {
+                data: unsafe { ptr::read(&me.data) },
+                _marker: PhantomData,
+            };
+            *unsafe { new.data.get_unchecked_mut(0) } = T::TAG_ID as u8;
+            new
         })
     }
 }
