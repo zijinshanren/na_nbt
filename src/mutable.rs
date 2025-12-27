@@ -18,10 +18,7 @@ mod value_own;
 mod value_ref;
 mod write;
 
-use std::{
-    any::TypeId,
-    io::{BufRead, BufReader, Read},
-};
+use std::{any::TypeId, io::Read};
 
 pub use compound_mut::*;
 pub use compound_own::*;
@@ -96,47 +93,10 @@ pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<
 }
 
 pub fn read_owned_from_reader<SOURCE: ByteOrder, STORE: ByteOrder>(
-    reader: impl Read,
+    mut reader: impl Read,
 ) -> Result<OwnValue<STORE>> {
-    unsafe {
-        let mut reader = BufReader::new(reader);
+    let mut buf = Vec::new();
+    reader.read_to_end(&mut buf).map_err(Error::IO)?;
 
-        let mut tag_id = [0u8];
-        reader.read_exact(&mut tag_id).map_err(Error::IO)?;
-        let tag_id = tag_id[0];
-
-        if tag_id == 0 {
-            cold_path();
-            return Ok(OwnValue::End(()));
-        }
-
-        let mut name_len = [0u8; 2];
-        reader.read_exact(&mut name_len).map_err(Error::IO)?;
-        let name_len = byteorder::U16::<SOURCE>::from_bytes(name_len).get() as usize;
-        {
-            let mut skipped = 0;
-            while skipped < name_len {
-                let buf_len = reader.fill_buf().map_err(Error::IO)?.len();
-                if buf_len == 0 {
-                    cold_path();
-                    return Err(Error::EOF);
-                }
-                let read = std::cmp::min(buf_len, name_len - skipped);
-                reader.consume(read);
-                skipped += read;
-            }
-        }
-
-        let value = read_unsafe_from_reader::<SOURCE, STORE>(tag_id, &mut reader)?;
-
-        {
-            let remaining = reader.fill_buf().map_err(Error::IO)?.len();
-            if remaining > 0 {
-                cold_path();
-                return Err(Error::REMAIN(remaining));
-            }
-        }
-
-        Ok(value)
-    }
+    read_owned::<SOURCE, STORE>(&buf)
 }
