@@ -2,7 +2,7 @@ use std::mem;
 
 #[inline(always)]
 #[cold]
-pub(crate) fn cold_path() {}
+pub(crate) const fn cold_path() {}
 
 pub trait ByteOrder: zerocopy::ByteOrder + Send + Sync + 'static {}
 

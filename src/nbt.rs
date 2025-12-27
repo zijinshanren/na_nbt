@@ -1,6 +1,6 @@
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, ImmutableGenericImpl, ImmutableImpl, MutableGenericImpl,
-    MutableImpl, NBTInto, NBTRef,
+    ByteOrder, ConfigMut, ConfigRef, Error, ImmutableGenericImpl, ImmutableImpl,
+    MutableGenericImpl, MutableImpl, NBTInto, NBTRef, cold_path,
 };
 
 pub mod tag;
@@ -30,8 +30,32 @@ impl TagID {
     ///
     /// The caller must ensure that `value` is a valid tag type (0-12).
     /// Passing an invalid value results in undefined behavior.
+    #[inline]
     pub(crate) const unsafe fn from_u8_unchecked(value: u8) -> Self {
         unsafe { std::mem::transmute(value) }
+    }
+
+    #[inline]
+    pub const fn from_u8(value: u8) -> Result<Self, Error> {
+        match value {
+            0 => Ok(Self::End),
+            1 => Ok(Self::Byte),
+            2 => Ok(Self::Short),
+            3 => Ok(Self::Int),
+            4 => Ok(Self::Long),
+            5 => Ok(Self::Float),
+            6 => Ok(Self::Double),
+            7 => Ok(Self::ByteArray),
+            8 => Ok(Self::String),
+            9 => Ok(Self::List),
+            10 => Ok(Self::Compound),
+            11 => Ok(Self::IntArray),
+            12 => Ok(Self::LongArray),
+            _ => {
+                cold_path();
+                Err(Error::INVALID(value))
+            }
+        }
     }
 
     /// Returns `true` if this is a primitive tag type.

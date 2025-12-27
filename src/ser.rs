@@ -85,20 +85,8 @@ impl<O: ByteOrder> Serializer<O> {
             ptr::write(write_ptr.add(1).cast(), [0u8; 2]);
             self.vec.set_len(old_len + 3);
             let tag_id = value.serialize(&mut *self)?;
-            if tag_id == TagID::Compound {
-                // unwrap the compound
-                let current_len = self.vec.len();
-                let compound_begin = self.vec.as_mut_ptr().add(old_len + 3);
-                ptr::copy(
-                    compound_begin,
-                    compound_begin.sub(3),
-                    current_len - old_len - 3,
-                );
-                self.vec.set_len(current_len - 3);
-            } else {
-                *self.vec.get_unchecked_mut(old_len) = tag_id as u8;
-                self.vec.push(TagID::End as u8);
-            }
+            *self.vec.get_unchecked_mut(old_len) = tag_id as u8;
+            self.vec.push(TagID::End as u8);
         }
         Ok(())
     }

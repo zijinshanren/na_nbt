@@ -6,6 +6,7 @@ use na_nbt::{
 use na_nbt::{from_slice_be, from_slice_le, to_vec_be, to_vec_le};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct TestCompound {
@@ -256,7 +257,27 @@ pub fn test_direct(data: &[u8]) {
     }
 }
 
-pub fn test(data: &[u8]) {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let data = include_bytes!(
+        r"D:\cmp\na_nbt\fuzz\hfuzz_workspace\hongg\input\001aa16f5e6b102f778a7dfbf96ba661.00001000.honggfuzz.cov"
+    );
     test_serde(data);
     test_direct(data);
+
+    let dir = r"D:\cmp\na_nbt\fuzz\hfuzz_workspace\hongg\input";
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            println!("Testing: {}", path.display());
+            let data = fs::read(path)?;
+            test_serde(&data);
+            test_direct(&data);
+        }
+    }
+
+    // test_direct(data);
+    // test_serde(data);
+    Ok(())
 }
