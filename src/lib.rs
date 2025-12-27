@@ -2,20 +2,32 @@ pub use zerocopy::BigEndian;
 pub use zerocopy::LittleEndian;
 pub use zerocopy::NativeEndian;
 
+#[cfg(feature = "serde")]
+pub mod array;
+#[cfg(feature = "serde")]
+pub mod de;
 pub mod error;
 pub mod immutable;
 pub mod index;
 pub mod mutable;
 pub mod nbt;
+#[cfg(feature = "serde")]
+pub mod ser;
 pub mod util;
 pub mod value;
 pub mod view;
 
+#[cfg(feature = "serde")]
+pub use array::*;
+#[cfg(feature = "serde")]
+pub use de::*;
 pub use error::*;
 pub use immutable::*;
 pub use index::*;
 pub use mutable::*;
 pub use nbt::*;
+#[cfg(feature = "serde")]
+pub use ser::*;
 pub use util::*;
 pub use value::*;
 pub use view::*;
