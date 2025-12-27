@@ -3,9 +3,9 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundMut, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MutValue,
-    MutVec, MutableConfig, OwnValue, RefCompoundIter, RefString, RefValue, TagID, cold_path,
-    mutable_tag_size,
+    ByteOrder, CompoundBase, CompoundMut, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MUTF8Str,
+    MutValue, MutVec, MutableConfig, OwnValue, RefCompoundIter, RefString, RefValue, TagID,
+    cold_path, mutable_tag_size,
 };
 
 pub struct MutCompound<'s, O: ByteOrder> {
@@ -149,7 +149,10 @@ impl<'s, O: ByteOrder> Iterator for MutCompoundIter<'s, O> {
 
             let name_len = byteorder::U16::<O>::from_bytes(*self.data.add(1).cast()).get();
             let name = RefString {
-                data: slice::from_raw_parts(self.data.add(3), name_len as usize),
+                data: MUTF8Str::from_mutf8_unchecked(slice::from_raw_parts(
+                    self.data.add(3),
+                    name_len as usize,
+                )),
             };
 
             let value = <MutableConfig<O> as ConfigMut>::read_value_mut(

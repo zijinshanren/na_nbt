@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundRef, ConfigRef, EMPTY_COMPOUND, MutableConfig, NBT, RefString,
-    RefValue, TagID, cold_path, mutable_tag_size,
+    ByteOrder, CompoundBase, CompoundRef, ConfigRef, EMPTY_COMPOUND, MUTF8Str, MutableConfig, NBT,
+    RefString, RefValue, TagID, cold_path, mutable_tag_size,
 };
 
 #[derive(Clone)]
@@ -111,7 +111,10 @@ impl<'s, O: ByteOrder> Iterator for RefCompoundIter<'s, O> {
 
             let name_len = byteorder::U16::<O>::from_bytes(*self.data.add(1).cast()).get();
             let name = RefString {
-                data: slice::from_raw_parts(self.data.add(3), name_len as usize),
+                data: MUTF8Str::from_mutf8_unchecked(slice::from_raw_parts(
+                    self.data.add(3),
+                    name_len as usize,
+                )),
             };
 
             let value = <MutableConfig<O> as crate::ConfigRef>::read_value(

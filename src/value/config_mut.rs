@@ -1,5 +1,6 @@
 use crate::{
-    CompoundMut, ConfigRef, GenericNBT, ListMut, NBT, OwnValue, TagID, TypedListMut, ValueMut,
+    CompoundMut, ConfigRef, GenericNBT, ListMut, MUTF8Str, NBT, OwnValue, TagID, TypedListMut,
+    ValueMut,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -113,7 +114,7 @@ pub trait ConfigMut: ConfigRef {
     /// NEED to call compound_remove first to check if the key is already in the compound.
     unsafe fn compound_insert<'a, T: GenericNBT>(
         params: Self::WriteParams<'a>,
-        key: &[u8],
+        key: &MUTF8Str,
         value: T::Type<Self::ByteOrder>,
     );
 
@@ -124,6 +125,6 @@ pub trait ConfigMut: ConfigRef {
     /// .
     unsafe fn compound_remove<'a>(
         params: Self::WriteParams<'a>,
-        key: &[u8],
+        key: &MUTF8Str,
     ) -> Option<OwnValue<Self::ByteOrder>>;
 }

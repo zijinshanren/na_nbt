@@ -1,6 +1,6 @@
 use crate::{
-    CompoundBase, ConfigMut, ConfigRef, GenericNBT, Index, IntoNBT, ListBase, MapMut, NBT, NBTBase,
-    OwnValue, TagID, TypedListBase, ValueBase, VisitMut, VisitMutShared, cold_path,
+    CompoundBase, ConfigMut, ConfigRef, GenericNBT, Index, IntoNBT, ListBase, MUTF8Str, MapMut,
+    NBT, NBTBase, OwnValue, TagID, TypedListBase, ValueBase, VisitMut, VisitMutShared, cold_path,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -724,7 +724,10 @@ pub trait CompoundMut<'s>:
     {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
+            let (tag_id, params) = Self::Config::compound_get(
+                self._to_read_params(),
+                MUTF8Str::from_mutf8_unchecked(&key),
+            )?;
             Some(Self::Config::read_value(tag_id, params))
         }
     }
@@ -736,7 +739,10 @@ pub trait CompoundMut<'s>:
     {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
+            let (tag_id, params) = Self::Config::compound_get(
+                self._to_read_params(),
+                MUTF8Str::from_mutf8_unchecked(&key),
+            )?;
             if tag_id != T::TAG_ID {
                 cold_path();
                 return None;
@@ -752,7 +758,10 @@ pub trait CompoundMut<'s>:
     {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
+            let (tag_id, params) = Self::Config::compound_get(
+                self._to_read_params(),
+                MUTF8Str::from_mutf8_unchecked(&key),
+            )?;
             Some(Self::Config::read_value_mut(tag_id, params))
         }
     }
@@ -764,7 +773,10 @@ pub trait CompoundMut<'s>:
     {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
+            let (tag_id, params) = Self::Config::compound_get(
+                self._to_read_params(),
+                MUTF8Str::from_mutf8_unchecked(&key),
+            )?;
             if tag_id != T::TAG_ID {
                 cold_path();
                 return None;
@@ -781,8 +793,9 @@ pub trait CompoundMut<'s>:
     ) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            let old = Self::Config::compound_remove(self._to_write_params(), &key);
-            Self::Config::compound_insert::<T>(self._to_write_params(), &key, value.into());
+            let key = MUTF8Str::from_mutf8_unchecked(&key);
+            let old = Self::Config::compound_remove(self._to_write_params(), key);
+            Self::Config::compound_insert::<T>(self._to_write_params(), key, value.into());
             old
         }
     }
@@ -791,7 +804,8 @@ pub trait CompoundMut<'s>:
     fn remove(&mut self, key: &str) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            Self::Config::compound_remove(self._to_write_params(), &key)
+            let key = MUTF8Str::from_mutf8_unchecked(&key);
+            Self::Config::compound_remove(self._to_write_params(), key)
         }
     }
 

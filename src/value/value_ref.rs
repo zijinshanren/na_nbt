@@ -1,5 +1,5 @@
 use crate::{
-    CompoundBase, ConfigRef, GenericNBT, Index, ListBase, MapRef, NBT, NBTBase, TagID,
+    CompoundBase, ConfigRef, GenericNBT, Index, ListBase, MUTF8Str, MapRef, NBT, NBTBase, TagID,
     TypedListBase, ValueBase, VisitRef, cold_path,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
@@ -271,7 +271,8 @@ pub trait CompoundRef<'s>:
     fn get(&self, key: &str) -> Option<<Self::Config as ConfigRef>::Value<'s>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
+            let key = MUTF8Str::from_mutf8_unchecked(&key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
             Some(Self::Config::read_value(tag_id, params))
         }
     }
@@ -280,7 +281,8 @@ pub trait CompoundRef<'s>:
     fn get_<T: GenericNBT>(&self, key: &str) -> Option<T::TypeRef<'s, Self::Config>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
-            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), &key)?;
+            let key = MUTF8Str::from_mutf8_unchecked(&key);
+            let (tag_id, params) = Self::Config::compound_get(self._to_read_params(), key)?;
             if tag_id != T::TAG_ID {
                 cold_path();
                 return None;

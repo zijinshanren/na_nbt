@@ -3,8 +3,8 @@ use std::{any::TypeId, hint::unreachable_unchecked, io::Write, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, Error, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
-    ReadonlyTypedList, ReadonlyValue, Result, TagID, Writable, cold_path,
+    ByteOrder, Document, Error, MUTF8Str, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList,
+    ReadonlyString, ReadonlyTypedList, ReadonlyValue, Result, TagID, Writable, cold_path,
 };
 
 macro_rules! change_endian {
@@ -581,16 +581,16 @@ impl Writable for f64 {
     }
 }
 
-impl<'doc, D: Document> Writable for ReadonlyArray<'doc, i8, D> {
+impl Writable for [i8] {
     fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
-        let len = self.data.len();
+        let len = self.len();
         reserve_guard(buf, 1 + 2 + 4 + len, |ptr| unsafe {
             ptr::write(ptr.cast(), [TagID::ByteArray as u8, 0u8, 0u8]);
             ptr::write(
                 ptr.add(3).cast(),
                 byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
             );
-            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr.add(7).cast(), len);
+            ptr::copy_nonoverlapping(self.as_ptr(), ptr.add(7).cast(), len);
         })
     }
 
@@ -603,30 +603,43 @@ impl<'doc, D: Document> Writable for ReadonlyArray<'doc, i8, D> {
             );
             ptr::write(
                 buf_head.as_mut_ptr().add(3).cast(),
-                byteorder::U32::<TARGET>::new(self.data.len() as u32).to_bytes(),
+                byteorder::U32::<TARGET>::new(self.len() as u32).to_bytes(),
             );
         }
         writer.write_all(&buf_head).map_err(Error::IO)?;
-        let bytes =
-            unsafe { slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), self.data.len()) };
+        let bytes = unsafe { slice::from_raw_parts(self.as_ptr().cast::<u8>(), self.len()) };
         writer.write_all(bytes).map_err(Error::IO)
     }
 }
 
-impl<'doc, D: Document> Writable for ReadonlyString<'doc, D> {
+impl<'doc, D: Document> Writable for ReadonlyArray<'doc, i8, D> {
+    #[inline]
     fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
-        let len = self.data.len();
+        self.data.write_to_vec::<TARGET>(buf)
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.data.write_to_writer::<TARGET>(writer)
+    }
+}
+
+impl Writable for MUTF8Str {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let bytes = self.as_bytes();
+        let len = bytes.len();
         reserve_guard(buf, 1 + 2 + 2 + len, |ptr| unsafe {
             ptr::write(ptr.cast(), [TagID::String as u8, 0u8, 0u8]);
             ptr::write(
                 ptr.add(3).cast(),
                 byteorder::U16::<TARGET>::new(len as u16).to_bytes(),
             );
-            ptr::copy_nonoverlapping(self.data.as_ptr(), ptr.add(5), len);
+            ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.add(5), len);
         })
     }
 
     fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        let bytes = self.as_bytes();
         let mut buf_head = [0u8; 1 + 2 + 2];
         unsafe {
             ptr::write(
@@ -635,11 +648,21 @@ impl<'doc, D: Document> Writable for ReadonlyString<'doc, D> {
             );
             ptr::write(
                 buf_head.as_mut_ptr().add(3).cast(),
-                byteorder::U16::<TARGET>::new(self.data.len() as u16).to_bytes(),
+                byteorder::U16::<TARGET>::new(bytes.len() as u16).to_bytes(),
             );
         }
         writer.write_all(&buf_head).map_err(Error::IO)?;
-        writer.write_all(self.data).map_err(Error::IO)
+        writer.write_all(bytes).map_err(Error::IO)
+    }
+}
+
+impl<'doc, D: Document> Writable for ReadonlyString<'doc, D> {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        self.raw_bytes().write_to_vec::<TARGET>(buf)
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.raw_bytes().write_to_writer::<TARGET>(writer)
     }
 }
 
@@ -729,12 +752,10 @@ impl<'doc, SOURCE: ByteOrder, D: Document> Writable for ReadonlyCompound<'doc, S
     }
 }
 
-impl<'doc, SOURCE: ByteOrder, D: Document> Writable
-    for ReadonlyArray<'doc, byteorder::I32<SOURCE>, D>
-{
+impl<O: ByteOrder> Writable for [byteorder::I32<O>] {
     fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
-        let len = self.data.len();
-        let len_bytes = std::mem::size_of_val(self.data);
+        let len = self.len();
+        let len_bytes = std::mem::size_of_val(self);
         reserve_guard(buf, 1 + 2 + 4 + len_bytes, |ptr| unsafe {
             ptr::write(ptr.cast(), [TagID::IntArray as u8, 0u8, 0u8]);
             ptr::write(
@@ -742,11 +763,11 @@ impl<'doc, SOURCE: ByteOrder, D: Document> Writable
                 byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
             );
             let data_ptr = ptr.add(7);
-            if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                ptr::copy_nonoverlapping(self.data.as_ptr().cast(), data_ptr, len_bytes);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                ptr::copy_nonoverlapping(self.as_ptr().cast(), data_ptr, len_bytes);
             } else {
                 let mut write_ptr = data_ptr;
-                for element in self.data {
+                for element in self {
                     ptr::write(
                         write_ptr.cast(),
                         byteorder::I32::<TARGET>::new(element.get()).to_bytes(),
@@ -766,17 +787,16 @@ impl<'doc, SOURCE: ByteOrder, D: Document> Writable
             );
             ptr::write(
                 buf_head.as_mut_ptr().add(3).cast(),
-                byteorder::U32::<TARGET>::new(self.data.len() as u32).to_bytes(),
+                byteorder::U32::<TARGET>::new(self.len() as u32).to_bytes(),
             );
         }
         writer.write_all(&buf_head).map_err(Error::IO)?;
-        if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-            let bytes = unsafe {
-                slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), self.data.len() * 4)
-            };
+        if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+            let bytes =
+                unsafe { slice::from_raw_parts(self.as_ptr().cast::<u8>(), self.len() * 4) };
             writer.write_all(bytes).map_err(Error::IO)
         } else {
-            for element in self.data {
+            for element in self {
                 writer
                     .write_all(&byteorder::I32::<TARGET>::new(element.get()).to_bytes())
                     .map_err(Error::IO)?;
@@ -787,11 +807,23 @@ impl<'doc, SOURCE: ByteOrder, D: Document> Writable
 }
 
 impl<'doc, SOURCE: ByteOrder, D: Document> Writable
-    for ReadonlyArray<'doc, byteorder::I64<SOURCE>, D>
+    for ReadonlyArray<'doc, byteorder::I32<SOURCE>, D>
 {
+    #[inline]
     fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
-        let len = self.data.len();
-        let len_bytes = std::mem::size_of_val(self.data);
+        self.data.write_to_vec::<TARGET>(buf)
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.data.write_to_writer::<TARGET>(writer)
+    }
+}
+
+impl<O: ByteOrder> Writable for [byteorder::I64<O>] {
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        let len = self.len();
+        let len_bytes = std::mem::size_of_val(self);
         reserve_guard(buf, 1 + 2 + 4 + len_bytes, |ptr| unsafe {
             ptr::write(ptr.cast(), [TagID::LongArray as u8, 0u8, 0u8]);
             ptr::write(
@@ -799,11 +831,11 @@ impl<'doc, SOURCE: ByteOrder, D: Document> Writable
                 byteorder::U32::<TARGET>::new(len as u32).to_bytes(),
             );
             let data_ptr = ptr.add(7);
-            if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-                ptr::copy_nonoverlapping(self.data.as_ptr().cast(), data_ptr, len_bytes);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                ptr::copy_nonoverlapping(self.as_ptr().cast(), data_ptr, len_bytes);
             } else {
                 let mut write_ptr = data_ptr;
-                for element in self.data {
+                for element in self {
                     ptr::write(
                         write_ptr.cast(),
                         byteorder::I64::<TARGET>::new(element.get()).to_bytes(),
@@ -823,23 +855,36 @@ impl<'doc, SOURCE: ByteOrder, D: Document> Writable
             );
             ptr::write(
                 buf_head.as_mut_ptr().add(3).cast(),
-                byteorder::U32::<TARGET>::new(self.data.len() as u32).to_bytes(),
+                byteorder::U32::<TARGET>::new(self.len() as u32).to_bytes(),
             );
         }
         writer.write_all(&buf_head).map_err(Error::IO)?;
-        if TypeId::of::<SOURCE>() == TypeId::of::<TARGET>() {
-            let bytes = unsafe {
-                slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), self.data.len() * 8)
-            };
+        if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+            let bytes =
+                unsafe { slice::from_raw_parts(self.as_ptr().cast::<u8>(), self.len() * 8) };
             writer.write_all(bytes).map_err(Error::IO)
         } else {
-            for element in self.data {
+            for element in self {
                 writer
                     .write_all(&byteorder::I64::<TARGET>::new(element.get()).to_bytes())
                     .map_err(Error::IO)?;
             }
             Ok(())
         }
+    }
+}
+
+impl<'doc, SOURCE: ByteOrder, D: Document> Writable
+    for ReadonlyArray<'doc, byteorder::I64<SOURCE>, D>
+{
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self, buf: &mut Vec<u8>) {
+        self.data.write_to_vec::<TARGET>(buf)
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.data.write_to_writer::<TARGET>(writer)
     }
 }
 

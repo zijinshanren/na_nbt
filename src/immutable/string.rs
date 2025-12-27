@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{Document, ReadonlyArray, StringRef};
+use crate::{Document, MUTF8Str, ReadonlyArray, StringRef};
 
 pub type ReadonlyString<'doc, D> = ReadonlyArray<'doc, u8, D>;
 
@@ -10,8 +10,8 @@ impl<'doc, D: Document> ReadonlyString<'doc, D> {
     /// For most ASCII strings, this is identical to UTF-8. Use [`decode`](Self::decode)
     /// for proper string conversion.
     #[inline]
-    pub fn raw_bytes(&self) -> &[u8] {
-        self.data
+    pub fn raw_bytes(&self) -> &MUTF8Str {
+        unsafe { MUTF8Str::from_mutf8_unchecked(self.data) }
     }
 
     /// Decodes the MUTF-8 string to a Rust string.
@@ -33,7 +33,7 @@ impl<'doc, D: Document> ReadonlyString<'doc, D> {
 
 impl<'doc, D: Document> StringRef<'doc> for ReadonlyString<'doc, D> {
     #[inline]
-    fn raw_bytes(&self) -> &[u8] {
+    fn raw_bytes(&self) -> &MUTF8Str {
         self.raw_bytes()
     }
 

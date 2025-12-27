@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, MutCompound, MutList, MutString, MutVec, MutableConfig, MutableGenericImpl,
-    MutableImpl, NBT, RefCompound, RefList, RefString, SIZE_USIZE,
+    ByteOrder, MUTF8Str, MutCompound, MutList, MutString, MutVec, MutableConfig,
+    MutableGenericImpl, MutableImpl, NBT, RefCompound, RefList, RefString, SIZE_USIZE,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -174,7 +174,7 @@ impl MutableGenericImpl for String {
             let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
             let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
             Some(RefString {
-                data: slice::from_raw_parts(ptr, len),
+                data: MUTF8Str::from_mutf8_unchecked(slice::from_raw_parts(ptr, len)),
             })
         }
     }

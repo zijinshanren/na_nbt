@@ -3,11 +3,10 @@ use std::ops::Deref;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundRef, GenericNBT, ListRef, NBT, StringRef, TagID, TypedListRef, ValueRef,
-    tag::{
+    ByteOrder, CompoundRef, GenericNBT, ListRef, MUTF8Str, NBT, StringRef, TagID, TypedListRef, ValueRef, tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
-    },
+    }
 };
 
 pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
@@ -50,7 +49,7 @@ pub trait ConfigRef: Send + Sync + Sized + Clone + 'static {
     /// .
     unsafe fn compound_get<'a, 'doc>(
         value: Self::ReadParams<'a>,
-        key: &[u8],
+        key: &MUTF8Str,
     ) -> Option<(TagID, Self::ReadParams<'a>)>
     where
         'doc: 'a;

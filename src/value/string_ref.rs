@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 
+use crate::MUTF8Str;
+
 pub trait StringRef<'s>: Send + Sync + Sized + Clone + Default {
-    fn raw_bytes(&self) -> &[u8];
+    fn raw_bytes(&self) -> &MUTF8Str;
 
     fn decode(&self) -> Cow<'_, str>;
 

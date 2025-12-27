@@ -3,7 +3,7 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, MutCompound, MutCompoundIter, MutList,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, MUTF8Str, MutCompound, MutCompoundIter, MutList,
     MutListIter, MutTypedList, MutTypedListIter, MutValue, MutVec, NBT, NBTBase, OwnList, OwnValue,
     RefCompound, RefCompoundIter, RefList, RefListIter, RefString, RefTypedList, RefTypedListIter,
     RefValue, TagID, cold_path, mutable_tag_size, tag::List,
@@ -64,12 +64,13 @@ impl<O: ByteOrder> ConfigRef for MutableConfig<O> {
 
     unsafe fn compound_get<'a, 'doc>(
         params: Self::ReadParams<'a>,
-        key: &[u8],
+        key: &MUTF8Str,
     ) -> Option<(crate::TagID, Self::ReadParams<'a>)>
     where
         'doc: 'a,
     {
         unsafe {
+            let key_bytes = key.as_bytes();
             let mut ptr = params;
             loop {
                 let tag_id = *ptr.cast();
@@ -86,7 +87,7 @@ impl<O: ByteOrder> ConfigRef for MutableConfig<O> {
                 let name_bytes = slice::from_raw_parts(ptr, name_len as usize);
                 ptr = ptr.add(name_len as usize);
 
-                if key == name_bytes {
+                if key_bytes == name_bytes {
                     return Some((tag_id, ptr));
                 }
 
@@ -227,14 +228,14 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
 
     unsafe fn compound_insert<'a, T: GenericNBT>(
         params: Self::WriteParams<'a>,
-        key: &[u8],
+        key: &MUTF8Str,
         value: T::Type<Self::ByteOrder>,
     ) {
         T::dispatch(
             (params, key, value),
             |_| panic!("End cannot be inserted into a compound"),
             |(mut params, key, value)| unsafe {
-                let name_bytes = key;
+                let name_bytes = key.as_bytes();
                 let name_len = byteorder::U16::<O>::new(name_bytes.len() as u16).to_bytes();
                 let tag_size = mutable_tag_size(T::TAG_ID);
                 let old_len = params.len();
@@ -264,9 +265,10 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
 
     unsafe fn compound_remove<'a>(
         mut params: Self::WriteParams<'a>,
-        key: &[u8],
-    ) -> Option<super::OwnValue<Self::ByteOrder>> {
+        key: &MUTF8Str,
+    ) -> Option<OwnValue<Self::ByteOrder>> {
         unsafe {
+            let key_bytes = key.as_bytes();
             let mut ptr = params.as_mut_ptr();
             loop {
                 let tag_id = *ptr.cast();
@@ -283,7 +285,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
                 let name_bytes = slice::from_raw_parts(ptr, name_len as usize);
                 ptr = ptr.add(name_len as usize);
 
-                if key == name_bytes {
+                if key_bytes == name_bytes {
                     let tag_size = mutable_tag_size(tag_id);
                     let pos_bytes = ptr.byte_offset_from_unsigned(params.as_mut_ptr());
                     let value = OwnValue::<O>::read(tag_id, ptr);

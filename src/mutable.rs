@@ -16,7 +16,7 @@ mod typed_list_ref;
 mod value_mut;
 mod value_own;
 mod value_ref;
-// mod write;
+mod write;
 
 use std::{
     any::TypeId,
@@ -40,7 +40,7 @@ pub use typed_list_ref::*;
 pub use value_mut::*;
 pub use value_own::*;
 pub use value_ref::*;
-// pub use write::*;
+pub use write::*;
 use zerocopy::byteorder;
 
 use crate::{ByteOrder, Error, Result, cold_path};

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, GenericNBT, Mark, NBT, NBTBase, ReadonlyArray,
+    ByteOrder, ConfigRef, Document, GenericNBT, MUTF8Str, Mark, NBT, NBTBase, ReadonlyArray,
     ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter, ReadonlyString,
     ReadonlyTypedList, ReadonlyTypedListIter, ReadonlyValue, TagID, cold_path,
 };
@@ -41,12 +41,13 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
 
     unsafe fn compound_get<'a, 'doc>(
         params: Self::ReadParams<'a>,
-        key: &[u8],
+        key: &MUTF8Str,
     ) -> Option<(crate::TagID, Self::ReadParams<'a>)>
     where
         'doc: 'a,
     {
         unsafe {
+            let key_bytes = key.as_bytes();
             let mut ptr = params.0;
             let mut mark = params.1;
             loop {
@@ -64,7 +65,7 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
                 let name_bytes = core::slice::from_raw_parts(ptr, name_len as usize);
                 ptr = ptr.add(name_len as usize);
 
-                if key == name_bytes {
+                if key_bytes == name_bytes {
                     return Some((tag_id, (ptr, mark, params.2)));
                 }
 
