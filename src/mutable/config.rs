@@ -3,10 +3,11 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, MUTF8Str, MutCompound, MutCompoundIter, MutList,
-    MutListIter, MutTypedList, MutTypedListIter, MutValue, MutVec, NBT, NBTBase, OwnList, OwnValue,
-    RefCompound, RefCompoundIter, RefList, RefListIter, RefString, RefTypedList, RefTypedListIter,
-    RefValue, TagID, cold_path, mutable_tag_size, tag::List,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, ListMut, ListRef, MUTF8Str, MutCompound,
+    MutCompoundIter, MutList, MutListIter, MutTypedList, MutTypedListIter, MutValue, MutVec, NBT,
+    NBTBase, OwnList, OwnValue, RefCompound, RefCompoundIter, RefList, RefListIter, RefString,
+    RefTypedList, RefTypedListIter, RefValue, SIZE_USIZE, TagID, cold_path, mutable_tag_size,
+    tag::List,
 };
 
 unsafe fn list_decrease<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
@@ -96,10 +97,48 @@ impl<O: ByteOrder> ConfigRef for MutableConfig<O> {
         }
     }
 
+    #[allow(forgetting_copy_types)]
+    #[allow(forgetting_references)]
     unsafe fn read<'a, 'doc, T: GenericNBT>(
         params: Self::ReadParams<'a>,
     ) -> Option<T::TypeRef<'doc, Self>> {
-        unsafe { T::read_mutable_impl(params) }
+        unsafe {
+            macro_rules! cast {
+                ($value:expr) => {{
+                    let value = $value;
+                    let result = ptr::read(&value as *const _ as *const _);
+                    std::mem::forget(value);
+                    Some(result)
+                }};
+            }
+
+            // the cases are constant evaluated
+            if T::TAG_ID == List::TAG_ID && T::Element::TAG_ID != List::TAG_ID {
+                // typed list
+                cast!(MutableConfig::<O>::read::<List>(params)?.typed_::<T::Element>()?)
+            } else {
+                match T::TAG_ID {
+                    TagID::End => cast!(()),
+                    TagID::Byte => cast!(*params),
+                    TagID::Short => cast!(byteorder::I16::<O>::from_bytes(*params.cast()).get()),
+                    TagID::Int => cast!(byteorder::I32::<O>::from_bytes(*params.cast()).get()),
+                    TagID::Long => cast!(byteorder::I64::<O>::from_bytes(*params.cast()).get()),
+                    TagID::Float => cast!(byteorder::F32::<O>::from_bytes(*params.cast()).get()),
+                    TagID::Double => cast!(byteorder::F64::<O>::from_bytes(*params.cast()).get()),
+                    TagID::ByteArray | TagID::String | TagID::IntArray | TagID::LongArray => {
+                        cast!({
+                            let ptr: *const <T::Element as NBTBase>::Type<O> =
+                                ptr::with_exposed_provenance(usize::from_ne_bytes(*params.cast()));
+                            let len = usize::from_ne_bytes(*params.add(SIZE_USIZE).cast());
+                            slice::from_raw_parts(ptr, len)
+                        })
+                    }
+                    TagID::List | TagID::Compound => cast!(ptr::with_exposed_provenance::<u8>(
+                        usize::from_ne_bytes(*params.cast())
+                    )),
+                }
+            }
+        }
     }
 }
 
@@ -114,10 +153,47 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
 
     type WriteParams<'a> = MutVec<'a, u8>;
 
+    #[allow(forgetting_references)]
     unsafe fn read_mut<'a, 'doc, T: GenericNBT>(
         params: Self::ReadParams<'a>,
     ) -> Option<T::TypeMut<'doc, Self>> {
-        unsafe { T::read_mutable_mut_impl(params) }
+        unsafe {
+            macro_rules! cast {
+                ($value:expr) => {{
+                    let value = $value;
+                    let result = ptr::read(&value as *const _ as *const _);
+                    std::mem::forget(value);
+                    Some(result)
+                }};
+            }
+
+            // the cases are constant evaluated
+            if T::TAG_ID == List::TAG_ID && T::Element::TAG_ID != List::TAG_ID {
+                // typed list
+                cast!(MutableConfig::<O>::read_mut::<List>(params)?.typed_::<T::Element>()?)
+            } else {
+                match T::TAG_ID {
+                    TagID::End => cast!(&mut *params.cast_mut().cast::<()>()),
+                    TagID::Byte => cast!(&mut *params.cast_mut().cast::<i8>()),
+                    TagID::Short => cast!(&mut *params.cast_mut().cast::<byteorder::I16<O>>()),
+                    TagID::Int => cast!(&mut *params.cast_mut().cast::<byteorder::I32<O>>()),
+                    TagID::Long => cast!(&mut *params.cast_mut().cast::<byteorder::I64<O>>()),
+                    TagID::Float => cast!(&mut *params.cast_mut().cast::<byteorder::F32<O>>()),
+                    TagID::Double => cast!(&mut *params.cast_mut().cast::<byteorder::F64<O>>()),
+                    _ => {
+                        cast!({
+                            let data = params.cast_mut();
+                            let ptr_ref = &mut *(data.cast());
+                            let len_ref = &mut *(data.add(SIZE_USIZE).cast());
+                            let cap_ref = &mut *(data.add(SIZE_USIZE * 2).cast());
+                            Some(MutVec::<<T::Element as NBTBase>::Type<O>>::new(
+                                ptr_ref, len_ref, cap_ref,
+                            ))
+                        })
+                    }
+                }
+            }
+        }
     }
 
     unsafe fn list_push<'a, T: NBT>(
@@ -303,24 +379,4 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
             }
         }
     }
-}
-
-pub trait MutableGenericImpl: NBTBase {
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn read_mutable_impl<'a, 'doc, O: ByteOrder>(
-        params: <MutableConfig<O> as ConfigRef>::ReadParams<'a>,
-    ) -> Option<Self::TypeRef<'doc, MutableConfig<O>>>;
-
-    /// .
-    ///
-    /// # Safety
-    ///
-    /// .
-    unsafe fn read_mutable_mut_impl<'a, 'doc, O: ByteOrder>(
-        params: <MutableConfig<O> as ConfigRef>::ReadParams<'a>,
-    ) -> Option<Self::TypeMut<'doc, MutableConfig<O>>>;
 }

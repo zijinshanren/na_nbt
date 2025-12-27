@@ -149,7 +149,7 @@ impl NBTBase for Double {
 
 impl NBTBase for ByteArray {
     const TAG_ID: TagID = TagID::ByteArray;
-    type Element = Self;
+    type Element = Byte;
     type TypeRef<'a, Config: ConfigRef> = Config::ByteArray<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutVec<'a, i8>;
     type Type<O: ByteOrder> = OwnVec<i8>;
@@ -167,7 +167,7 @@ impl NBTBase for ByteArray {
 
 impl NBTBase for String {
     const TAG_ID: TagID = TagID::String;
-    type Element = Self;
+    type Element = Byte;
     type TypeRef<'a, Config: ConfigRef> = Config::String<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutString<'a>;
     type Type<O: ByteOrder> = OwnString;
@@ -221,7 +221,7 @@ impl NBTBase for Compound {
 
 impl NBTBase for IntArray {
     const TAG_ID: TagID = TagID::IntArray;
-    type Element = Self;
+    type Element = Int;
     type TypeRef<'a, Config: ConfigRef> = Config::IntArray<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutVec<'a, byteorder::I32<Config::ByteOrder>>;
     type Type<O: ByteOrder> = OwnVec<byteorder::I32<O>>;
@@ -239,7 +239,7 @@ impl NBTBase for IntArray {
 
 impl NBTBase for LongArray {
     const TAG_ID: TagID = TagID::LongArray;
-    type Element = Self;
+    type Element = Long;
     type TypeRef<'a, Config: ConfigRef> = Config::LongArray<'a>;
     type TypeMut<'a, Config: ConfigMut> = MutVec<'a, byteorder::I64<Config::ByteOrder>>;
     type Type<O: ByteOrder> = OwnVec<byteorder::I64<O>>;

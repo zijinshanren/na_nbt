@@ -16,6 +16,7 @@ use zerocopy::Unalign;
 
 use crate::MUTF8Str;
 
+#[repr(C)]
 pub struct MutVec<'a, T> {
     pub(crate) ptr: &'a mut Unalign<usize>,
     pub(crate) len: &'a mut Unalign<usize>,
@@ -599,6 +600,7 @@ impl Write for MutVec<'_, u8> {
 /// A view into a String's raw parts, allowing mutable access without owning the String.
 ///
 /// This is similar to `VecView<u8>` but maintains String's UTF-8 invariants.
+#[repr(C)]
 pub struct MutString<'a> {
     pub(crate) ptr: &'a mut Unalign<usize>,
     pub(crate) len: &'a mut Unalign<usize>,

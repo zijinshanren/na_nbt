@@ -109,7 +109,7 @@ impl<'s, O: ByteOrder, T: NBT> Iterator for MutTypedListIter<'s, O, T> {
 
         self.remaining -= 1;
 
-        let value = unsafe { T::read_mutable_mut_impl(self.data) };
+        let value = unsafe { MutableConfig::<O>::read_mut::<T>(self.data) };
 
         self.data = unsafe { self.data.add(mutable_tag_size(T::TAG_ID)) };
 

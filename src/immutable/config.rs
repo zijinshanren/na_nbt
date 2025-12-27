@@ -131,7 +131,7 @@ impl<O: ByteOrder, D: Document> ConfigRef for ImmutableConfig<O, D> {
             }
 
             // the cases are constant evaluated
-            if T::TAG_ID != T::Element::TAG_ID {
+            if T::TAG_ID == List::TAG_ID && T::Element::TAG_ID != List::TAG_ID {
                 // typed list
                 cast!(ImmutableConfig::<O, D>::read::<List>(params)?.typed_::<T::Element>()?)
             } else {
