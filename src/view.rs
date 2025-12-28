@@ -1982,6 +1982,12 @@ impl From<&str> for OwnString {
     }
 }
 
+impl From<&MUTF8Str> for OwnString {
+    fn from(value: &MUTF8Str) -> Self {
+        value.as_bytes().into()
+    }
+}
+
 impl Drop for OwnString {
     fn drop(&mut self) {
         // Drop as Vec<u8> since internal format is mutf8, not UTF-8

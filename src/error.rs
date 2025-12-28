@@ -88,7 +88,7 @@ pub enum Error {
     /// ```
     INVALID(u8),
 
-    /// A list or array length exceeds the maximum.
+    /// A list, array or name length exceeds the maximum.
     ///
     /// NBT list lengths are stored as signed 32-bit integers,
     /// and na_nbt trait them as `u32`.
@@ -175,7 +175,7 @@ impl Display for Error {
             Error::INVALID(tag) => {
                 formatter.write_str(&format!("invalid NBT tag type: {tag:#04x}"))
             }
-            Error::LEN(len) => formatter.write_str(&format!("list length too long: {len}")),
+            Error::LEN(len) => formatter.write_str(&format!("length too long: {len}")),
             Error::KEY => formatter.write_str("map key must be a string"),
             Error::MISMATCH { expected, actual } => formatter.write_str(&format!(
                 "tag in mismatch: expected {expected:?}, got {actual:?}"

@@ -1,6 +1,11 @@
-use std::{borrow::Cow, mem};
+use std::{
+    borrow::{Borrow, Cow},
+    mem,
+};
 
 use simd_cesu8::DecodingError;
+
+use crate::OwnString;
 
 #[inline(always)]
 #[cold]
@@ -20,6 +25,20 @@ impl Default for &MUTF8Str {
     #[inline]
     fn default() -> Self {
         unsafe { MUTF8Str::from_mutf8_unchecked(&[]) }
+    }
+}
+
+impl Borrow<MUTF8Str> for OwnString {
+    fn borrow(&self) -> &MUTF8Str {
+        self.as_mutf8_str()
+    }
+}
+
+impl ToOwned for MUTF8Str {
+    type Owned = OwnString;
+
+    fn to_owned(&self) -> Self::Owned {
+        OwnString::from(self)
     }
 }
 
