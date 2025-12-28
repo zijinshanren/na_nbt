@@ -49,7 +49,7 @@ impl ValueHelper for OwnValue<BE> {
     }
     fn as_string_val(&self) -> Option<String> {
         if let OwnValue::String(s) = self {
-            Some(s.decode().into_owned())
+            Some(s.decode_lossy().into_owned())
         } else {
             None
         }
@@ -624,7 +624,7 @@ fn test_iter_mut_nested() {
             } else if key_str == "name" {
                 // Should be a string
                 if let MutValue::String(s) = val {
-                    assert_eq!(s.decode(), "test");
+                    assert_eq!(s.decode_lossy(), "test");
                 } else {
                     panic!("expected string");
                 }
@@ -1564,19 +1564,19 @@ fn test_string_operations() {
 
     // Create string and test basic operations
     let s = OwnString::from("Hello, World!");
-    assert_eq!(s.decode(), "Hello, World!");
+    assert_eq!(s.decode_lossy(), "Hello, World!");
 
     // Test Unicode
     let s = OwnString::from("日本語テスト");
-    assert_eq!(s.decode(), "日本語テスト");
+    assert_eq!(s.decode_lossy(), "日本語テスト");
 
     // Test emoji
     let s = OwnString::from("Test 🎮 emoji");
-    assert_eq!(s.decode(), "Test 🎮 emoji");
+    assert_eq!(s.decode_lossy(), "Test 🎮 emoji");
 
     // Test empty string
     let s = OwnString::from("");
-    assert_eq!(s.decode(), "");
+    assert_eq!(s.decode_lossy(), "");
 
     // Test through list
     let mut list = OwnList::<BE>::default();
@@ -2417,7 +2417,7 @@ fn test_mut_value_map_string() {
 
     // Verify modification
     if let OwnValue::String(s) = &val {
-        assert_eq!(s.decode().into_owned(), "modified");
+        assert_eq!(s.decode_lossy().into_owned(), "modified");
     }
 }
 
@@ -2538,7 +2538,7 @@ fn test_mut_value_visit_shared() {
     // Test String
     let mut val = OwnValue::<BE>::String(OwnString::from(String::from("test")));
     val.to_mut().visit_shared(|v| match v {
-        VisitMutShared::String(s) => assert_eq!(s.decode(), "test"),
+        VisitMutShared::String(s) => assert_eq!(s.decode_lossy(), "test"),
         _ => panic!("expected String"),
     });
 
@@ -3962,7 +3962,7 @@ fn test_mut_value_visit_string() {
     let mut val = OwnValue::<BE>::String(OwnString::from("hello"));
     val.to_mut().visit(|v| match v {
         VisitMut::String(s) => {
-            assert_eq!(s.decode(), "hello");
+            assert_eq!(s.decode_lossy(), "hello");
         }
         _ => panic!("Expected String"),
     });
@@ -4468,6 +4468,133 @@ fn test_typed_list_ref_get_all_types() {
     }
 }
 
+// Test na_nbt::list serialization module
+#[test]
+fn test_list_serde_module() {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct TestData {
+        #[serde(with = "na_nbt::list")]
+        scores: Vec<i32>,
+        #[serde(with = "na_nbt::list")]
+        names: Vec<String>,
+    }
+
+    let data = TestData {
+        scores: vec![100, 200, 300],
+        names: vec!["Alice".to_string(), "Bob".to_string()],
+    };
+
+    // Serialize
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+
+    // Deserialize
+    let decoded: TestData = na_nbt::de::from_slice_be(&bytes).unwrap();
+    assert_eq!(data, decoded);
+}
+
+// Test na_nbt::list with empty list
+#[test]
+fn test_list_serde_empty() {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct TestData {
+        #[serde(with = "na_nbt::list")]
+        items: Vec<i64>,
+    }
+
+    let data = TestData { items: vec![] };
+
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let decoded: TestData = na_nbt::de::from_slice_be(&bytes).unwrap();
+    assert_eq!(data, decoded);
+}
+
+// Test na_nbt::list with floats
+#[test]
+fn test_list_serde_floats() {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct TestData {
+        #[serde(with = "na_nbt::list")]
+        values: Vec<f32>,
+    }
+
+    let data = TestData {
+        values: vec![1.5, 2.5, 3.5],
+    };
+
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let decoded: TestData = na_nbt::de::from_slice_be(&bytes).unwrap();
+
+    // Compare floats with tolerance
+    for (a, b) in data.values.iter().zip(decoded.values.iter()) {
+        assert!((a - b).abs() < 0.001);
+    }
+}
+
+// Test na_nbt::list with compounds (native List<Compound>)
+#[test]
+fn test_list_serde_compounds() {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Item {
+        id: i32,
+        name: String,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Inventory {
+        #[serde(with = "na_nbt::list")]
+        items: Vec<Item>,
+    }
+
+    let data = Inventory {
+        items: vec![
+            Item { id: 1, name: "Sword".to_string() },
+            Item { id: 2, name: "Shield".to_string() },
+            Item { id: 3, name: "Potion".to_string() },
+        ],
+    };
+
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let decoded: Inventory = na_nbt::de::from_slice_be(&bytes).unwrap();
+    assert_eq!(data, decoded);
+}
+
+// Test that wrapped List<Compound> still works (default Vec<T> behavior)
+#[test]
+fn test_list_wrapped_compounds() {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Item {
+        id: i32,
+        name: String,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Inventory {
+        // Without #[serde(with = "na_nbt::list")], uses wrapped format
+        items: Vec<Item>,
+    }
+
+    let data = Inventory {
+        items: vec![
+            Item { id: 1, name: "Sword".to_string() },
+            Item { id: 2, name: "Shield".to_string() },
+        ],
+    };
+
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let decoded: Inventory = na_nbt::de::from_slice_be(&bytes).unwrap();
+    assert_eq!(data, decoded);
+}
+
 // Test ListRef::get for all element types (covers all branches in ListRef::get)
 #[test]
 fn test_list_ref_get_all_element_types() {
@@ -4587,4 +4714,202 @@ fn test_list_ref_get_all_element_types() {
         assert!(item.is_some());
         assert_eq!(item.unwrap().tag_id(), TagID::Compound);
     }
+}
+
+/// Test native compounds with empty string keys work correctly.
+/// The na_nbt::list attribute uses deserialize_newtype_struct to signal native mode,
+/// so there's no ambiguity with wrapped elements.
+#[test]
+fn test_native_compound_with_empty_key() {
+    use serde::{Serialize, Deserialize};
+    use std::collections::HashMap;
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Data {
+        #[serde(with = "na_nbt::list")]
+        items: Vec<HashMap<String, i32>>,
+    }
+    
+    // Create a compound with empty string key - this should now work!
+    let mut map = HashMap::new();
+    map.insert("".to_string(), 42);  // Empty string key
+    map.insert("other".to_string(), 99);
+    
+    let data = Data {
+        items: vec![map],
+    };
+    
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
+    
+    assert_eq!(result.items.len(), 1);
+    assert_eq!(result.items[0].get(""), Some(&42));
+    assert_eq!(result.items[0].get("other"), Some(&99));
+}
+
+/// Test nested lists - inner list should not inherit ArrayMode::List from outer
+#[test]
+fn test_nested_native_lists() {
+    use serde::{Serialize, Deserialize};
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Outer {
+        #[serde(with = "na_nbt::list")]
+        lists: Vec<Vec<i32>>,  // Inner Vec<i32> should use wrapped format
+    }
+    
+    let data = Outer {
+        lists: vec![
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+        ],
+    };
+    
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let result: Outer = na_nbt::de::from_slice_be(&bytes).unwrap();
+    
+    assert_eq!(result, data);
+}
+
+/// Test List<IntArray> - IntArray inside native list should work correctly
+#[test]
+fn test_list_of_int_arrays() {
+    use serde::{Serialize, Deserialize};
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct IntArrayWrapper {
+        #[serde(with = "na_nbt::int_array")]
+        data: Vec<i32>,
+    }
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Data {
+        #[serde(with = "na_nbt::list")]
+        arrays: Vec<IntArrayWrapper>,
+    }
+    
+    let data = Data {
+        arrays: vec![
+            IntArrayWrapper { data: vec![1, 2, 3] },
+            IntArrayWrapper { data: vec![4, 5, 6] },
+        ],
+    };
+    
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
+    
+    assert_eq!(result, data);
+}
+
+/// Test direct List<IntArray> serialization (not wrapped in struct)
+#[test]
+fn test_direct_list_of_int_arrays() {
+    use serde::{Serialize, Deserialize};
+    
+    // Newtype that serializes directly as IntArray
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct IntArray(#[serde(with = "na_nbt::int_array")] Vec<i32>);
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Data {
+        #[serde(with = "na_nbt::list")]
+        arrays: Vec<IntArray>,  // Should produce List<IntArray>
+    }
+    
+    let data = Data {
+        arrays: vec![
+            IntArray(vec![1, 2, 3]),
+            IntArray(vec![4, 5, 6]),
+            IntArray(vec![7, 8, 9]),
+        ],
+    };
+    
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    
+    // Verify the bytes contain IntArray tag (0x0B) as element type
+    // List header: tag_id (1 byte) + element_tag (1 byte) + length (4 bytes)
+    // For List<IntArray>, element_tag should be 0x0B (IntArray)
+    
+    let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
+    assert_eq!(result, data);
+}
+
+/// Test deeply nested structures with mixed native and wrapped lists
+#[test]
+fn test_deeply_nested_mixed_lists() {
+    use serde::{Serialize, Deserialize};
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Inner {
+        value: i32,
+    }
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Middle {
+        #[serde(with = "na_nbt::list")]
+        items: Vec<Inner>,  // Native list of compounds
+    }
+    
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Outer {
+        normal: Vec<Middle>,  // Wrapped list of compounds (default behavior)
+    }
+    
+    let data = Outer {
+        normal: vec![
+            Middle {
+                items: vec![Inner { value: 1 }, Inner { value: 2 }],
+            },
+            Middle {
+                items: vec![Inner { value: 3 }],
+            },
+        ],
+    };
+    
+    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let result: Outer = na_nbt::de::from_slice_be(&bytes).unwrap();
+    
+    assert_eq!(result, data);
+}
+
+/// Test the tag_of function for probing tag types without serializing
+#[test]
+fn test_tag_of_probe() {
+    use na_nbt::ser::tag_of;
+    use na_nbt::TagID;
+    use serde::Serialize;
+    
+    // Primitives
+    assert_eq!(tag_of(&42i8).unwrap(), TagID::Byte);
+    assert_eq!(tag_of(&42i16).unwrap(), TagID::Short);
+    assert_eq!(tag_of(&42i32).unwrap(), TagID::Int);
+    assert_eq!(tag_of(&42i64).unwrap(), TagID::Long);
+    assert_eq!(tag_of(&3.14f32).unwrap(), TagID::Float);
+    assert_eq!(tag_of(&3.14f64).unwrap(), TagID::Double);
+    assert_eq!(tag_of("hello").unwrap(), TagID::String);
+    assert_eq!(tag_of(&true).unwrap(), TagID::Byte);
+    
+    // Unsigned mapped to signed
+    assert_eq!(tag_of(&42u8).unwrap(), TagID::Byte);
+    assert_eq!(tag_of(&42u16).unwrap(), TagID::Short);
+    assert_eq!(tag_of(&42u32).unwrap(), TagID::Int);
+    assert_eq!(tag_of(&42u64).unwrap(), TagID::Long);
+    
+    // Struct -> Compound
+    #[derive(Serialize)]
+    struct Player { name: String, level: i32 }
+    let player = Player { name: "test".into(), level: 10 };
+    assert_eq!(tag_of(&player).unwrap(), TagID::Compound);
+    
+    // Vec -> List (wrapped, so List of Compound)
+    let vec = vec![1i32, 2, 3];
+    assert_eq!(tag_of(&vec).unwrap(), TagID::List);
+    
+    // Option::None -> End
+    let none: Option<i32> = None;
+    assert_eq!(tag_of(&none).unwrap(), TagID::End);
+    
+    // Option::Some -> inner type
+    let some = Some(42i32);
+    assert_eq!(tag_of(&some).unwrap(), TagID::Int);
 }

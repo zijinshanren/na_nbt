@@ -218,7 +218,7 @@ fn test_mut_string_basics() {
     assert_eq!(view.as_mut_ptr(), view.as_mut_ptr()); // Just checking API existence
     
     assert_eq!(view.as_mutf8_str().as_bytes(), b"hello");
-    assert_eq!(view.decode(), "hello");
+    assert_eq!(view.decode_lossy(), "hello");
 }
 
 #[test]
@@ -241,28 +241,28 @@ fn test_mut_string_mutation() {
     let mut view = own.to_mut();
 
     view.push_str(" world");
-    assert_eq!(view.decode(), "hello world");
+    assert_eq!(view.decode_lossy(), "hello world");
     
     view.push('!');
-    assert_eq!(view.decode(), "hello world!");
+    assert_eq!(view.decode_lossy(), "hello world!");
     
     view.truncate(5);
-    assert_eq!(view.decode(), "hello");
+    assert_eq!(view.decode_lossy(), "hello");
     
     assert_eq!(view.pop(), Some('o'));
-    assert_eq!(view.decode(), "hell");
+    assert_eq!(view.decode_lossy(), "hell");
     
     assert_eq!(view.remove(0), 'h');
-    assert_eq!(view.decode(), "ell");
+    assert_eq!(view.decode_lossy(), "ell");
     
     view.insert(0, 'H');
-    assert_eq!(view.decode(), "Hell");
+    assert_eq!(view.decode_lossy(), "Hell");
     
     view.insert_str(1, "i");
-    assert_eq!(view.decode(), "Hiell");
+    assert_eq!(view.decode_lossy(), "Hiell");
     
     view.retain(|c| c != 'i');
-    assert_eq!(view.decode(), "Hell");
+    assert_eq!(view.decode_lossy(), "Hell");
     
     view.clear();
     assert!(view.is_empty());
@@ -274,17 +274,17 @@ fn test_mut_string_advanced() {
     let mut view = own.to_mut();
 
     let split = view.split_off(2);
-    assert_eq!(view.decode(), "he");
+    assert_eq!(view.decode_lossy(), "he");
     assert_eq!(split, "llo");
 
     view.extend_from_within(0..1);
-    assert_eq!(view.decode(), "heh");
+    assert_eq!(view.decode_lossy(), "heh");
     
     view.replace_range(1..2, "a");
-    assert_eq!(view.decode(), "hah");
+    assert_eq!(view.decode_lossy(), "hah");
     
     view.drain_drop(1..2);
-    assert_eq!(view.decode(), "hh");
+    assert_eq!(view.decode_lossy(), "hh");
 }
 
 #[test]
@@ -310,7 +310,7 @@ fn test_mut_string_traits() {
 
     // Write
     view.write_all(b" world").unwrap();
-    assert_eq!(view.decode(), "hello world");
+    assert_eq!(view.decode_lossy(), "hello world");
     
     assert!(view.write(b"\xFF").is_err()); // Invalid UTF-8
     assert!(view.write_all(b"\xFF").is_err());
@@ -372,22 +372,22 @@ fn test_own_string() {
     assert_eq!(OwnString::default().len(), 0);
     
     assert_eq!(own.len(), 5);
-    assert_eq!(own.decode(), "hello");
+    assert_eq!(own.decode_lossy(), "hello");
     
     own.push('!');
-    assert_eq!(own.decode(), "hello!");
+    assert_eq!(own.decode_lossy(), "hello!");
     
     let mut view = own.to_mut();
     view.push('?');
     
     let mut own3 = OwnString::from(vec![b'a', b'b']);
-    assert_eq!(own3.decode(), "ab");
+    assert_eq!(own3.decode_lossy(), "ab");
     
     own3.write_all(b"c").unwrap();
-    assert_eq!(own3.decode(), "abc");
+    assert_eq!(own3.decode_lossy(), "abc");
 
     // Traits
-    let own_cmp = OwnString::from(own.decode().to_string());
+    let own_cmp = OwnString::from(own.decode_lossy().to_string());
     assert_eq!(own.partial_cmp(&own_cmp), Some(Ordering::Equal));
     assert_eq!(own.cmp(&own_cmp), Ordering::Equal);
     assert_eq!(calculate_hash(&own), calculate_hash(&own_cmp));

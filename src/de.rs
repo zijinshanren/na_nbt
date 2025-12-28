@@ -29,6 +29,9 @@ use crate::{ByteOrder, Error, Result, TagID, cold_path};
 pub struct Deserializer<'de, O: ByteOrder> {
     current_tag: TagID,
     input: &'de [u8],
+    /// When true, list elements are deserialized directly without compound unwrapping.
+    /// Set by deserialize_newtype_struct("na_nbt:list", ...).
+    native_list: bool,
     marker: PhantomData<O>,
 }
 
@@ -56,6 +59,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(Self {
             current_tag: tag_id,
             input: &input[1 + 2 + name_len as usize..],
+            native_list: false,
             marker: PhantomData,
         })
     }
@@ -284,10 +288,13 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                     return Err(Error::INVALID(tag_id as u8));
                 }
                 self.input = &self.input[1 + 4..];
+                // Consume native_list flag - it only applies to this list, not nested ones
+                let native_list = std::mem::take(&mut self.native_list);
                 visitor.visit_seq(ListDeserializer {
                     tag_id,
                     index: 0,
                     len: length,
+                    native_list,
                     deserializer: self,
                 })
             }
@@ -304,6 +311,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                     tag_id: TagID::Int,
                     index: 0,
                     len: length,
+                    native_list: true, // IntArray elements are always native
                     deserializer: self,
                 })
             }
@@ -316,6 +324,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                     tag_id: TagID::Long,
                     index: 0,
                     len: length,
+                    native_list: true, // LongArray elements are always native
                     deserializer: self,
                 })
             }
@@ -532,12 +541,17 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
 
     fn deserialize_newtype_struct<V>(
         self,
-        _name: &'static str,
+        name: &'static str,
         visitor: V,
     ) -> std::result::Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
+        if name == "na_nbt:list" {
+            // Signal that the next list should deserialize elements directly
+            // without compound unwrapping
+            self.native_list = true;
+        }
         visitor.visit_newtype_struct(self)
     }
 
@@ -557,6 +571,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                     tag_id: TagID::Int,
                     index: 0,
                     len: length,
+                    native_list: true, // IntArray elements are always native
                     deserializer: self,
                 })
             }
@@ -570,6 +585,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                     tag_id: TagID::Long,
                     index: 0,
                     len: length,
+                    native_list: true, // LongArray elements are always native
                     deserializer: self,
                 })
             }
@@ -585,10 +601,13 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                     return Err(Error::INVALID(tag_id as u8));
                 }
                 self.input = &self.input[1 + 4..];
+                // Consume native_list flag - it only applies to this list
+                let native_list = std::mem::take(&mut self.native_list);
                 visitor.visit_seq(ListDeserializer {
                     tag_id,
                     index: 0,
                     len: length,
+                    native_list,
                     deserializer: self,
                 })
             }
@@ -739,6 +758,8 @@ struct ListDeserializer<'a, 'de: 'a, O: ByteOrder> {
     tag_id: TagID,
     index: u32,
     len: u32,
+    /// When true, elements are deserialized directly without compound unwrapping.
+    native_list: bool,
     deserializer: &'a mut Deserializer<'de, O>,
 }
 
@@ -764,38 +785,63 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for ListDeserializer<'a, 'de, O> {
             return Ok(None);
         }
         self.index += 1;
+        
+        // If native_list is set (via na_nbt::list), deserialize elements directly
+        if self.native_list {
+            self.deserializer.current_tag = self.tag_id;
+            return seed.deserialize(&mut *self.deserializer).map(Some);
+        }
+        
         if self.tag_id == TagID::Compound {
-            // Each element is wrapped: tag_id (1), name_len (2, always 0), value, Tag::End (1)
+            // Check if this is wrapped format or native compound.
+            // Wrapped format uses name_len=0 (empty string) as marker.
+            // Native compound has either:
+            //   - End tag (empty compound)
+            //   - name_len>0 with actual name
             check_bounds!(1 + 2, self.deserializer.input);
-            let tag_id = self.deserializer.input[0];
-            if tag_id == TagID::End as u8 || tag_id > TagID::LongArray as u8 {
-                cold_path();
-                return Err(Error::INVALID(tag_id));
+            let first_tag_id = self.deserializer.input[0];
+            
+            // Check for End tag (empty compound) - this is a native empty compound
+            if first_tag_id == TagID::End as u8 {
+                // Native empty compound - just skip the End tag
+                self.deserializer.input = &self.deserializer.input[1..];
+                self.deserializer.current_tag = TagID::Compound;
+                return seed.deserialize(&mut *self.deserializer).map(Some);
             }
-            // Verify empty name
+            
+            if first_tag_id > TagID::LongArray as u8 {
+                cold_path();
+                return Err(Error::INVALID(first_tag_id));
+            }
+            
+            // Check name_len to distinguish wrapped vs native format
             let name_len = byteorder::U16::<O>::from_bytes(unsafe {
                 *self.deserializer.input.as_ptr().add(1).cast()
             })
             .get();
-            if name_len != 0 {
-                cold_path();
-                return Err(Error::MSG("Expected empty name in list element".into()));
+            
+            // Wrapped format: name_len=0 (empty string)
+            if name_len == 0 {
+                // Skip tag_id (1) + name_len (2) = 3 bytes
+                self.deserializer.input = &self.deserializer.input[3..];
+                self.deserializer.current_tag = TagID::from_u8(first_tag_id)?;
+
+                let value = seed.deserialize(&mut *self.deserializer)?;
+
+                // Consume the Tag::End
+                check_bounds!(1, self.deserializer.input);
+                if self.deserializer.input[0] != TagID::End as u8 {
+                    cold_path();
+                    return Err(Error::INVALID(self.deserializer.input[0]));
+                }
+                self.deserializer.input = &self.deserializer.input[1..];
+
+                return Ok(Some(value));
             }
-            // Skip tag_id and empty name
-            self.deserializer.input = &self.deserializer.input[1 + 2..];
-            self.deserializer.current_tag = TagID::from_u8(tag_id)?;
-
-            let value = seed.deserialize(&mut *self.deserializer)?;
-
-            // Consume the Tag::End
-            check_bounds!(1, self.deserializer.input);
-            if self.deserializer.input[0] != TagID::End as u8 {
-                cold_path();
-                return Err(Error::INVALID(self.deserializer.input[0]));
-            }
-            self.deserializer.input = &self.deserializer.input[1..];
-
-            Ok(Some(value))
+            
+            // Native compound format - deserialize the whole compound directly
+            self.deserializer.current_tag = TagID::Compound;
+            seed.deserialize(&mut *self.deserializer).map(Some)
         } else {
             self.deserializer.current_tag = self.tag_id;
             seed.deserialize(&mut *self.deserializer).map(Some)

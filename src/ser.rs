@@ -12,6 +12,125 @@ enum ArrayMode {
     None,
     IntArray,
     LongArray,
+    /// Native list mode - first element determines tag type
+    List,
+}
+
+/// A zero-allocation serializer that only determines the NBT tag type.
+/// Used to probe the tag before writing, avoiding backpatching.
+pub struct TagProbe;
+
+impl ser::Serializer for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+
+    type SerializeSeq = Self;
+    type SerializeTuple = Self;
+    type SerializeTupleStruct = Self;
+    type SerializeTupleVariant = Self;
+    type SerializeMap = Self;
+    type SerializeStruct = Self;
+    type SerializeStructVariant = Self;
+
+    fn serialize_bool(self, _v: bool) -> Result<TagID> { Ok(TagID::Byte) }
+    fn serialize_i8(self, _v: i8) -> Result<TagID> { Ok(TagID::Byte) }
+    fn serialize_i16(self, _v: i16) -> Result<TagID> { Ok(TagID::Short) }
+    fn serialize_i32(self, _v: i32) -> Result<TagID> { Ok(TagID::Int) }
+    fn serialize_i64(self, _v: i64) -> Result<TagID> { Ok(TagID::Long) }
+    fn serialize_u8(self, _v: u8) -> Result<TagID> { Ok(TagID::Byte) }
+    fn serialize_u16(self, _v: u16) -> Result<TagID> { Ok(TagID::Short) }
+    fn serialize_u32(self, _v: u32) -> Result<TagID> { Ok(TagID::Int) }
+    fn serialize_u64(self, _v: u64) -> Result<TagID> { Ok(TagID::Long) }
+    fn serialize_f32(self, _v: f32) -> Result<TagID> { Ok(TagID::Float) }
+    fn serialize_f64(self, _v: f64) -> Result<TagID> { Ok(TagID::Double) }
+    fn serialize_char(self, _v: char) -> Result<TagID> { Ok(TagID::String) }
+    fn serialize_str(self, _v: &str) -> Result<TagID> { Ok(TagID::String) }
+    fn serialize_bytes(self, _v: &[u8]) -> Result<TagID> { Ok(TagID::ByteArray) }
+    fn serialize_none(self) -> Result<TagID> { Ok(TagID::End) }
+    fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> Result<TagID> {
+        value.serialize(self)
+    }
+    fn serialize_unit(self) -> Result<TagID> { Ok(TagID::End) }
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<TagID> { Ok(TagID::End) }
+    fn serialize_unit_variant(self, _name: &'static str, _idx: u32, _var: &'static str) -> Result<TagID> {
+        // Unit variants serialize as u32 index -> Int
+        Ok(TagID::Int)
+    }
+    fn serialize_newtype_struct<T: ?Sized + Serialize>(self, name: &'static str, value: &T) -> Result<TagID> {
+        match name {
+            "na_nbt:int_array" => Ok(TagID::IntArray),
+            "na_nbt:long_array" => Ok(TagID::LongArray),
+            "na_nbt:list" => Ok(TagID::List),
+            _ => value.serialize(self),
+        }
+    }
+    fn serialize_newtype_variant<T: ?Sized + Serialize>(self, _name: &'static str, _idx: u32, _var: &'static str, _value: &T) -> Result<TagID> {
+        Ok(TagID::Compound)
+    }
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> { Ok(self) }
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> { Ok(self) }
+    fn serialize_tuple_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeTupleStruct> { Ok(self) }
+    fn serialize_tuple_variant(self, _name: &'static str, _idx: u32, _var: &'static str, _len: usize) -> Result<Self::SerializeTupleVariant> { Ok(self) }
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> { Ok(self) }
+    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct> { Ok(self) }
+    fn serialize_struct_variant(self, _name: &'static str, _idx: u32, _var: &'static str, _len: usize) -> Result<Self::SerializeStructVariant> { Ok(self) }
+}
+
+impl ser::SerializeSeq for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<()> { Ok(()) }
+    fn end(self) -> Result<TagID> { Ok(TagID::List) }
+}
+
+impl ser::SerializeTuple for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<()> { Ok(()) }
+    fn end(self) -> Result<TagID> { Ok(TagID::List) }
+}
+
+impl ser::SerializeTupleStruct for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<()> { Ok(()) }
+    fn end(self) -> Result<TagID> { Ok(TagID::List) }
+}
+
+impl ser::SerializeTupleVariant for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<()> { Ok(()) }
+    fn end(self) -> Result<TagID> { Ok(TagID::Compound) }
+}
+
+impl ser::SerializeMap for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+    fn serialize_key<T: ?Sized + Serialize>(&mut self, _key: &T) -> Result<()> { Ok(()) }
+    fn serialize_value<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<()> { Ok(()) }
+    fn end(self) -> Result<TagID> { Ok(TagID::Compound) }
+}
+
+impl ser::SerializeStruct for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _key: &'static str, _value: &T) -> Result<()> { Ok(()) }
+    fn end(self) -> Result<TagID> { Ok(TagID::Compound) }
+}
+
+impl ser::SerializeStructVariant for TagProbe {
+    type Ok = TagID;
+    type Error = Error;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _key: &'static str, _value: &T) -> Result<()> { Ok(()) }
+    fn end(self) -> Result<TagID> { Ok(TagID::Compound) }
+}
+
+/// Get the NBT tag type for a value without serializing it.
+/// This is a zero-allocation operation that just probes the type.
+#[inline]
+pub fn tag_of<T: ?Sized + Serialize>(value: &T) -> Result<TagID> {
+    value.serialize(TagProbe)
 }
 
 /// NBT serializer implementing [`serde::Serializer`].
@@ -74,15 +193,19 @@ impl<O: ByteOrder> Serializer<O> {
     }
 
     // Tag::Compound { "" : value }
+    // Uses empty string as the wrapper field name.
+    // Note: This creates ambiguity with native Compound having an empty string key,
+    // but any marker could theoretically appear as a real key, so we use the simplest.
     unsafe fn write_list_of_compound_item<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
         unsafe {
             let old_len = self.vec.len();
-            self.vec.reserve(3);
+            self.vec.reserve(4); // tag_id(1) + name_len(2) + name(0) + end(1) overhead
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
-            ptr::write(write_ptr.add(1).cast(), [0u8; 2]);
+            // name_len = 0 (empty string)
+            ptr::write(write_ptr.add(1).cast(), byteorder::U16::<O>::new(0).to_bytes());
             self.vec.set_len(old_len + 3);
             let tag_id = value.serialize(&mut *self)?;
             *self.vec.get_unchecked_mut(old_len) = tag_id as u8;
@@ -119,17 +242,19 @@ impl<O: ByteOrder> Serializer<O> {
 /// [`Error::TagMismatch`]: crate::Error::TagMismatch
 #[inline]
 pub fn to_vec<O: ByteOrder>(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>> {
-    let mut serializer = Serializer::<O> {
-        vec: vec![0u8; 3],
-        marker: PhantomData,
-        array_mode: ArrayMode::None,
-    };
-    let tag_id = value.serialize(&mut serializer)?;
+    // Probe tag first to avoid backpatching
+    let tag_id = value.serialize(TagProbe)?;
     if tag_id == TagID::End {
         cold_path();
         return Ok(vec![0]);
     }
-    unsafe { *serializer.vec.get_unchecked_mut(0) = tag_id as u8 };
+    let mut serializer = Serializer::<O> {
+        // Write tag_id directly in initial vec
+        vec: vec![tag_id as u8, 0u8, 0u8],
+        marker: PhantomData,
+        array_mode: ArrayMode::None,
+    };
+    value.serialize(&mut serializer)?;
     Ok(serializer.vec)
 }
 
@@ -350,16 +475,20 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     where
         T: ?Sized + Serialize,
     {
+        // Probe tag first to avoid backpatching
+        let tag_id = value.serialize(TagProbe)?;
         unsafe {
             let old_len = self.vec.len();
             self.vec.reserve(1 + 2);
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
+            // Write tag_id directly (no backpatching needed)
+            ptr::write(write_ptr, tag_id as u8);
+            // name_len = 0
             ptr::write(write_ptr.add(1).cast(), [0u8; 2]);
             self.vec.set_len(old_len + 1 + 2);
-            let tag_id = value.serialize(&mut *self)?;
-            *self.vec.get_unchecked_mut(old_len) = tag_id as u8;
-            self.vec.push(TagID::End as u8);
         }
+        value.serialize(&mut *self)?;
+        self.vec.push(TagID::End as u8);
         Ok(TagID::Compound)
     }
 
@@ -409,6 +538,12 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
                 self.array_mode = ArrayMode::None;
                 result
             }
+            "na_nbt:list" => {
+                self.array_mode = ArrayMode::List;
+                let result = value.serialize(&mut *self);
+                self.array_mode = ArrayMode::None;
+                result
+            }
             _ => value.serialize(self),
         }
     }
@@ -435,6 +570,30 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         self,
         len: Option<usize>,
     ) -> std::result::Result<Self::SerializeSeq, Self::Error> {
+        if self.array_mode == ArrayMode::List {
+            // Consume the mode immediately to prevent nested lists from seeing it
+            self.array_mode = ArrayMode::None;
+            // Native list mode - elements are serialized directly
+            let known_len = len;
+            let len = len.unwrap_or(0);
+            if len > u32::MAX as usize {
+                cold_path();
+                return Err(Error::LEN(len));
+            }
+            let start_pos = self.vec.len();
+            // Reserve space for tag_id (1 byte) + length (4 bytes)
+            // Initialize with placeholder values (will be overwritten in end())
+            self.vec.extend_from_slice(&[0u8; 5]);
+            return Ok(SeqSerializer {
+                start_pos,
+                // If length is known, store it; otherwise track count starting at 0
+                len: Some(known_len.unwrap_or(0) as u32),
+                element_tag: None,
+                native_list: true,
+                serializer: &mut *self,
+            });
+        }
+
         let seq_len = match len {
             Some(_) => None,
             None => Some(0),
@@ -447,6 +606,8 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             Ok(SeqSerializer {
                 start_pos: old_len,
                 len: seq_len,
+                element_tag: None,
+                native_list: false,
                 serializer: &mut *self,
             })
         }
@@ -483,7 +644,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
                 }
                 Ok(self)
             }
-            ArrayMode::None => unsafe { self.write_list_of_compound_begin(len) },
+            ArrayMode::None | ArrayMode::List => unsafe { self.write_list_of_compound_begin(len) },
         }
     }
 
@@ -592,6 +753,8 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
 pub struct SeqSerializer<'a, O: ByteOrder> {
     start_pos: usize,
     len: Option<u32>,
+    element_tag: Option<TagID>,
+    native_list: bool,
     serializer: &'a mut Serializer<O>,
 }
 
@@ -603,16 +766,42 @@ impl<'a, O: ByteOrder> ser::SerializeSeq for SeqSerializer<'a, O> {
     where
         T: ?Sized + Serialize,
     {
-        if let Some(ref mut len) = self.len {
-            assert!(*len < u32::MAX, "list length too long");
-            *len += 1;
+        if self.native_list {
+            // Native list mode - serialize element directly
+            let tag_id = value.serialize(&mut *self.serializer)?;
+            // Check/set element tag
+            if let Some(expected_tag) = self.element_tag {
+                if expected_tag != tag_id {
+                    cold_path();
+                    return Err(Error::MISMATCH { expected: expected_tag, actual: tag_id });
+                }
+            } else {
+                self.element_tag = Some(tag_id);
+            }
+            Ok(())
+        } else {
+            // Compound-wrapped mode
+            if let Some(ref mut len) = self.len {
+                assert!(*len < u32::MAX, "list length too long");
+                *len += 1;
+            }
+            unsafe { self.serializer.write_list_of_compound_item(value) }
         }
-        unsafe { self.serializer.write_list_of_compound_item(value) }
     }
 
     fn end(self) -> std::result::Result<Self::Ok, Self::Error> {
         unsafe {
-            if let Some(len) = self.len {
+            if self.native_list {
+                // Write the list header: tag_id + length
+                let element_tag = self.element_tag.unwrap_or(TagID::End);
+                let len = self.len.unwrap_or(0);
+                let write_ptr = self.serializer.vec.as_mut_ptr().add(self.start_pos);
+                ptr::write(write_ptr, element_tag as u8);
+                ptr::write(
+                    write_ptr.add(1).cast(),
+                    byteorder::U32::<O>::new(len).to_bytes(),
+                );
+            } else if let Some(len) = self.len {
                 cold_path();
                 ptr::write(
                     self.serializer
@@ -661,7 +850,7 @@ impl<O: ByteOrder> ser::SerializeTuple for &mut Serializer<O> {
                 value.serialize(&mut **self)?;
                 Ok(())
             }
-            ArrayMode::None => unsafe { self.write_list_of_compound_item(value) },
+            ArrayMode::None | ArrayMode::List => unsafe { self.write_list_of_compound_item(value) },
         }
     }
 
@@ -670,7 +859,7 @@ impl<O: ByteOrder> ser::SerializeTuple for &mut Serializer<O> {
         match self.array_mode {
             ArrayMode::IntArray => Ok(TagID::IntArray),
             ArrayMode::LongArray => Ok(TagID::LongArray),
-            ArrayMode::None => Ok(TagID::List),
+            ArrayMode::None | ArrayMode::List => Ok(TagID::List),
         }
     }
 }

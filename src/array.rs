@@ -184,3 +184,96 @@ pub mod long_array {
         deserializer.deserialize_seq(LongArrayVisitor)
     }
 }
+
+/// Serde module for serializing `Vec<T>` / `&[T]` as native NBT `List`.
+///
+/// By default, `Vec<T>` is serialized as `List[Compound{"": value}, ...]` because
+/// serde sequences don't carry type information. This module serializes directly
+/// as a native NBT `List<T>` where all elements have the same tag type.
+///
+/// # Example
+///
+/// ```ignore
+/// use serde::{Serialize, Deserialize};
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Player {
+///     #[serde(with = "na_nbt::list")]
+///     scores: Vec<i32>,  // Serializes as List<Int> instead of List<Compound>
+/// }
+/// ```
+///
+/// # Panics
+///
+/// Serialization will return an error if elements have different NBT types.
+pub mod list {
+    use serde::ser::SerializeSeq;
+
+    use super::*;
+
+    struct ListRef<'a, T>(&'a [T]);
+
+    impl<'a, T: Serialize> Serialize for ListRef<'a, T> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+            for val in self.0 {
+                seq.serialize_element(val)?;
+            }
+            seq.end()
+        }
+    }
+
+    /// Serialize `&[T]` as native NBT `List<T>`.
+    ///
+    /// Elements are serialized directly without wrapping in compounds.
+    /// All elements must serialize to the same NBT tag type.
+    pub fn serialize<T: Serialize, S>(data: &[T], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_newtype_struct("na_nbt:list", &ListRef(data))
+    }
+
+    struct ListVisitor<T>(std::marker::PhantomData<T>);
+
+    impl<'de, T: de::Deserialize<'de>> de::Visitor<'de> for ListVisitor<T> {
+        type Value = Vec<T>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("an NBT List")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+            while let Some(val) = seq.next_element()? {
+                vec.push(val);
+            }
+            Ok(vec)
+        }
+
+        fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            // After the newtype wrapper sets native_list flag, deserialize the seq
+            deserializer.deserialize_seq(self)
+        }
+    }
+
+    /// Deserialize `Vec<T>` from native NBT `List<T>`.
+    ///
+    /// Uses `deserialize_newtype_struct` to signal native list mode,
+    /// which skips compound unwrapping for list elements.
+    pub fn deserialize<'de, T: de::Deserialize<'de>, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_newtype_struct("na_nbt:list", ListVisitor(std::marker::PhantomData))
+    }
+}
