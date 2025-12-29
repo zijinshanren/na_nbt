@@ -43,7 +43,7 @@ pub mod int_array {
     use serde::{
         Deserializer, Serialize, Serializer,
         de::{SeqAccess, Visitor},
-        ser::SerializeSeq,
+        ser::SerializeTuple,
     };
 
     struct IntArray<'a, T>(&'a [T]);
@@ -56,7 +56,7 @@ pub mod int_array {
         where
             S: Serializer,
         {
-            let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+            let mut seq = serializer.serialize_tuple(self.0.len())?;
             for item in self.0 {
                 seq.serialize_element(&(*item).into())?;
             }
@@ -111,7 +111,7 @@ pub mod long_array {
     use serde::{
         Deserializer, Serialize, Serializer,
         de::{SeqAccess, Visitor},
-        ser::SerializeSeq,
+        ser::SerializeTuple,
     };
 
     struct LongArray<'a, T>(&'a [T]);
@@ -124,7 +124,7 @@ pub mod long_array {
         where
             S: Serializer,
         {
-            let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+            let mut seq = serializer.serialize_tuple(self.0.len())?;
             for item in self.0 {
                 seq.serialize_element(&(*item).into())?;
             }
