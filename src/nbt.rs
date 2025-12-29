@@ -55,6 +55,10 @@ impl TagID {
         }
     }
 
+    pub const fn is_end(self) -> bool {
+        matches!(self, Self::End)
+    }
+
     /// Returns `true` if this is a primitive tag type.
     ///
     /// Primitive tags are: End, Byte, Short, Int, Long, Float, Double.

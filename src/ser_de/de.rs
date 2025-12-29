@@ -1007,7 +1007,7 @@ impl<'a, 'de, O: ByteOrder> MapAccess<'de> for CompoundAccess<'a, 'de, O> {
     where
         K: de::DeserializeSeed<'de>,
     {
-        check_bounds!(1, self.deserializer.input);
+        check_bounds!(1 + 2, self.deserializer.input);
         self.deserializer.current_tag = TagID::from_u8(self.deserializer.input[0])?;
         if self.deserializer.current_tag.is_end() {
             self.deserializer.input = &self.deserializer.input[1..];
