@@ -796,9 +796,9 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
         self,
         _name: &'static str,
         _variant_index: u32,
-        variant: &'static str,
+        _variant: &'static str,
     ) -> std::result::Result<Self::Ok, Self::Error> {
-        self.serialize_str(variant)
+        Err(Error::KEY)
     }
 
     #[cfg(feature = "i128")]
@@ -826,13 +826,13 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
         self,
         _name: &'static str,
         _variant_index: u32,
-        variant: &'static str,
-        value: &T,
+        _variant: &'static str,
+        _value: &T,
     ) -> std::result::Result<Self::Ok, Self::Error>
     where
         T: ?Sized + Serialize,
     {
-        self.write_wrapped(variant, value)
+        Err(Error::KEY)
     }
 
     fn serialize_map(
