@@ -54,6 +54,19 @@ pub struct Serializer<O: ByteOrder> {
     _marker: PhantomData<O>,
 }
 
+unsafe fn write_string<O: ByteOrder>(dst: *mut u8, encoded: &[u8]) -> Result<()> {
+    unsafe {
+        let len = encoded.len();
+        if len >= u16::MAX as usize {
+            cold_path();
+            return Err(Error::LEN(len));
+        }
+        ptr::write(dst.cast(), byteorder::U16::<O>::new(len as u16).to_bytes());
+        ptr::copy_nonoverlapping(encoded.as_ptr(), dst.add(2), len);
+        Ok(())
+    }
+}
+
 impl<O: ByteOrder> Serializer<O> {
     fn write_compound_item<T>(&mut self, name: &str, value: &T) -> Result<()>
     where
@@ -93,6 +106,21 @@ impl<O: ByteOrder> Serializer<O> {
         value.serialize(&mut *self)?;
         self.vec.push(TagID::End as u8);
         Ok(())
+    }
+
+    unsafe fn write_string_unreserved(&mut self, encoded: &[u8]) -> Result<()> {
+        unsafe {
+            let old_len = self.vec.len();
+            let write_ptr = self.vec.as_mut_ptr().add(old_len);
+            write_string::<O>(write_ptr, encoded)?;
+            self.vec.set_len(old_len + 2 + encoded.len());
+            Ok(())
+        }
+    }
+
+    fn write_string(&mut self, encoded: &[u8]) -> Result<()> {
+        self.vec.reserve(2 + encoded.len());
+        unsafe { self.write_string_unreserved(encoded) }
     }
 }
 
@@ -224,23 +252,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     /// String
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
         let encoded = simd_cesu8::mutf8::encode(v);
-        let len = encoded.len();
-        if len >= u16::MAX as usize {
-            cold_path();
-            return Err(Error::LEN(len));
-        }
-        unsafe {
-            let old_len = self.vec.len();
-            self.vec.reserve(2 + len);
-            let write_ptr = self.vec.as_mut_ptr().add(old_len);
-            ptr::write(
-                write_ptr.cast(),
-                byteorder::U16::<O>::new(len as u16).to_bytes(),
-            );
-            ptr::copy_nonoverlapping(encoded.as_ptr(), write_ptr.add(2), len);
-            self.vec.set_len(old_len + 2 + len);
-        }
-        Ok(())
+        self.write_string(&encoded)
     }
 
     /// ByteArray
@@ -434,11 +446,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             self.vec.reserve(1 + 2 + name_len + 1 + 4);
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
             ptr::write(write_ptr, TagID::List as u8);
-            ptr::write(
-                write_ptr.add(1).cast(),
-                byteorder::U16::<O>::new(name_len as u16).to_bytes(),
-            );
-            ptr::copy_nonoverlapping(encoded.as_ptr(), write_ptr.add(3), name_len);
+            write_string::<O>(write_ptr.add(1).cast(), &encoded)?;
             ptr::write(write_ptr.add(3 + name_len).cast(), TagID::Compound as u8);
             ptr::write(
                 write_ptr.add(3 + name_len + 1).cast(),
@@ -479,7 +487,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         _variant_index: u32,
         variant: &'static str,
         _len: usize,
-    ) -> std::result::Result<Self::SerializeStructVariant, Self::Error> {
+    ) -> Result<Self::SerializeStructVariant> {
         let encoded = simd_cesu8::mutf8::encode(variant);
         let name_len = encoded.len();
         unsafe {
@@ -487,11 +495,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             self.vec.reserve(1 + 2 + name_len);
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
             ptr::write(write_ptr, TagID::Compound as u8);
-            ptr::write(
-                write_ptr.add(1).cast(),
-                byteorder::U16::<O>::new(name_len as u16).to_bytes(),
-            );
-            ptr::copy_nonoverlapping(encoded.as_ptr(), write_ptr.add(3), name_len);
+            write_string::<O>(write_ptr.add(1).cast(), &encoded)?;
             self.vec.set_len(old_len + 1 + 2 + name_len);
         }
         Ok(&mut *self)
@@ -506,6 +510,15 @@ pub struct ArraySerializer<'a, O: ByteOrder> {
     serializer: &'a mut Serializer<O>,
 }
 
+macro_rules! impl_unreachable_ser {
+    ($($name:ident: $ty:ty),* $(,)?) => {
+        $(fn $name(self, _v: $ty) -> Result<Self::Ok> {
+            unreachable!()
+        }
+    )*
+    };
+}
+
 impl<'a, O: ByteOrder> ser::Serializer for ArraySerializer<'a, O> {
     type Ok = ();
     type Error = Error;
@@ -518,61 +531,22 @@ impl<'a, O: ByteOrder> ser::Serializer for ArraySerializer<'a, O> {
     type SerializeStruct = ser::Impossible<Self::Ok, Self::Error>;
     type SerializeStructVariant = ser::Impossible<Self::Ok, Self::Error>;
 
-    fn serialize_bool(self, _v: bool) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_i8(self, _v: i8) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_i16(self, _v: i16) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_i32(self, _v: i32) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_i64(self, _v: i64) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_u8(self, _v: u8) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_u16(self, _v: u16) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_u32(self, _v: u32) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_u64(self, _v: u64) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_f32(self, _v: f32) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_f64(self, _v: f64) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_char(self, _v: char) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_str(self, _v: &str) -> Result<Self::Ok> {
-        unreachable!()
-    }
-
-    fn serialize_bytes(self, _v: &[u8]) -> Result<Self::Ok> {
-        unreachable!()
-    }
+    impl_unreachable_ser!(
+        serialize_bool: bool,
+        serialize_i8: i8,
+        serialize_i16: i16,
+        serialize_i32: i32,
+        serialize_i64: i64,
+        serialize_u8: u8,
+        serialize_u16: u16,
+        serialize_u32: u32,
+        serialize_u64: u64,
+        serialize_f32: f32,
+        serialize_f64: f64,
+        serialize_char: char,
+        serialize_str: &str,
+        serialize_bytes: &[u8],
+    );
 
     fn serialize_none(self) -> Result<Self::Ok> {
         unreachable!()
@@ -891,6 +865,14 @@ impl<'a, O: ByteOrder> KeySerializer<'a, O> {
     }
 }
 
+macro_rules! impl_strlike_key {
+    ($($name:ident: $ty:ty),* $(,)?) => {
+        $(fn $name(self, v: $ty) -> Result<Self::Ok> {
+            self.serialize_str(&v.to_string())
+        })*
+    }
+}
+
 impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
     type Ok = ();
     type Error = Error;
@@ -907,67 +889,15 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
         self.serialize_str(if v { "true" } else { "false" })
     }
 
-    fn serialize_i8(self, v: i8) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_i16(self, v: i16) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_i32(self, v: i32) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_i64(self, v: i64) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_u8(self, v: u8) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_u16(self, v: u16) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_u32(self, v: u32) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_u64(self, v: u64) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_f32(self, v: f32) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_f64(self, v: f64) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    fn serialize_char(self, v: char) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
         unsafe {
             let old_len = self.serializer.vec.len();
             let encoded = simd_cesu8::mutf8::encode(v);
             let len = encoded.len();
-            if len >= u16::MAX as usize {
-                cold_path();
-                return Err(Error::LEN(len));
-            }
             self.serializer.vec.reserve(1 + 2 + len);
             let write_ptr = self.serializer.vec.as_mut_ptr().add(old_len);
             ptr::write(write_ptr, self.tag_id as u8);
-            ptr::write(
-                write_ptr.add(1).cast(),
-                byteorder::U16::<O>::new(len as u16).to_bytes(),
-            );
-            ptr::copy_nonoverlapping(encoded.as_ptr(), write_ptr.add(3), len);
+            write_string::<O>(write_ptr.add(1).cast(), &encoded)?;
             self.serializer.vec.set_len(old_len + 1 + 2 + len);
         }
         Ok(())
@@ -1005,16 +935,6 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
         Err(Error::KEY)
     }
 
-    #[cfg(feature = "i128")]
-    fn serialize_i128(self, v: i128) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
-    #[cfg(feature = "i128")]
-    fn serialize_u128(self, v: u128) -> Result<Self::Ok> {
-        self.serialize_str(&v.to_string())
-    }
-
     fn serialize_newtype_struct<T>(self, name: &'static str, value: &T) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
@@ -1035,42 +955,11 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
         Err(Error::KEY)
     }
 
-    fn serialize_map(
-        self,
-        _len: Option<usize>,
-    ) -> std::result::Result<Self::SerializeMap, Self::Error> {
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
         Err(Error::KEY)
     }
 
-    fn serialize_seq(
-        self,
-        _len: Option<usize>,
-    ) -> std::result::Result<Self::SerializeSeq, Self::Error> {
-        Err(Error::KEY)
-    }
-
-    fn serialize_struct(
-        self,
-        _name: &'static str,
-        _len: usize,
-    ) -> std::result::Result<Self::SerializeStruct, Self::Error> {
-        Err(Error::KEY)
-    }
-
-    fn serialize_struct_variant(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        _variant: &'static str,
-        _len: usize,
-    ) -> std::result::Result<Self::SerializeStructVariant, Self::Error> {
-        Err(Error::KEY)
-    }
-
-    fn serialize_tuple(
-        self,
-        _len: usize,
-    ) -> std::result::Result<Self::SerializeTuple, Self::Error> {
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> {
         Err(Error::KEY)
     }
 
@@ -1078,7 +967,7 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
         self,
         _name: &'static str,
         _len: usize,
-    ) -> std::result::Result<Self::SerializeTupleStruct, Self::Error> {
+    ) -> Result<Self::SerializeTupleStruct> {
         Err(Error::KEY)
     }
 
@@ -1088,9 +977,47 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
         _variant_index: u32,
         _variant: &'static str,
         _len: usize,
-    ) -> std::result::Result<Self::SerializeTupleVariant, Self::Error> {
+    ) -> Result<Self::SerializeTupleVariant> {
         Err(Error::KEY)
     }
+
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
+        Err(Error::KEY)
+    }
+
+    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
+        Err(Error::KEY)
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant> {
+        Err(Error::KEY)
+    }
+
+    impl_strlike_key!(
+        serialize_i8: i8,
+        serialize_i16: i16,
+        serialize_i32: i32,
+        serialize_i64: i64,
+        serialize_u8: u8,
+        serialize_u16: u16,
+        serialize_u32: u32,
+        serialize_u64: u64,
+        serialize_f32: f32,
+        serialize_f64: f64,
+        serialize_char: char,
+    );
+
+    #[cfg(feature = "i128")]
+    impl_strlike_key!(
+        serialize_i128: i128,
+        serialize_u128: u128,
+    );
 }
 
 pub struct MapSerializer<'a, O: ByteOrder> {

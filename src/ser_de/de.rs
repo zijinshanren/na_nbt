@@ -186,6 +186,12 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(())
     }
 
+    fn skip_bytes(&mut self, n: usize) -> Result<()> {
+        check_bounds!(n, self.input);
+        self.input = &self.input[n..];
+        Ok(())
+    }
+
     fn deserialize_wrapped_list<V>(&mut self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -721,43 +727,21 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     {
         match self.current_tag {
             TagID::End => (),
-            TagID::Byte => {
-                check_bounds!(1, self.input);
-                self.input = &self.input[1..];
-            }
-            TagID::Short => {
-                check_bounds!(2, self.input);
-                self.input = &self.input[2..];
-            }
-            TagID::Int => {
-                check_bounds!(4, self.input);
-                self.input = &self.input[4..];
-            }
-            TagID::Long => {
-                check_bounds!(8, self.input);
-                self.input = &self.input[8..];
-            }
-            TagID::Float => {
-                check_bounds!(4, self.input);
-                self.input = &self.input[4..];
-            }
-            TagID::Double => {
-                check_bounds!(8, self.input);
-                self.input = &self.input[8..];
-            }
+            TagID::Byte => self.skip_bytes(1)?,
+            TagID::Short => self.skip_bytes(2)?,
+            TagID::Int | TagID::Float => self.skip_bytes(4)?,
+            TagID::Long | TagID::Double => self.skip_bytes(8)?,
             TagID::ByteArray => {
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                check_bounds!(4 + length as usize, self.input);
-                self.input = &self.input[4 + length as usize..];
+                self.skip_bytes(4 + length as usize)?;
             }
             TagID::String => {
                 check_bounds!(2, self.input);
                 let length =
                     byteorder::U16::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                check_bounds!(2 + length as usize, self.input);
-                self.input = &self.input[2 + length as usize..];
+                self.skip_bytes(2 + length as usize)?;
             }
             TagID::List => {
                 check_bounds!(5, self.input);
@@ -772,22 +756,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 self.input = &self.input[5..];
                 match element_tag {
                     TagID::End => (),
-                    TagID::Byte => {
-                        check_bounds!(length as usize, self.input);
-                        self.input = &self.input[length as usize..];
-                    }
-                    TagID::Short => {
-                        check_bounds!(length as usize * 2, self.input);
-                        self.input = &self.input[length as usize * 2..];
-                    }
-                    TagID::Int | TagID::Float => {
-                        check_bounds!(length as usize * 4, self.input);
-                        self.input = &self.input[length as usize * 4..];
-                    }
-                    TagID::Long | TagID::Double => {
-                        check_bounds!(length as usize * 8, self.input);
-                        self.input = &self.input[length as usize * 8..];
-                    }
+                    TagID::Byte => self.skip_bytes(length as usize)?,
+                    TagID::Short => self.skip_bytes(length as usize * 2)?,
+                    TagID::Int | TagID::Float => self.skip_bytes(length as usize * 4)?,
+                    TagID::Long | TagID::Double => self.skip_bytes(length as usize * 8)?,
                     _ => {
                         for _ in 0..length {
                             self.current_tag = element_tag;
@@ -814,22 +786,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 self.input = &self.input[2 + name_len as usize..];
                 match self.current_tag {
                     TagID::End => unsafe { unreachable_unchecked() },
-                    TagID::Byte => {
-                        check_bounds!(1, self.input);
-                        self.input = &self.input[1..];
-                    }
-                    TagID::Short => {
-                        check_bounds!(2, self.input);
-                        self.input = &self.input[2..];
-                    }
-                    TagID::Int | TagID::Float => {
-                        check_bounds!(4, self.input);
-                        self.input = &self.input[4..];
-                    }
-                    TagID::Long | TagID::Double => {
-                        check_bounds!(8, self.input);
-                        self.input = &self.input[8..];
-                    }
+                    TagID::Byte => self.skip_bytes(1)?,
+                    TagID::Short => self.skip_bytes(2)?,
+                    TagID::Int | TagID::Float => self.skip_bytes(4)?,
+                    TagID::Long | TagID::Double => self.skip_bytes(8)?,
                     _ => {
                         self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     }
@@ -839,18 +799,27 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                check_bounds!(4 + length as usize * 4, self.input);
-                self.input = &self.input[4 + length as usize * 4..];
+                self.skip_bytes(4 + length as usize * 4)?;
             }
             TagID::LongArray => {
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                check_bounds!(4 + length as usize * 8, self.input);
-                self.input = &self.input[4 + length as usize * 8..];
+                self.skip_bytes(4 + length as usize * 8)?;
             }
         }
         visitor.visit_unit()
+    }
+}
+
+macro_rules! impl_key_parse {
+    ($($name:ident: $visit:ident, $ty:ty),* $(,)?) => {
+        $(fn $name<V>(self, visitor: V) -> Result<V::Value>
+        where
+            V: de::Visitor<'de>,
+        {
+            visitor.$visit(self.name.parse::<$ty>().map_err(|e| Error::MSG(e.to_string()))?)
+        })*
     }
 }
 
@@ -866,162 +835,6 @@ impl<'a, 'de: 'a> de::Deserializer<'de> for KeyDeserializer<'a> {
         V: de::Visitor<'de>,
     {
         self.deserialize_str(visitor)
-    }
-
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_bool(
-            self.name
-                .parse::<bool>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_i8(
-            self.name
-                .parse::<i8>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_i16(
-            self.name
-                .parse::<i16>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_i32(
-            self.name
-                .parse::<i32>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_i64(
-            self.name
-                .parse::<i64>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    #[cfg(feature = "i128")]
-    fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_i128(
-            self.name
-                .parse::<i128>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_u8(
-            self.name
-                .parse::<u8>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_u16(
-            self.name
-                .parse::<u16>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_u32(
-            self.name
-                .parse::<u32>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_u64(
-            self.name
-                .parse::<u64>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    #[cfg(feature = "i128")]
-    fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_u128(
-            self.name
-                .parse::<u128>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_f32(
-            self.name
-                .parse::<f32>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_f64(
-            self.name
-                .parse::<f64>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
-    }
-
-    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_char(
-            self.name
-                .parse::<char>()
-                .map_err(|e| Error::MSG(e.to_string()))?,
-        )
     }
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
@@ -1186,6 +999,27 @@ impl<'a, 'de: 'a> de::Deserializer<'de> for KeyDeserializer<'a> {
     {
         visitor.visit_unit()
     }
+
+    impl_key_parse!(
+        deserialize_bool: visit_bool, bool,
+        deserialize_i8: visit_i8, i8,
+        deserialize_i16: visit_i16, i16,
+        deserialize_i32: visit_i32, i32,
+        deserialize_i64: visit_i64, i64,
+        deserialize_u8: visit_u8, u8,
+        deserialize_u16: visit_u16, u16,
+        deserialize_u32: visit_u32, u32,
+        deserialize_u64: visit_u64, u64,
+        deserialize_f32: visit_f32, f32,
+        deserialize_f64: visit_f64, f64,
+        deserialize_char: visit_char, char,
+    );
+
+    #[cfg(feature = "i128")]
+    impl_key_parse!(
+        deserialize_i128: visit_i128, i128,
+        deserialize_u128: visit_u128, u128,
+    );
 }
 
 struct WrappedListAccess<'a, 'de: 'a, O: ByteOrder> {
