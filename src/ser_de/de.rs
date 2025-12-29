@@ -177,13 +177,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
     }
 
     fn parse_unit(&mut self) -> Result<()> {
-        check_bounds!(1, self.input);
-        let value = self.input[0];
-        if value != TagID::End as u8 {
-            return Err(Error::INVALID(value));
-        }
-        self.input = &self.input[1..];
-        Ok(())
+        self.consume_end_tag()
     }
 
     fn skip_bytes(&mut self, n: usize) -> Result<()> {
@@ -242,14 +236,19 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         self.input = &self.input[3..];
         let value = seed.deserialize(&mut *self)?;
 
+        self.consume_end_tag()?;
+
+        Ok(value)
+    }
+
+    fn consume_end_tag(&mut self) -> Result<()> {
         check_bounds!(1, self.input);
         if self.input[0] != TagID::End as u8 {
             cold_path();
-            return Err(Error::MSG(FORMAT_ERROR.to_string()));
+            return Err(Error::INVALID(self.input[0]));
         }
-
         self.input = &self.input[1..];
-        Ok(value)
+        Ok(())
     }
 }
 
@@ -1196,12 +1195,7 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for EnumVariantAccess<'a, 'de, O>
         T: de::DeserializeSeed<'de>,
     {
         let value = seed.deserialize(&mut *self.deserializer)?;
-        check_bounds!(1, self.deserializer.input);
-        if self.deserializer.input[0] != TagID::End as u8 {
-            cold_path();
-            return Err(Error::INVALID(self.deserializer.input[0]));
-        }
-        self.deserializer.input = &self.deserializer.input[1..];
+        self.deserializer.consume_end_tag()?;
         Ok(value)
     }
 
@@ -1210,12 +1204,7 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for EnumVariantAccess<'a, 'de, O>
         V: de::Visitor<'de>,
     {
         let value = de::Deserializer::deserialize_tuple(&mut *self.deserializer, len, visitor)?;
-        check_bounds!(1, self.deserializer.input);
-        if self.deserializer.input[0] != TagID::End as u8 {
-            cold_path();
-            return Err(Error::INVALID(self.deserializer.input[0]));
-        }
-        self.deserializer.input = &self.deserializer.input[1..];
+        self.deserializer.consume_end_tag()?;
         Ok(value)
     }
 
@@ -1224,12 +1213,7 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for EnumVariantAccess<'a, 'de, O>
         V: de::Visitor<'de>,
     {
         let value = de::Deserializer::deserialize_map(&mut *self.deserializer, visitor)?;
-        check_bounds!(1, self.deserializer.input);
-        if self.deserializer.input[0] != TagID::End as u8 {
-            cold_path();
-            return Err(Error::INVALID(self.deserializer.input[0]));
-        }
-        self.deserializer.input = &self.deserializer.input[1..];
+        self.deserializer.consume_end_tag()?;
         Ok(value)
     }
 }
