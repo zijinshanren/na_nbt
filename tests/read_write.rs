@@ -1,7 +1,8 @@
 use bytes::Bytes;
 use na_nbt::{
     BigEndian, CompoundRef, ListBase, ListRef, LittleEndian, OwnCompound, OwnList, OwnValue,
-    ValueRef, VisitRef, Writable, read_borrowed, read_owned, read_shared,
+    ValueRef, VisitRef, Writable, from_slice_be, from_slice_le, read_borrowed, read_owned,
+    read_shared,
 };
 use na_nbt::{to_vec_be, to_vec_le};
 use serde::{Deserialize, Serialize};
@@ -167,97 +168,97 @@ fn dump_inner<'doc>(value: &impl ValueRef<'doc>, indent: usize) -> String {
     })
 }
 
-// fn test_serde(data: &[u8]) {
-//     if let Ok(val) = from_slice_be::<SimpleCompound>(data) {
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<SimpleCompound>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<SimpleCompound>(&vec).unwrap();
-//         }
-//     }
+fn test_serde(data: &[u8]) {
+    if let Ok(val) = from_slice_be::<SimpleCompound>(data) {
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<SimpleCompound>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<SimpleCompound>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_le::<SimpleCompound>(data) {
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<SimpleCompound>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<SimpleCompound>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_le::<SimpleCompound>(data) {
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<SimpleCompound>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<SimpleCompound>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_be::<TestCompound>(data) {
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<TestCompound>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<TestCompound>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_be::<TestCompound>(data) {
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<TestCompound>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<TestCompound>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_le::<TestCompound>(data) {
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<TestCompound>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<TestCompound>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_le::<TestCompound>(data) {
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<TestCompound>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<TestCompound>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_be::<WithEnum>(data) {
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<WithEnum>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<WithEnum>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_be::<WithEnum>(data) {
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<WithEnum>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<WithEnum>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_le::<WithEnum>(data) {
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<WithEnum>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<WithEnum>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_le::<WithEnum>(data) {
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<WithEnum>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<WithEnum>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_be::<HashMap<String, i32>>(data) {
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<HashMap<String, i32>>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<HashMap<String, i32>>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_be::<HashMap<String, i32>>(data) {
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<HashMap<String, i32>>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<HashMap<String, i32>>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_le::<HashMap<String, i32>>(data) {
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<HashMap<String, i32>>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<HashMap<String, i32>>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_le::<HashMap<String, i32>>(data) {
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<HashMap<String, i32>>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<HashMap<String, i32>>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_be::<Vec<i32>>(data) {
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<Vec<i32>>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<Vec<i32>>(&vec).unwrap();
-//         }
-//     }
+    if let Ok(val) = from_slice_be::<Vec<i32>>(data) {
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<Vec<i32>>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<Vec<i32>>(&vec).unwrap();
+        }
+    }
 
-//     if let Ok(val) = from_slice_le::<Vec<i32>>(data) {
-//         if let Ok(vec) = to_vec_le(&val) {
-//             let _ = from_slice_le::<Vec<i32>>(&vec).unwrap();
-//         }
-//         if let Ok(vec) = to_vec_be(&val) {
-//             let _ = from_slice_be::<Vec<i32>>(&vec).unwrap();
-//         }
-//     }
-// }
+    if let Ok(val) = from_slice_le::<Vec<i32>>(data) {
+        if let Ok(vec) = to_vec_le(&val) {
+            let _ = from_slice_le::<Vec<i32>>(&vec).unwrap();
+        }
+        if let Ok(vec) = to_vec_be(&val) {
+            let _ = from_slice_be::<Vec<i32>>(&vec).unwrap();
+        }
+    }
+}
 
 fn test_round<'doc>(value: &impl ValueRef<'doc>) {
     let a = dump(value);
@@ -378,7 +379,7 @@ fn test_read_write() {
         if path.is_file() {
             count += 1;
             let data = fs::read(path).unwrap();
-            // test_serde(&data);
+            test_serde(&data);
             test_direct(&data);
         }
     }
@@ -430,46 +431,48 @@ fn test_construct_read_write() {
     ]);
 }
 
-// #[test]
-// fn test_serde_read_write() {
-//     let value = TestCompound {
-//         byte_val: 1,
-//         short_val: 2,
-//         int_val: 3,
-//         long_val: 4,
-//         float_val: 5.0,
-//         double_val: 6.0,
-//         string_val: "test".to_string(),
-//         list_ints: vec![1, 2, 3, 4, 5],
-//         list_longs: vec![1, 2, 3, 4, 5],
-//         list_bytes: vec![1, 2, 3, 4, 5],
-//         list_strings: vec!["test".to_string(), "test2".to_string()],
-//         nested: Some(Box::new(TestCompound {
-//             byte_val: 1,
-//             short_val: 2,
-//             int_val: 3,
-//             long_val: 4,
-//             float_val: 5.0,
-//             double_val: 6.0,
-//             string_val: "test".to_string(),
-//             list_ints: vec![1, 2, 3, 4, 5],
-//             list_longs: vec![1, 2, 3, 4, 5],
-//             list_bytes: vec![1, 2, 3, 4, 5],
-//             list_strings: vec!["test".to_string(), "test2".to_string()],
-//             nested: None,
-//             map_vals: HashMap::new(),
-//         })),
-//         map_vals: HashMap::new(),
-//     };
-//     let vec_be = to_vec_be(&value).unwrap();
-//     let vec_le = to_vec_le(&value).unwrap();
-//     // assert!(from_slice_be::<TestCompound>(&vec_be).unwrap() == value);
-//     // assert!(from_slice_le::<TestCompound>(&vec_le).unwrap() == value);
-//     // test_serde(&vec_be);
-//     // test_serde(&vec_le);
-//     test_direct(&vec_be);
-//     test_direct(&vec_le);
-// }
+#[test]
+fn test_serde_read_write() {
+    let value = TestCompound {
+        byte_val: 1,
+        short_val: 2,
+        int_val: 3,
+        long_val: 4,
+        float_val: 5.0,
+        double_val: 6.0,
+        string_val: "test".to_string(),
+        list_ints: vec![1, 2, 3, 4, 5],
+        list_ints_b: vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into()],
+        list_longs: vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into()],
+        list_bytes: vec![1, 2, 3, 4, 5],
+        list_strings: vec!["test".to_string(), "test2".to_string()],
+        nested: Some(Box::new(TestCompound {
+            byte_val: 1,
+            short_val: 2,
+            int_val: 3,
+            long_val: 4,
+            float_val: 5.0,
+            double_val: 6.0,
+            string_val: "test".to_string(),
+            list_ints: vec![1, 2, 3, 4, 5],
+            list_ints_b: vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into()],
+            list_longs: vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into()],
+            list_bytes: vec![1, 2, 3, 4, 5],
+            list_strings: vec!["test".to_string(), "test2".to_string()],
+            nested: None,
+            map_vals: HashMap::new(),
+        })),
+        map_vals: HashMap::new(),
+    };
+    let vec_be = to_vec_be(&value).unwrap();
+    let vec_le = to_vec_le(&value).unwrap();
+    assert!(from_slice_be::<TestCompound>(&vec_be).unwrap() == value);
+    assert!(from_slice_le::<TestCompound>(&vec_le).unwrap() == value);
+    test_serde(&vec_be);
+    test_serde(&vec_le);
+    test_direct(&vec_be);
+    test_direct(&vec_le);
+}
 
 /// Test that creates a complex NBT structure, writes it to bytes, and verifies round-trip
 /// through all reading modes (borrowed, shared, owned with different byte orders)

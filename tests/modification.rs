@@ -4555,9 +4555,18 @@ fn test_list_serde_compounds() {
 
     let data = Inventory {
         items: vec![
-            Item { id: 1, name: "Sword".to_string() },
-            Item { id: 2, name: "Shield".to_string() },
-            Item { id: 3, name: "Potion".to_string() },
+            Item {
+                id: 1,
+                name: "Sword".to_string(),
+            },
+            Item {
+                id: 2,
+                name: "Shield".to_string(),
+            },
+            Item {
+                id: 3,
+                name: "Potion".to_string(),
+            },
         ],
     };
 
@@ -4585,8 +4594,14 @@ fn test_list_wrapped_compounds() {
 
     let data = Inventory {
         items: vec![
-            Item { id: 1, name: "Sword".to_string() },
-            Item { id: 2, name: "Shield".to_string() },
+            Item {
+                id: 1,
+                name: "Sword".to_string(),
+            },
+            Item {
+                id: 2,
+                name: "Shield".to_string(),
+            },
         ],
     };
 
@@ -4721,27 +4736,25 @@ fn test_list_ref_get_all_element_types() {
 /// so there's no ambiguity with wrapped elements.
 #[test]
 fn test_native_compound_with_empty_key() {
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
-    
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Data {
         #[serde(with = "na_nbt::list")]
         items: Vec<HashMap<String, i32>>,
     }
-    
+
     // Create a compound with empty string key - this should now work!
     let mut map = HashMap::new();
-    map.insert("".to_string(), 42);  // Empty string key
+    map.insert("".to_string(), 42); // Empty string key
     map.insert("other".to_string(), 99);
-    
-    let data = Data {
-        items: vec![map],
-    };
-    
+
+    let data = Data { items: vec![map] };
+
     let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
     let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
-    
+
     assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].get(""), Some(&42));
     assert_eq!(result.items[0].get("other"), Some(&99));
@@ -4750,72 +4763,73 @@ fn test_native_compound_with_empty_key() {
 /// Test nested lists - inner list should not inherit ArrayMode::List from outer
 #[test]
 fn test_nested_native_lists() {
-    use serde::{Serialize, Deserialize};
-    
+    use serde::{Deserialize, Serialize};
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Outer {
         #[serde(with = "na_nbt::list")]
-        lists: Vec<Vec<i32>>,  // Inner Vec<i32> should use wrapped format
+        lists: Vec<Vec<i32>>, // Inner Vec<i32> should use wrapped format
     }
-    
+
     let data = Outer {
-        lists: vec![
-            vec![1, 2, 3],
-            vec![4, 5, 6],
-        ],
+        lists: vec![vec![1, 2, 3], vec![4, 5, 6]],
     };
-    
+
     let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
     let result: Outer = na_nbt::de::from_slice_be(&bytes).unwrap();
-    
+
     assert_eq!(result, data);
 }
 
 /// Test List<IntArray> - IntArray inside native list should work correctly
 #[test]
 fn test_list_of_int_arrays() {
-    use serde::{Serialize, Deserialize};
-    
+    use serde::{Deserialize, Serialize};
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct IntArrayWrapper {
         #[serde(with = "na_nbt::int_array")]
         data: Vec<i32>,
     }
-    
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Data {
         #[serde(with = "na_nbt::list")]
         arrays: Vec<IntArrayWrapper>,
     }
-    
+
     let data = Data {
         arrays: vec![
-            IntArrayWrapper { data: vec![1, 2, 3] },
-            IntArrayWrapper { data: vec![4, 5, 6] },
+            IntArrayWrapper {
+                data: vec![1, 2, 3],
+            },
+            IntArrayWrapper {
+                data: vec![4, 5, 6],
+            },
         ],
     };
-    
+
     let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
     let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
-    
+
     assert_eq!(result, data);
 }
 
 /// Test direct List<IntArray> serialization (not wrapped in struct)
 #[test]
 fn test_direct_list_of_int_arrays() {
-    use serde::{Serialize, Deserialize};
-    
+    use serde::{Deserialize, Serialize};
+
     // Newtype that serializes directly as IntArray
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct IntArray(#[serde(with = "na_nbt::int_array")] Vec<i32>);
-    
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Data {
         #[serde(with = "na_nbt::list")]
-        arrays: Vec<IntArray>,  // Should produce List<IntArray>
+        arrays: Vec<IntArray>, // Should produce List<IntArray>
     }
-    
+
     let data = Data {
         arrays: vec![
             IntArray(vec![1, 2, 3]),
@@ -4823,13 +4837,13 @@ fn test_direct_list_of_int_arrays() {
             IntArray(vec![7, 8, 9]),
         ],
     };
-    
+
     let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    
+
     // Verify the bytes contain IntArray tag (0x0B) as element type
     // List header: tag_id (1 byte) + element_tag (1 byte) + length (4 bytes)
     // For List<IntArray>, element_tag should be 0x0B (IntArray)
-    
+
     let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
     assert_eq!(result, data);
 }
@@ -4837,24 +4851,24 @@ fn test_direct_list_of_int_arrays() {
 /// Test deeply nested structures with mixed native and wrapped lists
 #[test]
 fn test_deeply_nested_mixed_lists() {
-    use serde::{Serialize, Deserialize};
-    
+    use serde::{Deserialize, Serialize};
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Inner {
         value: i32,
     }
-    
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Middle {
         #[serde(with = "na_nbt::list")]
-        items: Vec<Inner>,  // Native list of compounds
+        items: Vec<Inner>, // Native list of compounds
     }
-    
+
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Outer {
-        normal: Vec<Middle>,  // Wrapped list of compounds (default behavior)
+        normal: Vec<Middle>, // Wrapped list of compounds (default behavior)
     }
-    
+
     let data = Outer {
         normal: vec![
             Middle {
@@ -4865,51 +4879,57 @@ fn test_deeply_nested_mixed_lists() {
             },
         ],
     };
-    
+
     let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
     let result: Outer = na_nbt::de::from_slice_be(&bytes).unwrap();
-    
+
     assert_eq!(result, data);
 }
 
 /// Test the tag_of function for probing tag types without serializing
 #[test]
 fn test_tag_of_probe() {
-    use na_nbt::ser::tag_of;
     use na_nbt::TagID;
+    use na_nbt::tag_of;
     use serde::Serialize;
-    
+
     // Primitives
-    assert_eq!(tag_of(&42i8).unwrap(), TagID::Byte);
-    assert_eq!(tag_of(&42i16).unwrap(), TagID::Short);
-    assert_eq!(tag_of(&42i32).unwrap(), TagID::Int);
-    assert_eq!(tag_of(&42i64).unwrap(), TagID::Long);
-    assert_eq!(tag_of(&3.14f32).unwrap(), TagID::Float);
-    assert_eq!(tag_of(&3.14f64).unwrap(), TagID::Double);
-    assert_eq!(tag_of("hello").unwrap(), TagID::String);
-    assert_eq!(tag_of(&true).unwrap(), TagID::Byte);
-    
+    assert_eq!(tag_of(&42i8), TagID::Byte);
+    assert_eq!(tag_of(&42i16), TagID::Short);
+    assert_eq!(tag_of(&42i32), TagID::Int);
+    assert_eq!(tag_of(&42i64), TagID::Long);
+    assert_eq!(tag_of(&std::f32::consts::PI), TagID::Float);
+    assert_eq!(tag_of(&std::f64::consts::PI), TagID::Double);
+    assert_eq!(tag_of("hello"), TagID::String);
+    assert_eq!(tag_of(&true), TagID::Byte);
+
     // Unsigned mapped to signed
-    assert_eq!(tag_of(&42u8).unwrap(), TagID::Byte);
-    assert_eq!(tag_of(&42u16).unwrap(), TagID::Short);
-    assert_eq!(tag_of(&42u32).unwrap(), TagID::Int);
-    assert_eq!(tag_of(&42u64).unwrap(), TagID::Long);
-    
+    assert_eq!(tag_of(&42u8), TagID::Byte);
+    assert_eq!(tag_of(&42u16), TagID::Short);
+    assert_eq!(tag_of(&42u32), TagID::Int);
+    assert_eq!(tag_of(&42u64), TagID::Long);
+
     // Struct -> Compound
     #[derive(Serialize)]
-    struct Player { name: String, level: i32 }
-    let player = Player { name: "test".into(), level: 10 };
-    assert_eq!(tag_of(&player).unwrap(), TagID::Compound);
-    
+    struct Player {
+        name: String,
+        level: i32,
+    }
+    let player = Player {
+        name: "test".into(),
+        level: 10,
+    };
+    assert_eq!(tag_of(&player), TagID::Compound);
+
     // Vec -> List (wrapped, so List of Compound)
     let vec = vec![1i32, 2, 3];
-    assert_eq!(tag_of(&vec).unwrap(), TagID::List);
-    
+    assert_eq!(tag_of(&vec), TagID::List);
+
     // Option::None -> End
     let none: Option<i32> = None;
-    assert_eq!(tag_of(&none).unwrap(), TagID::End);
-    
+    assert_eq!(tag_of(&none), TagID::End);
+
     // Option::Some -> inner type
     let some = Some(42i32);
-    assert_eq!(tag_of(&some).unwrap(), TagID::Int);
+    assert_eq!(tag_of(&some), TagID::Int);
 }

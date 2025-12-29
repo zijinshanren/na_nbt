@@ -1,10 +1,7 @@
 pub mod byte_array {
     use std::slice;
 
-    use serde::{
-        Deserializer, Serializer,
-        de::{SeqAccess, Visitor},
-    };
+    use serde::{Deserializer, Serializer, de::Visitor};
 
     pub fn serialize<S>(data: &[i8], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -29,24 +26,6 @@ pub mod byte_array {
             E: serde::de::Error,
         {
             Ok(unsafe { slice::from_raw_parts(v.as_ptr() as *const i8, v.len()).to_vec() })
-        }
-
-        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(unsafe { std::mem::transmute::<Vec<u8>, Vec<i8>>(v) })
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-        {
-            let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
-            while let Some(item) = seq.next_element()? {
-                vec.push(item);
-            }
-            Ok(vec)
         }
     }
 
@@ -244,13 +223,6 @@ pub mod list {
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
             formatter.write_str("a list")
-        }
-
-        fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserializer.deserialize_seq(self)
         }
 
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>

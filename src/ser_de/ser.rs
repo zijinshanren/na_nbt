@@ -325,6 +325,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     where
         T: ?Sized + Serialize,
     {
+        // todo: direct x_array_serializer
         match name {
             "na_nbt:int_array" => {
                 self.mode = Mode::IntArray;
