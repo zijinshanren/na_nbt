@@ -198,6 +198,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         }
         let length =
             byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() }).get();
+        self.input = &self.input[1 + 4..];
         visitor.visit_seq(WrappedListAccess {
             remaining: length,
             deserializer: self,
@@ -766,7 +767,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 }
                 let element_tag = unsafe { TagID::from_u8_unchecked(element_tag) };
                 let length =
-                    byteorder::I32::<O>::from_bytes(unsafe { *self.input[1..].as_ptr().cast() })
+                    byteorder::U32::<O>::from_bytes(unsafe { *self.input[1..].as_ptr().cast() })
                         .get();
                 self.input = &self.input[5..];
                 match element_tag {
@@ -837,14 +838,14 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
             TagID::IntArray => {
                 check_bounds!(4, self.input);
                 let length =
-                    byteorder::I32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
+                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 check_bounds!(4 + length as usize * 4, self.input);
                 self.input = &self.input[4 + length as usize * 4..];
             }
             TagID::LongArray => {
                 check_bounds!(4, self.input);
                 let length =
-                    byteorder::I32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
+                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 check_bounds!(4 + length as usize * 8, self.input);
                 self.input = &self.input[4 + length as usize * 8..];
             }
@@ -1291,9 +1292,11 @@ impl<'a, 'de, O: ByteOrder> MapAccess<'de> for CompoundAccess<'a, 'de, O> {
             return Ok(None);
         }
         self.deserializer.current_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
-        let name_len =
-            byteorder::U16::<O>::from_bytes(unsafe { *self.deserializer.input.as_ptr().cast() })
-                .get();
+        let name_len = byteorder::U16::<O>::from_bytes(unsafe {
+            *self.deserializer.input.as_ptr().add(1).cast()
+        })
+        .get();
+        check_bounds!(1 + 2 + name_len as usize, self.deserializer.input);
         let name = &self.deserializer.input[1 + 2..1 + 2 + name_len as usize];
         self.deserializer.input = &self.deserializer.input[1 + 2 + name_len as usize..];
         let name = simd_cesu8::decode_lossy(name);

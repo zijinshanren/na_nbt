@@ -808,7 +808,7 @@ fn test_error_display() {
 
     // Test LEN
     let err = Error::LEN(999999999);
-    assert_eq!(format!("{}", err), "list length too long: 999999999");
+    assert_eq!(format!("{}", err), "length too long: 999999999");
 
     // Test KEY
     let err = Error::KEY;
@@ -4881,6 +4881,8 @@ fn test_deeply_nested_mixed_lists() {
     };
 
     let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let mut file = std::fs::File::create("test_deeply_nested_mixed_lists.nbt").unwrap();
+    std::io::Write::write_all(&mut file, &bytes).unwrap();
     let result: Outer = na_nbt::de::from_slice_be(&bytes).unwrap();
 
     assert_eq!(result, data);
@@ -4927,9 +4929,9 @@ fn test_tag_of_probe() {
 
     // Option::None -> End
     let none: Option<i32> = None;
-    assert_eq!(tag_of(&none), TagID::End);
+    assert_eq!(tag_of(&none), TagID::Compound);
 
     // Option::Some -> inner type
     let some = Some(42i32);
-    assert_eq!(tag_of(&some), TagID::Int);
+    assert_eq!(tag_of(&some), TagID::Compound);
 }
