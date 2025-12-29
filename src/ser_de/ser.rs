@@ -1026,10 +1026,6 @@ impl<'a, O: ByteOrder> ser::SerializeMap for MapSerializer<'a, O> {
         #[cfg(not(debug_assertions))]
         {
             self.tag_pos = self.serializer.vec.len();
-            key.serialize(KeySerializer {
-                tag_id: TagID::End, // placeholder
-                serializer: self.serializer,
-            })?;
         }
         #[cfg(debug_assertions)]
         {
@@ -1038,11 +1034,11 @@ impl<'a, O: ByteOrder> ser::SerializeMap for MapSerializer<'a, O> {
                 "serialize_key called without tag_pos consumed"
             );
             self.tag_pos = Some(self.serializer.vec.len());
-            key.serialize(KeySerializer {
-                tag_id: TagID::End, // placeholder
-                serializer: self.serializer,
-            })?;
         }
+        key.serialize(KeySerializer {
+            tag_id: TagID::End, // placeholder
+            serializer: self.serializer,
+        })?;
         Ok(())
     }
 
@@ -1050,25 +1046,21 @@ impl<'a, O: ByteOrder> ser::SerializeMap for MapSerializer<'a, O> {
     where
         T: ?Sized + Serialize,
     {
-        #[cfg(not(debug_assertions))]
-        {
-            let tag_id = tag_of(value);
-            unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos) = tag_id as u8 };
-            value.serialize(&mut *self.serializer)?;
-            Ok(())
-        }
         #[cfg(debug_assertions)]
         {
             debug_assert!(
                 self.tag_pos.is_some(),
                 "serialize_value called without serialize_key"
             );
-            let tag_id = tag_of(value);
-            unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos.unwrap()) = tag_id as u8 };
-            value.serialize(&mut *self.serializer)?;
-            self.tag_pos = None;
-            Ok(())
         }
+        let tag_id = tag_of(value);
+        unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos.unwrap()) = tag_id as u8 };
+        value.serialize(&mut *self.serializer)?;
+        #[cfg(debug_assertions)]
+        {
+            self.tag_pos = None;
+        }
+        Ok(())
     }
 
     fn serialize_entry<K, V>(&mut self, key: &K, value: &V) -> Result<Self::Ok>

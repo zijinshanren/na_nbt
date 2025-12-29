@@ -1,4 +1,9 @@
-use std::{borrow::Cow, hint::unreachable_unchecked, io::Read, marker::PhantomData};
+use std::{
+    borrow::Cow,
+    hint::{assert_unchecked, unreachable_unchecked},
+    io::Read,
+    marker::PhantomData,
+};
 
 use serde::{
     Deserialize,
@@ -84,7 +89,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
     fn from_slice(input: &'de [u8]) -> Result<Self> {
         check_bounds!(1, input);
         let tag_id = TagID::from_u8(input[0])?;
-        if tag_id == TagID::End {
+        if tag_id.is_end() {
             cold_path();
             return Err(Error::INVALID(tag_id as u8));
         }
@@ -215,16 +220,11 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         // Compound { "" : <value> }
         check_bounds!(1 + 2, self.input);
 
-        let tag = self.input[0];
-        if tag > TagID::LongArray as u8 {
-            cold_path();
-            return Err(Error::INVALID(tag));
-        }
-        if tag == TagID::End as u8 {
+        self.current_tag = TagID::from_u8(self.input[0])?;
+        if self.current_tag.is_end() {
             cold_path();
             return Err(Error::MSG(FORMAT_ERROR.to_string()));
         }
-        self.current_tag = unsafe { TagID::from_u8_unchecked(tag) };
 
         let name_len =
             byteorder::U16::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() }).get();
@@ -253,19 +253,25 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
 
     fn parse_list_header(&mut self) -> Result<(TagID, u32)> {
         check_bounds!(1 + 4, self.input);
-        let tag_id = self.input[0];
-        if tag_id > TagID::LongArray as u8 {
-            cold_path();
-            return Err(Error::INVALID(tag_id));
-        }
+        let tag_id = TagID::from_u8(self.input[0])?;
         let length =
             byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() }).get();
-        if tag_id == TagID::End as u8 && length > 0 {
-            cold_path();
-            return Err(Error::INVALID(tag_id));
-        }
         self.input = &self.input[1 + 4..];
-        Ok((unsafe { TagID::from_u8_unchecked(tag_id) }, length))
+        Ok((tag_id, length))
+    }
+
+    fn deserialize_array<V>(&mut self, element_tag_id: TagID, visitor: V) -> Result<V::Value>
+    where
+        V: de::Visitor<'de>,
+    {
+        check_bounds!(4, self.input);
+        let length = byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
+        self.input = &self.input[4..];
+        visitor.visit_seq(ArrayAccess {
+            element_tag_id,
+            remaining: length,
+            deserializer: self,
+        })
     }
 }
 
@@ -316,28 +322,8 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
                 }
             }
             TagID::Compound => visitor.visit_map(CompoundAccess { deserializer: self }),
-            TagID::IntArray => {
-                check_bounds!(4, self.input);
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                self.input = &self.input[4..];
-                visitor.visit_seq(ArrayAccess {
-                    element_tag_id: TagID::Int,
-                    remaining: length,
-                    deserializer: self,
-                })
-            }
-            TagID::LongArray => {
-                check_bounds!(4, self.input);
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                self.input = &self.input[4..];
-                visitor.visit_seq(ArrayAccess {
-                    element_tag_id: TagID::Long,
-                    remaining: length,
-                    deserializer: self,
-                })
-            }
+            TagID::IntArray => self.deserialize_array(TagID::Int, visitor),
+            TagID::LongArray => self.deserialize_array(TagID::Long, visitor),
         }
     }
 
@@ -532,17 +518,13 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     {
         check_tag!(TagID::Compound, self.current_tag, {
             check_bounds!(1, self.input);
-            let tag_id = self.input[0];
-            let value = if tag_id == TagID::End as u8 {
+            self.current_tag = TagID::from_u8(self.input[0])?;
+            let value = if self.current_tag.is_end() {
                 visitor.visit_none()
-            } else if tag_id <= TagID::LongArray as u8 {
+            } else {
                 check_bounds!(1 + 2, self.input);
                 self.input = &self.input[1 + 2..];
-                self.current_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
                 visitor.visit_some(&mut *self)
-            } else {
-                cold_path();
-                Err(Error::INVALID(tag_id))
             };
             check_bounds!(1, self.input);
             self.input = &self.input[1..];
@@ -566,10 +548,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
-        check_tag!(TagID::Compound, self.current_tag, {
-            self.parse_unit()?;
-            visitor.visit_unit()
-        })
+        self.deserialize_unit(visitor)
     }
 
     fn deserialize_newtype_struct<V>(self, name: &'static str, visitor: V) -> Result<V::Value>
@@ -596,21 +575,8 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         V: de::Visitor<'de>,
     {
         match self.current_tag {
-            TagID::IntArray | TagID::LongArray => {
-                check_bounds!(4, self.input);
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                self.input = &self.input[4..];
-                visitor.visit_seq(ArrayAccess {
-                    element_tag_id: if self.current_tag == TagID::IntArray {
-                        TagID::Int
-                    } else {
-                        TagID::Long
-                    },
-                    remaining: length,
-                    deserializer: self,
-                })
-            }
+            TagID::IntArray => self.deserialize_array(TagID::Int, visitor),
+            TagID::LongArray => self.deserialize_array(TagID::Long, visitor),
             TagID::List => self.deserialize_wrapped_list(visitor),
             _ => {
                 cold_path();
@@ -707,17 +673,22 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
     where
         V: de::Visitor<'de>,
     {
+        const TAG_SIZE: [usize; 13] = [0, 1, 2, 4, 8, 4, 8, 1, 0, 0, 0, 4, 8];
+
+        #[inline(always)]
+        const fn tag_size(tag_id: TagID) -> usize {
+            let tag_id = tag_id as u8;
+            unsafe { assert_unchecked(tag_id < 13) };
+            TAG_SIZE[tag_id as usize]
+        }
+
         match self.current_tag {
-            TagID::End => (),
-            TagID::Byte => self.skip_bytes(1)?,
-            TagID::Short => self.skip_bytes(2)?,
-            TagID::Int | TagID::Float => self.skip_bytes(4)?,
-            TagID::Long | TagID::Double => self.skip_bytes(8)?,
-            TagID::ByteArray => {
+            p if p.is_primitive() => self.skip_bytes(tag_size(p))?,
+            a if a.is_array() => {
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                self.skip_bytes(4 + length as usize)?;
+                self.skip_bytes(4 + length as usize * tag_size(a))?;
             }
             TagID::String => {
                 check_bounds!(2, self.input);
@@ -727,68 +698,35 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
             }
             TagID::List => {
                 check_bounds!(5, self.input);
-                let element_tag = self.input[0];
-                if element_tag > TagID::LongArray as u8 {
-                    return Err(Error::INVALID(element_tag));
-                }
-                let element_tag = unsafe { TagID::from_u8_unchecked(element_tag) };
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input[1..].as_ptr().cast() })
-                        .get();
-                self.input = &self.input[5..];
-                match element_tag {
-                    TagID::End => (),
-                    TagID::Byte => self.skip_bytes(length as usize)?,
-                    TagID::Short => self.skip_bytes(length as usize * 2)?,
-                    TagID::Int | TagID::Float => self.skip_bytes(length as usize * 4)?,
-                    TagID::Long | TagID::Double => self.skip_bytes(length as usize * 8)?,
-                    _ => {
-                        for _ in 0..length {
-                            self.current_tag = element_tag;
-                            self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                        }
+                let (element_tag, length) = self.parse_list_header()?;
+                if element_tag.is_primitive() {
+                    self.skip_bytes(length as usize * tag_size(element_tag))?;
+                } else {
+                    for _ in 0..length {
+                        self.current_tag = element_tag;
+                        self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     }
                 }
             }
             TagID::Compound => loop {
                 check_bounds!(1, self.input);
-                let tag_id = self.input[0];
+                self.current_tag = TagID::from_u8(self.input[0])?;
                 self.input = &self.input[1..];
-                if tag_id == TagID::End as u8 {
+                if self.current_tag.is_end() {
                     break;
                 }
-                if tag_id > TagID::LongArray as u8 {
-                    return Err(Error::INVALID(tag_id));
-                }
-                self.current_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
                 check_bounds!(2, self.input);
                 let name_len =
                     byteorder::U16::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 check_bounds!(2 + name_len as usize, self.input);
                 self.input = &self.input[2 + name_len as usize..];
-                match self.current_tag {
-                    TagID::End => unsafe { unreachable_unchecked() },
-                    TagID::Byte => self.skip_bytes(1)?,
-                    TagID::Short => self.skip_bytes(2)?,
-                    TagID::Int | TagID::Float => self.skip_bytes(4)?,
-                    TagID::Long | TagID::Double => self.skip_bytes(8)?,
-                    _ => {
-                        self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                    }
+                if self.current_tag.is_primitive() {
+                    self.skip_bytes(tag_size(self.current_tag))?;
+                } else {
+                    self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                 }
             },
-            TagID::IntArray => {
-                check_bounds!(4, self.input);
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                self.skip_bytes(4 + length as usize * 4)?;
-            }
-            TagID::LongArray => {
-                check_bounds!(4, self.input);
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                self.skip_bytes(4 + length as usize * 8)?;
-            }
+            _ => unsafe { unreachable_unchecked() },
         }
         visitor.visit_unit()
     }
@@ -1070,16 +1008,11 @@ impl<'a, 'de, O: ByteOrder> MapAccess<'de> for CompoundAccess<'a, 'de, O> {
         K: de::DeserializeSeed<'de>,
     {
         check_bounds!(1, self.deserializer.input);
-        let tag_id = self.deserializer.input[0];
-        if tag_id > TagID::LongArray as u8 {
-            cold_path();
-            return Err(Error::INVALID(tag_id));
-        }
-        if tag_id == TagID::End as u8 {
+        self.deserializer.current_tag = TagID::from_u8(self.deserializer.input[0])?;
+        if self.deserializer.current_tag.is_end() {
             self.deserializer.input = &self.deserializer.input[1..];
             return Ok(None);
         }
-        self.deserializer.current_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
         let name_len = byteorder::U16::<O>::from_bytes(unsafe {
             *self.deserializer.input.as_ptr().add(1).cast()
         })
@@ -1115,16 +1048,11 @@ impl<'a, 'de, O: ByteOrder> EnumAccess<'de> for EnumVariantAccess<'a, 'de, O> {
         V: de::DeserializeSeed<'de>,
     {
         check_bounds!(1, self.deserializer.input);
-        let tag_id = self.deserializer.input[0];
-        if tag_id > TagID::LongArray as u8 {
+        self.deserializer.current_tag = TagID::from_u8(self.deserializer.input[0])?;
+        if self.deserializer.current_tag.is_end() {
             cold_path();
-            return Err(Error::INVALID(tag_id));
+            return Err(Error::INVALID(self.deserializer.current_tag as u8));
         }
-        if tag_id == TagID::End as u8 {
-            cold_path();
-            return Err(Error::INVALID(tag_id));
-        }
-        self.deserializer.current_tag = unsafe { TagID::from_u8_unchecked(tag_id) };
         self.deserializer.input = &self.deserializer.input[1..];
         let name = self.deserializer.parse_str()?;
         Ok((
