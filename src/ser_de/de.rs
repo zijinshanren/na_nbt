@@ -682,10 +682,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         self.deserialize_map(visitor)
     }
 
-    /// Int
-    /// Compound { "<variant>" : <value> }
-    /// Compound { "<variant>" : Compound }
-    /// Compound { "<variant>" : List [ Compound { "" : <value> }, ... ] }
+    /// Int => unit_variant
+    /// Compound { "<variant>" : <value> } => newtype_variant
+    /// Compound { "<variant>" : Compound } => struct_variant
+    /// Compound { "<variant>" : List [ Compound { "" : <value> }, ... ] } => tuple_variant
     fn deserialize_enum<V>(
         self,
         _name: &'static str,
@@ -1361,20 +1361,41 @@ impl<'a, 'de, O: ByteOrder> VariantAccess<'de> for EnumVariantAccess<'a, 'de, O>
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(&mut *self.deserializer)
+        let value = seed.deserialize(&mut *self.deserializer)?;
+        check_bounds!(1, self.deserializer.input);
+        if self.deserializer.input[0] != TagID::End as u8 {
+            cold_path();
+            return Err(Error::INVALID(self.deserializer.input[0]));
+        }
+        self.deserializer.input = &self.deserializer.input[1..];
+        Ok(value)
     }
 
     fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        de::Deserializer::deserialize_tuple(self.deserializer, len, visitor)
+        let value = de::Deserializer::deserialize_tuple(&mut *self.deserializer, len, visitor)?;
+        check_bounds!(1, self.deserializer.input);
+        if self.deserializer.input[0] != TagID::End as u8 {
+            cold_path();
+            return Err(Error::INVALID(self.deserializer.input[0]));
+        }
+        self.deserializer.input = &self.deserializer.input[1..];
+        Ok(value)
     }
 
     fn struct_variant<V>(self, _fields: &'static [&'static str], visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        de::Deserializer::deserialize_map(self.deserializer, visitor)
+        let value = de::Deserializer::deserialize_map(&mut *self.deserializer, visitor)?;
+        check_bounds!(1, self.deserializer.input);
+        if self.deserializer.input[0] != TagID::End as u8 {
+            cold_path();
+            return Err(Error::INVALID(self.deserializer.input[0]));
+        }
+        self.deserializer.input = &self.deserializer.input[1..];
+        Ok(value)
     }
 }
