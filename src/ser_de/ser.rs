@@ -67,6 +67,32 @@ unsafe fn write_string<O: ByteOrder>(dst: *mut u8, encoded: &[u8]) -> Result<()>
     }
 }
 
+unsafe fn write_compound_header<O: ByteOrder>(
+    dst: *mut u8,
+    tag_id: TagID,
+    encoded: &[u8],
+) -> Result<()> {
+    unsafe {
+        ptr::write(dst, tag_id as u8);
+        write_string::<O>(dst.add(1).cast(), encoded)
+    }
+}
+
+unsafe fn write_wrapped_list_header<O: ByteOrder>(dst: *mut u8, len: usize) -> Result<()> {
+    unsafe {
+        if len > u32::MAX as usize {
+            cold_path();
+            return Err(Error::LEN(len));
+        }
+        ptr::write(dst, TagID::Compound as u8);
+        ptr::write(
+            dst.add(1).cast(),
+            byteorder::U32::<O>::new(len as u32).to_bytes(),
+        );
+        Ok(())
+    }
+}
+
 impl<O: ByteOrder> Serializer<O> {
     fn write_compound_item<T>(&mut self, name: &str, value: &T) -> Result<()>
     where
@@ -90,6 +116,7 @@ impl<O: ByteOrder> Serializer<O> {
         value.serialize(&mut *self)
     }
 
+    /// writes a Compound { "" : <value> }. used in Some, Seq(non-native), Tuple and more heterogeneous sequences.
     fn write_wrapped_item<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -108,8 +135,9 @@ impl<O: ByteOrder> Serializer<O> {
         Ok(())
     }
 
-    unsafe fn write_string_unreserved(&mut self, encoded: &[u8]) -> Result<()> {
+    fn write_string(&mut self, encoded: &[u8]) -> Result<()> {
         unsafe {
+            self.vec.reserve(2 + encoded.len());
             let old_len = self.vec.len();
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
             write_string::<O>(write_ptr, encoded)?;
@@ -118,9 +146,26 @@ impl<O: ByteOrder> Serializer<O> {
         }
     }
 
-    fn write_string(&mut self, encoded: &[u8]) -> Result<()> {
-        self.vec.reserve(2 + encoded.len());
-        unsafe { self.write_string_unreserved(encoded) }
+    fn write_compound_header(&mut self, tag_id: TagID, encoded: &[u8]) -> Result<()> {
+        unsafe {
+            self.vec.reserve(1 + 2 + encoded.len());
+            let old_len = self.vec.len();
+            let write_ptr = self.vec.as_mut_ptr().add(old_len);
+            write_compound_header::<O>(write_ptr, tag_id, encoded)?;
+            self.vec.set_len(old_len + 1 + 2 + encoded.len());
+            Ok(())
+        }
+    }
+
+    fn write_wrapped_list_header(&mut self, len: usize) -> Result<()> {
+        unsafe {
+            let old_len = self.vec.len();
+            self.vec.reserve(1 + 4);
+            let write_ptr = self.vec.as_mut_ptr().add(old_len);
+            write_wrapped_list_header::<O>(write_ptr, len)?;
+            self.vec.set_len(old_len + 1 + 4);
+            Ok(())
+        }
     }
 }
 
@@ -286,18 +331,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     where
         T: ?Sized + Serialize,
     {
-        let tag_id = tag_of(value);
-        unsafe {
-            let old_len = self.vec.len();
-            self.vec.reserve(1 + 2);
-            let write_ptr = self.vec.as_mut_ptr().add(old_len);
-            ptr::write(write_ptr, tag_id as u8);
-            ptr::write(write_ptr.add(1).cast(), [0u8; 2]);
-            self.vec.set_len(old_len + 1 + 2);
-        }
-        value.serialize(&mut *self)?;
-        self.vec.push(TagID::End as u8);
-        Ok(())
+        self.write_wrapped_item(value)
     }
 
     /// Compound { }
@@ -404,21 +438,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
 
     /// List [ Compound { "" : <value> }, ... ]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
-        if len > u32::MAX as usize {
-            cold_path();
-            return Err(Error::LEN(len));
-        }
-        unsafe {
-            let old_len = self.vec.len();
-            self.vec.reserve(1 + 4);
-            let write_ptr = self.vec.as_mut_ptr().add(old_len);
-            ptr::write(write_ptr, TagID::Compound as u8);
-            ptr::write(
-                write_ptr.add(1).cast(),
-                byteorder::U32::<O>::new(len as u32).to_bytes(),
-            );
-            self.vec.set_len(old_len + 1 + 4);
-        }
+        self.write_wrapped_list_header(len)?;
         Ok(&mut *self)
     }
 
@@ -445,13 +465,8 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
             let old_len = self.vec.len();
             self.vec.reserve(1 + 2 + name_len + 1 + 4);
             let write_ptr = self.vec.as_mut_ptr().add(old_len);
-            ptr::write(write_ptr, TagID::List as u8);
-            write_string::<O>(write_ptr.add(1).cast(), &encoded)?;
-            ptr::write(write_ptr.add(3 + name_len).cast(), TagID::Compound as u8);
-            ptr::write(
-                write_ptr.add(3 + name_len + 1).cast(),
-                byteorder::U32::<O>::new(len as u32).to_bytes(),
-            );
+            write_compound_header::<O>(write_ptr, TagID::List, &encoded)?;
+            write_wrapped_list_header::<O>(write_ptr.add(3 + name_len).cast(), len)?;
             self.vec.set_len(old_len + 1 + 2 + name_len + 1 + 4);
         }
         Ok(&mut *self)
@@ -489,15 +504,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
         let encoded = simd_cesu8::mutf8::encode(variant);
-        let name_len = encoded.len();
-        unsafe {
-            let old_len = self.vec.len();
-            self.vec.reserve(1 + 2 + name_len);
-            let write_ptr = self.vec.as_mut_ptr().add(old_len);
-            ptr::write(write_ptr, TagID::Compound as u8);
-            write_string::<O>(write_ptr.add(1).cast(), &encoded)?;
-            self.vec.set_len(old_len + 1 + 2 + name_len);
-        }
+        self.write_compound_header(TagID::Compound, &encoded)?;
         Ok(&mut *self)
     }
 }
@@ -597,22 +604,11 @@ impl<'a, O: ByteOrder> ser::Serializer for ArraySerializer<'a, O> {
     }
 
     fn serialize_seq(mut self, len: Option<usize>) -> Result<Self::SerializeSeq> {
-        if let Some(len) = len {
-            if len > u32::MAX as usize {
-                return Err(Error::LEN(len));
-            }
+        if len.is_some() {
             self.len = None;
         }
-        unsafe {
-            self.serializer.vec.reserve(1 + 4);
-            let write_ptr = self.serializer.vec.as_mut_ptr().add(self.start_pos);
-            ptr::write(write_ptr, TagID::End as u8);
-            ptr::write(
-                write_ptr.add(1).cast(),
-                byteorder::U32::<O>::new(len.unwrap_or(0) as u32).to_bytes(),
-            );
-            self.serializer.vec.set_len(self.start_pos + 1 + 4);
-        }
+        self.serializer
+            .write_wrapped_list_header(len.unwrap_or(0))?;
         Ok(self)
     }
 
@@ -890,17 +886,8 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
-        unsafe {
-            let old_len = self.serializer.vec.len();
-            let encoded = simd_cesu8::mutf8::encode(v);
-            let len = encoded.len();
-            self.serializer.vec.reserve(1 + 2 + len);
-            let write_ptr = self.serializer.vec.as_mut_ptr().add(old_len);
-            ptr::write(write_ptr, self.tag_id as u8);
-            write_string::<O>(write_ptr.add(1).cast(), &encoded)?;
-            self.serializer.vec.set_len(old_len + 1 + 2 + len);
-        }
-        Ok(())
+        let encoded = simd_cesu8::mutf8::encode(v);
+        self.serializer.write_compound_header(self.tag_id, &encoded)
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok> {

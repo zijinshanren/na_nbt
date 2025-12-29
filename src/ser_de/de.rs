@@ -250,6 +250,23 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         self.input = &self.input[1..];
         Ok(())
     }
+
+    fn parse_list_header(&mut self) -> Result<(TagID, u32)> {
+        check_bounds!(1 + 4, self.input);
+        let tag_id = self.input[0];
+        if tag_id > TagID::LongArray as u8 {
+            cold_path();
+            return Err(Error::INVALID(tag_id));
+        }
+        let length =
+            byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() }).get();
+        if tag_id == TagID::End as u8 && length > 0 {
+            cold_path();
+            return Err(Error::INVALID(tag_id));
+        }
+        self.input = &self.input[1 + 4..];
+        Ok((unsafe { TagID::from_u8_unchecked(tag_id) }, length))
+    }
 }
 
 macro_rules! check_tag {
@@ -284,28 +301,15 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
             TagID::ByteArray => visitor.visit_borrowed_bytes(self.parse_bytes()?),
             TagID::String => visitor.visit_str(self.parse_str()?.as_ref()),
             TagID::List => {
-                check_bounds!(1 + 4, self.input);
-                let tag_id = self.input[0];
-                if tag_id > TagID::LongArray as u8 {
-                    cold_path();
-                    return Err(Error::INVALID(tag_id));
-                }
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().add(1).cast() })
-                        .get();
-                if tag_id == TagID::End as u8 && length > 0 {
-                    cold_path();
-                    return Err(Error::INVALID(tag_id));
-                }
-                self.input = &self.input[1 + 4..];
-                if tag_id == TagID::Compound as u8 {
+                let (tag_id, length) = self.parse_list_header()?;
+                if tag_id == TagID::Compound {
                     visitor.visit_seq(WrappedListAccess {
                         remaining: length,
                         deserializer: self,
                     })
                 } else {
-                    visitor.visit_seq(NativeListAccess {
-                        element_tag_id: unsafe { TagID::from_u8_unchecked(tag_id) },
+                    visitor.visit_seq(ArrayAccess {
+                        element_tag_id: tag_id,
                         remaining: length,
                         deserializer: self,
                     })
@@ -575,23 +579,9 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         match name {
             "na_nbt:list" => {
                 check_tag!(TagID::List, self.current_tag, {
-                    check_bounds!(1 + 4, self.input);
-                    let tag_id = self.input[0];
-                    if tag_id > TagID::LongArray as u8 {
-                        cold_path();
-                        return Err(Error::INVALID(tag_id));
-                    }
-                    let length = byteorder::U32::<O>::from_bytes(unsafe {
-                        *self.input.as_ptr().add(1).cast()
-                    })
-                    .get();
-                    if tag_id == TagID::End as u8 && length > 0 {
-                        cold_path();
-                        return Err(Error::INVALID(tag_id));
-                    }
-                    self.input = &self.input[1 + 4..];
-                    visitor.visit_seq(NativeListAccess {
-                        element_tag_id: unsafe { TagID::from_u8_unchecked(tag_id) },
+                    let (tag_id, length) = self.parse_list_header()?;
+                    visitor.visit_seq(ArrayAccess {
+                        element_tag_id: tag_id,
                         remaining: length,
                         deserializer: self,
                     })
@@ -606,24 +596,17 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         V: de::Visitor<'de>,
     {
         match self.current_tag {
-            TagID::IntArray => {
+            TagID::IntArray | TagID::LongArray => {
                 check_bounds!(4, self.input);
                 let length =
                     byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
                 self.input = &self.input[4..];
                 visitor.visit_seq(ArrayAccess {
-                    element_tag_id: TagID::Int,
-                    remaining: length,
-                    deserializer: self,
-                })
-            }
-            TagID::LongArray => {
-                check_bounds!(4, self.input);
-                let length =
-                    byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
-                self.input = &self.input[4..];
-                visitor.visit_seq(ArrayAccess {
-                    element_tag_id: TagID::Long,
+                    element_tag_id: if self.current_tag == TagID::IntArray {
+                        TagID::Int
+                    } else {
+                        TagID::Long
+                    },
                     remaining: length,
                     deserializer: self,
                 })
@@ -1040,34 +1023,6 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for WrappedListAccess<'a, 'de, O> {
         self.remaining -= 1;
 
         Ok(Some(self.deserializer.deserialize_wrapped_item(seed)?))
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining as usize)
-    }
-}
-
-struct NativeListAccess<'a, 'de: 'a, O: ByteOrder> {
-    element_tag_id: TagID,
-    remaining: u32,
-    deserializer: &'a mut Deserializer<'de, O>,
-}
-
-impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for NativeListAccess<'a, 'de, O> {
-    type Error = Error;
-
-    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-
-        self.remaining -= 1;
-
-        self.deserializer.current_tag = self.element_tag_id;
-        Ok(Some(seed.deserialize(&mut *self.deserializer)?))
     }
 
     fn size_hint(&self) -> Option<usize> {
