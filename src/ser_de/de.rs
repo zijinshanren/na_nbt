@@ -5,6 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
+use base64ct::Encoding;
 use serde::{
     Deserialize,
     de::{self, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, VariantAccess},
@@ -775,14 +776,18 @@ impl<'a, 'de: 'a> de::Deserializer<'de> for KeyDeserializer<'a> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_bytes(self.name.as_bytes())
+        visitor.visit_bytes(
+            &base64ct::Base64::decode_vec(self.name).map_err(|e| Error::MSG(e.to_string()))?,
+        )
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_byte_buf(self.name.as_bytes().to_vec())
+        visitor.visit_byte_buf(
+            base64ct::Base64::decode_vec(self.name).map_err(|e| Error::MSG(e.to_string()))?,
+        )
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>

@@ -1,5 +1,6 @@
 use std::{io::Write, marker::PhantomData, ptr};
 
+use base64ct::Encoding;
 use serde::{Serialize, ser};
 use zerocopy::byteorder;
 
@@ -509,7 +510,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     }
 }
 
-pub struct ArraySerializer<'a, O: ByteOrder> {
+struct ArraySerializer<'a, O: ByteOrder> {
     start_pos: usize,
     element_tag: TagID,
     len: Option<u32>,
@@ -891,7 +892,7 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok> {
-        self.serialize_str(str::from_utf8(v).map_err(|e| Error::MSG(e.to_string()))?)
+        self.serialize_str(&base64ct::Base64::encode_string(v))
     }
 
     fn serialize_none(self) -> Result<Self::Ok> {

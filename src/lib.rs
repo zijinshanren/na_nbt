@@ -8,7 +8,7 @@ pub mod index;
 pub mod mutable;
 pub mod nbt;
 #[cfg(feature = "serde")]
-pub mod ser_de;
+mod ser_de;
 pub mod util;
 pub mod value;
 pub mod view;

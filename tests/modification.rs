@@ -4487,10 +4487,10 @@ fn test_list_serde_module() {
     };
 
     // Serialize
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
 
     // Deserialize
-    let decoded: TestData = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let decoded: TestData = na_nbt::from_slice_be(&bytes).unwrap();
     assert_eq!(data, decoded);
 }
 
@@ -4507,8 +4507,8 @@ fn test_list_serde_empty() {
 
     let data = TestData { items: vec![] };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    let decoded: TestData = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
+    let decoded: TestData = na_nbt::from_slice_be(&bytes).unwrap();
     assert_eq!(data, decoded);
 }
 
@@ -4527,8 +4527,8 @@ fn test_list_serde_floats() {
         values: vec![1.5, 2.5, 3.5],
     };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    let decoded: TestData = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
+    let decoded: TestData = na_nbt::from_slice_be(&bytes).unwrap();
 
     // Compare floats with tolerance
     for (a, b) in data.values.iter().zip(decoded.values.iter()) {
@@ -4570,8 +4570,8 @@ fn test_list_serde_compounds() {
         ],
     };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    let decoded: Inventory = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
+    let decoded: Inventory = na_nbt::from_slice_be(&bytes).unwrap();
     assert_eq!(data, decoded);
 }
 
@@ -4605,8 +4605,8 @@ fn test_list_wrapped_compounds() {
         ],
     };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    let decoded: Inventory = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
+    let decoded: Inventory = na_nbt::from_slice_be(&bytes).unwrap();
     assert_eq!(data, decoded);
 }
 
@@ -4752,8 +4752,8 @@ fn test_native_compound_with_empty_key() {
 
     let data = Data { items: vec![map] };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
+    let result: Data = na_nbt::from_slice_be(&bytes).unwrap();
 
     assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].get(""), Some(&42));
@@ -4775,8 +4775,8 @@ fn test_nested_native_lists() {
         lists: vec![vec![1, 2, 3], vec![4, 5, 6]],
     };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    let result: Outer = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
+    let result: Outer = na_nbt::from_slice_be(&bytes).unwrap();
 
     assert_eq!(result, data);
 }
@@ -4809,8 +4809,8 @@ fn test_list_of_int_arrays() {
         ],
     };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
-    let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
+    let result: Data = na_nbt::from_slice_be(&bytes).unwrap();
 
     assert_eq!(result, data);
 }
@@ -4838,13 +4838,13 @@ fn test_direct_list_of_int_arrays() {
         ],
     };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
 
     // Verify the bytes contain IntArray tag (0x0B) as element type
     // List header: tag_id (1 byte) + element_tag (1 byte) + length (4 bytes)
     // For List<IntArray>, element_tag should be 0x0B (IntArray)
 
-    let result: Data = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let result: Data = na_nbt::from_slice_be(&bytes).unwrap();
     assert_eq!(result, data);
 }
 
@@ -4880,10 +4880,10 @@ fn test_deeply_nested_mixed_lists() {
         ],
     };
 
-    let bytes = na_nbt::ser::to_vec_be(&data).unwrap();
+    let bytes = na_nbt::to_vec_be(&data).unwrap();
     let mut file = std::fs::File::create("test_deeply_nested_mixed_lists.nbt").unwrap();
     std::io::Write::write_all(&mut file, &bytes).unwrap();
-    let result: Outer = na_nbt::de::from_slice_be(&bytes).unwrap();
+    let result: Outer = na_nbt::from_slice_be(&bytes).unwrap();
 
     assert_eq!(result, data);
 }
