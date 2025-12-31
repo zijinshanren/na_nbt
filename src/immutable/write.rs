@@ -3,8 +3,11 @@ use std::{any::TypeId, hint::unreachable_unchecked, io::Write, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Document, Error, NBT, ReadonlyArray, ReadonlyCompound, ReadonlyList, ReadonlyString,
-    ReadonlyTypedList, ReadonlyValue, Result, TagID, Writable, cold_path,
+    ByteOrder, Error, NBT, Result, TagID, Writable, cold_path,
+    immutable::{
+        array::ReadonlyArray, compound::ReadonlyCompound, document::Document, list::ReadonlyList,
+        string::ReadonlyString, typed_list::ReadonlyTypedList, value::ReadonlyValue,
+    },
 };
 
 macro_rules! change_endian {

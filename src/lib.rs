@@ -3,7 +3,7 @@ pub use zerocopy::LittleEndian;
 pub use zerocopy::NativeEndian;
 
 pub mod error;
-pub mod immutable;
+mod immutable;
 pub mod index;
 pub mod mutable;
 pub mod nbt;
@@ -15,7 +15,7 @@ pub mod view;
 pub mod write;
 
 pub use error::*;
-pub use immutable::*;
+pub use immutable::{read_borrowed, read_shared};
 pub use index::*;
 pub use mutable::*;
 pub use nbt::*;

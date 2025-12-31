@@ -11,21 +11,13 @@ mod typed_list;
 mod value;
 mod write;
 
-pub use array::*;
-pub use compound::*;
-pub use config::*;
-pub use document::*;
-pub use list::*;
-pub use mark::*;
-pub use size::*;
-pub use string::*;
-pub use typed_list::*;
-pub use value::*;
-
 mod borrowed {
     use zerocopy::byteorder;
 
-    use crate::{ByteOrder, ConfigRef, Result, TagID, cold_path};
+    use crate::{
+        ByteOrder, ConfigRef, Result, TagID, cold_path,
+        immutable::{config::ImmutableConfig, document::Document},
+    };
 
     use super::*;
 
@@ -81,7 +73,7 @@ mod borrowed {
     unsafe impl<'s, O: ByteOrder> Sync for BorrowedDocument<'s, O> {}
 }
 
-pub use borrowed::*;
+pub use borrowed::read_borrowed;
 
 #[cfg(feature = "shared")]
 mod shared {
@@ -90,7 +82,10 @@ mod shared {
     use bytes::Bytes;
     use zerocopy::byteorder;
 
-    use crate::{ByteOrder, ConfigRef, Result, TagID, cold_path};
+    use crate::{
+        ByteOrder, ConfigRef, Result, TagID, cold_path,
+        immutable::{config::ImmutableConfig, document::Document},
+    };
 
     use super::*;
 
@@ -153,4 +148,4 @@ mod shared {
 }
 
 #[cfg(feature = "shared")]
-pub use shared::*;
+pub use shared::read_shared;

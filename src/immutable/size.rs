@@ -1,6 +1,6 @@
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, Mark, TagID};
+use crate::{ByteOrder, TagID, immutable::mark::Mark};
 
 /// .
 ///

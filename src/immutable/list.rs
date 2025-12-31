@@ -3,8 +3,11 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, EMPTY_LIST, ImmutableConfig, ListBase, ListRef, Mark, NBT,
-    ReadonlyTypedList, ReadonlyValue, TagID, cold_path, immutable_tag_size,
+    ByteOrder, ConfigRef, EMPTY_LIST, ListBase, ListRef, NBT, TagID, cold_path,
+    immutable::{
+        config::ImmutableConfig, document::Document, mark::Mark, size::immutable_tag_size,
+        typed_list::ReadonlyTypedList, value::ReadonlyValue,
+    },
 };
 
 #[derive(Clone)]

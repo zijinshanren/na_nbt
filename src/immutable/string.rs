@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{Document, MUTF8Str};
+use crate::{MUTF8Str, immutable::document::Document};
 
 #[derive(Clone)]
 pub struct ReadonlyString<'doc, D> {

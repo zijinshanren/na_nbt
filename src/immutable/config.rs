@@ -3,10 +3,19 @@ use std::{hint::assert_unchecked, marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigRef, Document, GenericNBT, ListRef, MUTF8Str, Mark, NBT, NBTBase,
-    ReadonlyArray, ReadonlyCompound, ReadonlyCompoundIter, ReadonlyList, ReadonlyListIter,
-    ReadonlyString, ReadonlyTypedList, ReadonlyTypedListIter, ReadonlyValue, TagID, cold_path,
-    immutable_tag_size, tag::List,
+    ByteOrder, ConfigRef, GenericNBT, ListRef, MUTF8Str, NBT, NBTBase, TagID, cold_path,
+    immutable::{
+        array::ReadonlyArray,
+        compound::{ReadonlyCompound, ReadonlyCompoundIter},
+        document::Document,
+        list::{ReadonlyList, ReadonlyListIter},
+        mark::Mark,
+        size::immutable_tag_size,
+        string::ReadonlyString,
+        typed_list::{ReadonlyTypedList, ReadonlyTypedListIter},
+        value::ReadonlyValue,
+    },
+    tag::List,
 };
 
 #[derive(Clone)]

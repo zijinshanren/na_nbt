@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::Document;
+use crate::immutable::document::Document;
 
 #[derive(Clone)]
 pub struct ReadonlyArray<'doc, T, D: Document> {
