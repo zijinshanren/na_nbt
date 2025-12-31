@@ -6,6 +6,10 @@ use zerocopy::byteorder;
 
 use crate::{ByteOrder, Error, Result, TagID, cold_path, tag_of};
 
+/// Serializes a value to a byte vector in NBT format.
+///
+/// The output includes the root tag ID byte followed by the serialized data.
+/// Use `to_vec_be` or `to_vec_le` for convenience when the byte order is known.
 #[inline]
 pub fn to_vec<O: ByteOrder>(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>> {
     let tag_id = tag_of(value);
@@ -29,6 +33,10 @@ pub fn to_vec_le(value: &(impl ?Sized + Serialize)) -> Result<Vec<u8>> {
     to_vec::<zerocopy::byteorder::LittleEndian>(value)
 }
 
+/// Serializes a value to a writer in NBT format.
+///
+/// The output includes the root tag ID byte followed by the serialized data.
+/// Use `to_writer_be` or `to_writer_le` for convenience when the byte order is known.
 #[inline]
 pub fn to_writer<O: ByteOrder>(
     writer: &mut impl Write,
@@ -50,11 +58,18 @@ pub fn to_writer_le(writer: &mut impl Write, value: &(impl ?Sized + Serialize)) 
     to_writer::<zerocopy::byteorder::LittleEndian>(writer, value)
 }
 
+/// NBT serializer that writes to an internal byte vector.
+///
+/// This type implements `serde::Serializer` for the NBT format.
+/// The `O` generic parameter specifies the byte order (BigEndian or LittleEndian).
 pub struct Serializer<O: ByteOrder> {
     vec: Vec<u8>,
     _marker: PhantomData<O>,
 }
 
+// Writes a length-prefixed MUTF-8 string to the destination pointer.
+// The length is written as a u16 in the specified byte order, followed by the encoded bytes.
+// Safety: dst must have valid write access for 2 + encoded.len() bytes.
 unsafe fn write_string<O: ByteOrder>(dst: *mut u8, encoded: &[u8]) -> Result<()> {
     unsafe {
         let len = encoded.len();
@@ -68,6 +83,9 @@ unsafe fn write_string<O: ByteOrder>(dst: *mut u8, encoded: &[u8]) -> Result<()>
     }
 }
 
+// Writes a compound tag header: tag ID byte followed by a length-prefixed name string.
+// Used at the start of each compound entry.
+// Safety: dst must have valid write access for 1 + 2 + encoded.len() bytes.
 unsafe fn write_compound_header<O: ByteOrder>(
     dst: *mut u8,
     tag_id: TagID,
@@ -79,6 +97,9 @@ unsafe fn write_compound_header<O: ByteOrder>(
     }
 }
 
+// Writes a wrapped list header: TAG_Compound byte followed by length as u32.
+// Wrapped lists store heterogeneous elements by wrapping each in a Compound with empty name.
+// Safety: dst must have valid write access for 1 + 4 bytes.
 unsafe fn write_wrapped_list_header<O: ByteOrder>(dst: *mut u8, len: usize) -> Result<()> {
     unsafe {
         if len > u32::MAX as usize {
@@ -95,6 +116,7 @@ unsafe fn write_wrapped_list_header<O: ByteOrder>(dst: *mut u8, len: usize) -> R
 }
 
 impl<O: ByteOrder> Serializer<O> {
+    // Writes a compound entry: tag ID, name length (u16), name (MUTF-8 encoded), then the value.
     fn write_compound_item<T>(&mut self, name: &str, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -117,7 +139,9 @@ impl<O: ByteOrder> Serializer<O> {
         value.serialize(&mut *self)
     }
 
-    /// writes a Compound { "" : <value> }. used in Some, Seq(non-native), Tuple and more heterogeneous sequences.
+    // Writes a wrapped item: Compound { "" : <value> }.
+    // This representation allows any NBT type to be stored in a homogeneous list structure.
+    // Used by Option, heterogeneous sequences, tuples, and more.
     fn write_wrapped_item<T>(&mut self, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
@@ -136,6 +160,8 @@ impl<O: ByteOrder> Serializer<O> {
         Ok(())
     }
 
+    // Writes a length-prefixed MUTF-8 string to the output buffer.
+    // Encodes the string using MUTF-8 (modified UTF-8) as required by NBT.
     fn write_string(&mut self, encoded: &[u8]) -> Result<()> {
         unsafe {
             self.vec.reserve(2 + encoded.len());
@@ -147,6 +173,8 @@ impl<O: ByteOrder> Serializer<O> {
         }
     }
 
+    // Writes a compound tag header to the output buffer.
+    // Format: tag ID byte + name length (u16) + name bytes.
     fn write_compound_header(&mut self, tag_id: TagID, encoded: &[u8]) -> Result<()> {
         unsafe {
             self.vec.reserve(1 + 2 + encoded.len());
@@ -158,6 +186,9 @@ impl<O: ByteOrder> Serializer<O> {
         }
     }
 
+    // Writes a wrapped list header to the output buffer.
+    // Format: TAG_Compound byte + length (u32).
+    // The list elements are stored as Compound { "" : <value> }.
     fn write_wrapped_list_header(&mut self, len: usize) -> Result<()> {
         unsafe {
             let old_len = self.vec.len();
@@ -182,39 +213,39 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     type SerializeStruct = Self;
     type SerializeStructVariant = Self;
 
-    /// Byte
+    // Byte
     fn serialize_bool(self, v: bool) -> Result<Self::Ok> {
         self.serialize_u8(v as u8)
     }
 
-    /// Byte
+    // Byte
     fn serialize_i8(self, v: i8) -> Result<Self::Ok> {
         self.vec.push(v as u8);
         Ok(())
     }
 
-    /// Short
+    // Short
     fn serialize_i16(self, v: i16) -> Result<Self::Ok> {
         self.vec
             .extend_from_slice(&byteorder::I16::<O>::new(v).to_bytes());
         Ok(())
     }
 
-    /// Int
+    // Int
     fn serialize_i32(self, v: i32) -> Result<Self::Ok> {
         self.vec
             .extend_from_slice(&byteorder::I32::<O>::new(v).to_bytes());
         Ok(())
     }
 
-    /// Long
+    // Long
     fn serialize_i64(self, v: i64) -> Result<Self::Ok> {
         self.vec
             .extend_from_slice(&byteorder::I64::<O>::new(v).to_bytes());
         Ok(())
     }
 
-    /// IntArray[4]
+    // IntArray[4]
     #[cfg(feature = "i128")]
     #[inline]
     fn serialize_i128(self, v: i128) -> Result<Self::Ok> {
@@ -249,59 +280,59 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         Ok(())
     }
 
-    /// Byte
+    // Byte
     fn serialize_u8(self, v: u8) -> Result<Self::Ok> {
         self.serialize_i8(v as i8)
     }
 
-    /// Short
+    // Short
     fn serialize_u16(self, v: u16) -> Result<Self::Ok> {
         self.serialize_i16(v as i16)
     }
 
-    /// Int
+    // Int
     fn serialize_u32(self, v: u32) -> Result<Self::Ok> {
         self.serialize_i32(v as i32)
     }
 
-    /// Long
+    // Long
     fn serialize_u64(self, v: u64) -> Result<Self::Ok> {
         self.serialize_i64(v as i64)
     }
 
-    /// IntArray[4]
+    // IntArray[4]
     #[cfg(feature = "i128")]
     #[inline]
     fn serialize_u128(self, v: u128) -> Result<Self::Ok> {
         self.serialize_i128(v as i128)
     }
 
-    /// Float
+    // Float
     fn serialize_f32(self, v: f32) -> Result<Self::Ok> {
         self.vec
             .extend_from_slice(&byteorder::F32::<O>::new(v).to_bytes());
         Ok(())
     }
 
-    /// Double
+    // Double
     fn serialize_f64(self, v: f64) -> Result<Self::Ok> {
         self.vec
             .extend_from_slice(&byteorder::F64::<O>::new(v).to_bytes());
         Ok(())
     }
 
-    /// Int
+    // Int
     fn serialize_char(self, v: char) -> Result<Self::Ok> {
         self.serialize_i32(v as i32)
     }
 
-    /// String
+    // String
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
         let encoded = simd_cesu8::mutf8::encode(v);
         self.write_string(&encoded)
     }
 
-    /// ByteArray
+    // ByteArray
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok> {
         let len = v.len();
         if len >= u32::MAX as usize {
@@ -322,12 +353,12 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         Ok(())
     }
 
-    /// Compound { }
+    // Compound { }
     fn serialize_none(self) -> Result<Self::Ok> {
         self.serialize_unit()
     }
 
-    /// Compound { "" : <value> }
+    // Compound { "" : <value> }
     fn serialize_some<T>(self, value: &T) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
@@ -335,18 +366,18 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         self.write_wrapped_item(value)
     }
 
-    /// Compound { }
+    // Compound { }
     fn serialize_unit(self) -> Result<Self::Ok> {
         self.vec.push(TagID::End as u8);
         Ok(())
     }
 
-    /// Compound { }
+    // Compound { }
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok> {
         self.serialize_unit()
     }
 
-    /// Int
+    // Int
     fn serialize_unit_variant(
         self,
         _name: &'static str,
@@ -356,7 +387,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         self.serialize_u32(variant_index)
     }
 
-    /// <value>
+    // <value>
     fn serialize_newtype_struct<T>(self, name: &'static str, value: &T) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
@@ -394,7 +425,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         }
     }
 
-    /// Compound { "<variant>" : <value> }
+    // Compound { "<variant>" : <value> }
     fn serialize_newtype_variant<T>(
         self,
         _name: &'static str,
@@ -410,7 +441,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         Ok(())
     }
 
-    /// List [ Compound { "" : <value> }, ... ]
+    // List [ Compound { "" : <value> }, ... ]
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
         if let Some(len) = len
             && len > u32::MAX as usize
@@ -437,13 +468,13 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         }
     }
 
-    /// List [ Compound { "" : <value> }, ... ]
+    // List [ Compound { "" : <value> }, ... ]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
         self.write_wrapped_list_header(len)?;
         Ok(&mut *self)
     }
 
-    /// List [ Compound { "" : <value> }, ... ]
+    // List [ Compound { "" : <value> }, ... ]
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
@@ -452,7 +483,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         self.serialize_tuple(len)
     }
 
-    /// Compound { "<variant>" : List [ Compound { "" : <value> }, ... ] }
+    // Compound { "<variant>" : List [ Compound { "" : <value> }, ... ] }
     fn serialize_tuple_variant(
         self,
         _name: &'static str,
@@ -473,7 +504,7 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         Ok(&mut *self)
     }
 
-    /// Compound
+    // Compound
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
         #[cfg(not(debug_assertions))]
         {
@@ -491,12 +522,12 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
         }
     }
 
-    /// Compound
+    // Compound
     fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
         Ok(&mut *self)
     }
 
-    /// Compound { "<variant>" : Compound }
+    // Compound { "<variant>" : Compound }
     fn serialize_struct_variant(
         self,
         _name: &'static str,
@@ -510,6 +541,9 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
     }
 }
 
+// Serializer for native NBT arrays (ByteArray, IntArray, LongArray) or lists.
+// Used by the newtype_struct markers to serialize homogeneous sequences.
+// The size field indicates bytes per element (1, 4, or 8) or ignored for lists.
 struct ArraySerializer<'a, O: ByteOrder> {
     start_pos: usize,
     element_tag: TagID,
@@ -727,6 +761,8 @@ impl<'a, O: ByteOrder> ser::SerializeSeq for ArraySerializer<'a, O> {
     }
 }
 
+// Serializer for heterogeneous sequences.
+// Wraps each element in a Compound { "" : <value> } to allow different types.
 pub struct SeqSerializer<'a, O: ByteOrder> {
     len_pos: usize,
     len: Option<u32>,
@@ -815,6 +851,9 @@ impl<O: ByteOrder> ser::SerializeTupleVariant for &mut Serializer<O> {
     }
 }
 
+// Serializer for map keys. NBT requires compound keys to be strings.
+// Converts various Rust types to their string representation.
+// See tag_probe.rs for the complete type-to-string mapping.
 struct KeySerializer<'a, O: ByteOrder> {
     tag_id: TagID,
     serializer: &'a mut Serializer<O>,
@@ -1008,6 +1047,9 @@ impl<'a, O: ByteOrder> ser::Serializer for KeySerializer<'a, O> {
     );
 }
 
+// Serializer for maps and structs as NBT compounds.
+// Tracks the position of the tag byte for key-value validation.
+// Uses debug_assertions in debug mode to ensure correct usage.
 pub struct MapSerializer<'a, O: ByteOrder> {
     #[cfg(not(debug_assertions))]
     tag_pos: usize,

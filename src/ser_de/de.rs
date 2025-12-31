@@ -14,6 +14,11 @@ use zerocopy::byteorder;
 
 use crate::{ByteOrder, Error, Result, TagID, cold_path};
 
+/// Deserializes a value from a byte slice in NBT format.
+///
+/// The input must contain the root tag ID byte followed by the serialized data.
+/// The entire input must be consumed; any trailing bytes result in an error.
+/// Use `from_slice_be` or `from_slice_le` for convenience when the byte order is known.
 #[inline]
 pub fn from_slice<'de, O: ByteOrder, T>(input: &'de [u8]) -> Result<T>
 where
@@ -29,6 +34,7 @@ where
     }
 }
 
+/// Convenience function for deserializing with big-endian byte order.
 #[inline]
 pub fn from_slice_be<'de, T>(input: &'de [u8]) -> Result<T>
 where
@@ -37,6 +43,7 @@ where
     from_slice::<zerocopy::byteorder::BigEndian, T>(input)
 }
 
+/// Convenience function for deserializing with little-endian byte order.
 #[inline]
 pub fn from_slice_le<'de, T>(input: &'de [u8]) -> Result<T>
 where
@@ -45,6 +52,10 @@ where
     from_slice::<zerocopy::byteorder::LittleEndian, T>(input)
 }
 
+/// Deserializes a value from a reader in NBT format.
+///
+/// Reads the entire input into memory before deserializing.
+/// The input must contain the root tag ID byte followed by the serialized data.
 #[inline]
 pub fn from_reader<O: ByteOrder, T, R: Read>(mut reader: R) -> Result<T>
 where
@@ -55,6 +66,7 @@ where
     from_slice::<O, T>(&buf)
 }
 
+/// Convenience function for reading from a reader with big-endian byte order.
 #[inline]
 pub fn from_reader_be<T, R: Read>(reader: R) -> Result<T>
 where
@@ -63,6 +75,7 @@ where
     from_reader::<zerocopy::byteorder::BigEndian, T, R>(reader)
 }
 
+/// Convenience function for reading from a reader with little-endian byte order.
 #[inline]
 pub fn from_reader_le<T, R: Read>(reader: R) -> Result<T>
 where
@@ -71,6 +84,10 @@ where
     from_reader::<zerocopy::byteorder::LittleEndian, T, R>(reader)
 }
 
+/// NBT deserializer that reads from a byte slice.
+///
+/// This type implements `serde::Deserializer` for the NBT format.
+/// The `'de` lifetime is the input data lifetime, and `O` specifies the byte order.
 pub struct Deserializer<'de, O: ByteOrder> {
     current_tag: TagID,
     input: &'de [u8],
@@ -87,7 +104,11 @@ macro_rules! check_bounds {
 }
 
 impl<'de, O: ByteOrder> Deserializer<'de, O> {
-    fn from_slice(input: &'de [u8]) -> Result<Self> {
+    /// Creates a new deserializer from a byte slice.
+    /// 
+    /// Parses the root tag header (tag ID + name) and advances past it.
+    /// The remaining input starts at the first byte of the root value's payload.
+    pub fn from_slice(input: &'de [u8]) -> Result<Self> {
         check_bounds!(1, input);
         let tag_id = TagID::from_u8(input[0])?;
         if tag_id.is_end() {
@@ -105,6 +126,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         })
     }
 
+    // Parses a single byte as i8 (TAG_Byte).
     fn parse_i8(&mut self) -> Result<i8> {
         check_bounds!(1, self.input);
         let value = self.input[0];
@@ -112,6 +134,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value as i8)
     }
 
+    // Parses a 16-bit integer in the specified byte order (TAG_Short).
     fn parse_i16(&mut self) -> Result<i16> {
         check_bounds!(2, self.input);
         let value = byteorder::I16::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -119,6 +142,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Parses a 32-bit integer in the specified byte order (TAG_Int).
     fn parse_i32(&mut self) -> Result<i32> {
         check_bounds!(4, self.input);
         let value = byteorder::I32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -126,6 +150,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Parses a 64-bit integer in the specified byte order (TAG_Long).
     fn parse_i64(&mut self) -> Result<i64> {
         check_bounds!(8, self.input);
         let value = byteorder::I64::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -133,6 +158,8 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Parses a 128-bit integer as a 4-element IntArray (TAG_Int_Array).
+    // This is the Minecraft UUID representation.
     #[cfg(feature = "i128")]
     fn parse_i128(&mut self) -> Result<i128> {
         check_bounds!(4 + 4 * 4, self.input);
@@ -150,6 +177,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         }
     }
 
+    // Parses a 32-bit float in the specified byte order (TAG_Float).
     fn parse_f32(&mut self) -> Result<f32> {
         check_bounds!(4, self.input);
         let value = byteorder::F32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -157,6 +185,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Parses a 64-bit float in the specified byte order (TAG_Double).
     fn parse_f64(&mut self) -> Result<f64> {
         check_bounds!(8, self.input);
         let value = byteorder::F64::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -164,6 +193,8 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Parses a length-prefixed MUTF-8 string (TAG_String).
+    // Returns a Cow to avoid allocation when the string is valid UTF-8.
     fn parse_str(&mut self) -> Result<Cow<'de, str>> {
         check_bounds!(2, self.input);
         let length = byteorder::U16::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -173,6 +204,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Parses a length-prefixed byte array (TAG_ByteArray).
     fn parse_bytes(&mut self) -> Result<&'de [u8]> {
         check_bounds!(4, self.input);
         let length = byteorder::U32::<O>::from_bytes(unsafe { *self.input.as_ptr().cast() }).get();
@@ -182,16 +214,20 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Parses an empty compound (TAG_Compound with only TAG_End).
     fn parse_unit(&mut self) -> Result<()> {
         self.consume_end_tag()
     }
 
+    // Advances the input position by n bytes after bounds checking.
     fn skip_bytes(&mut self, n: usize) -> Result<()> {
         check_bounds!(n, self.input);
         self.input = &self.input[n..];
         Ok(())
     }
 
+    // Deserializes a wrapped list (TAG_List containing TAG_Compound wrappers).
+    // Each element is wrapped in Compound { "" : <value> } for heterogeneity.
     fn deserialize_wrapped_list<V>(&mut self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -211,6 +247,8 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         })
     }
 
+    // Deserializes a wrapped item: Compound { "" : <value> }.
+    // Used for Option, tuple elements, and other wrapped values.
     fn deserialize_wrapped_item<T>(&mut self, seed: T) -> Result<T::Value>
     where
         T: de::DeserializeSeed<'de>,
@@ -242,6 +280,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(value)
     }
 
+    // Consumes a TAG_End byte, verifying that the input is not empty and the byte is correct.
     fn consume_end_tag(&mut self) -> Result<()> {
         check_bounds!(1, self.input);
         if self.input[0] != TagID::End as u8 {
@@ -252,6 +291,7 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok(())
     }
 
+    // Parses a TAG_List header, returning the element tag ID and list length.
     fn parse_list_header(&mut self) -> Result<(TagID, u32)> {
         check_bounds!(1 + 4, self.input);
         let tag_id = TagID::from_u8(self.input[0])?;
@@ -261,6 +301,8 @@ impl<'de, O: ByteOrder> Deserializer<'de, O> {
         Ok((tag_id, length))
     }
 
+    // Deserializes a native NBT array (ByteArray, IntArray, LongArray).
+    // All elements have the same tag type.
     fn deserialize_array<V>(&mut self, element_tag_id: TagID, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -589,7 +631,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         }
     }
 
-    /// List [ Compound { "" : <value> }, ... ]
+    // List [ Compound { "" : <value> }, ... ]
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -599,7 +641,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         })
     }
 
-    /// List [ Compound { "" : <value> }, ... ]
+    // List [ Compound { "" : <value> }, ... ]
     fn deserialize_tuple_struct<V>(
         self,
         _name: &'static str,
@@ -614,7 +656,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         })
     }
 
-    /// Compound
+    // Compound
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
     where
         V: de::Visitor<'de>,
@@ -624,7 +666,7 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         })
     }
 
-    /// Compound
+    // Compound
     fn deserialize_struct<V>(
         self,
         _name: &'static str,
@@ -637,10 +679,10 @@ impl<'de, O: ByteOrder> de::Deserializer<'de> for &mut Deserializer<'de, O> {
         self.deserialize_map(visitor)
     }
 
-    /// Int => unit_variant
-    /// Compound { "<variant>" : <value> } => newtype_variant
-    /// Compound { "<variant>" : Compound } => struct_variant
-    /// Compound { "<variant>" : List [ Compound { "" : <value> }, ... ] } => tuple_variant
+    // Int => unit_variant
+    // Compound { "<variant>" : <value> } => newtype_variant
+    // Compound { "<variant>" : Compound } => struct_variant
+    // Compound { "<variant>" : List [ Compound { "" : <value> }, ... ] } => tuple_variant
     fn deserialize_enum<V>(
         self,
         _name: &'static str,
@@ -744,6 +786,9 @@ macro_rules! impl_key_parse {
     }
 }
 
+// Deserializes NBT compound keys back to Rust types.
+// Handles the reverse of KeySerializer's string encoding.
+// See tag_probe.rs for the complete type-to-string mapping.
 struct KeyDeserializer<'a> {
     name: &'a str,
 }
@@ -947,6 +992,8 @@ impl<'a, 'de: 'a> de::Deserializer<'de> for KeyDeserializer<'a> {
     );
 }
 
+// SeqAccess for heterogeneous wrapped lists.
+// Each element is a Compound { "" : <value> }.
 struct WrappedListAccess<'a, 'de: 'a, O: ByteOrder> {
     remaining: u32,
     deserializer: &'a mut Deserializer<'de, O>,
@@ -973,6 +1020,8 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for WrappedListAccess<'a, 'de, O> {
     }
 }
 
+// SeqAccess for homogeneous NBT arrays or lists.
+// All elements have the same tag type.
 struct ArrayAccess<'a, 'de: 'a, O: ByteOrder> {
     element_tag_id: TagID,
     remaining: u32,
@@ -1001,6 +1050,8 @@ impl<'a, 'de, O: ByteOrder> SeqAccess<'de> for ArrayAccess<'a, 'de, O> {
     }
 }
 
+// MapAccess for NBT compounds.
+// Parses string keys and delegates value deserialization.
 struct CompoundAccess<'a, 'de: 'a, O: ByteOrder> {
     deserializer: &'a mut Deserializer<'de, O>,
 }
@@ -1040,6 +1091,8 @@ impl<'a, 'de, O: ByteOrder> MapAccess<'de> for CompoundAccess<'a, 'de, O> {
     }
 }
 
+// VariantAccess for enum deserialization.
+// Handles newtype, tuple, and struct variants.
 struct EnumVariantAccess<'a, 'de: 'a, O: ByteOrder> {
     deserializer: &'a mut Deserializer<'de, O>,
 }
