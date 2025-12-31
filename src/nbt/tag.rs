@@ -4,7 +4,7 @@ use zerocopy::byteorder;
 
 use crate::{
     ByteOrder, ConfigMut, ConfigRef, MutString, MutVec, NBT, NBTBase, OwnCompound, OwnList,
-    OwnString, OwnTypedList, OwnVec, PrimitiveNBTBase, TagID,
+    OwnString, OwnTypedList, OwnVec, TagID,
 };
 
 macro_rules! define_primary_tag {
@@ -275,13 +275,3 @@ impl<T: NBT> NBTBase for TypedList<T> {
         typed_list(a)
     }
 }
-
-macro_rules! primitive_tag {
-    ($($name:ident),* $(,)?) => {
-        $(
-            impl PrimitiveNBTBase for $name {}
-        )*
-    };
-}
-
-primitive_tag!(End, Byte, Short, Int, Long, Float, Double);

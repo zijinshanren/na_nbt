@@ -160,8 +160,6 @@ pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'stati
     ) -> R;
 }
 
-pub trait PrimitiveNBTBase: NBTBase {}
-
 macro_rules! define_trait {
     ($name:ident: $first:path $(, $rest:path)*) => {
         pub trait $name: $first $(+ $rest)* {}
@@ -170,11 +168,6 @@ macro_rules! define_trait {
     };
 }
 
-// todo: NBTBase -> GenericNBTBase
-// todo: add NBTBase
-
 define_trait!(GenericNBT: NBTBase, NBTInto);
 
 define_trait!(NBT: GenericNBT, NBTRef);
-
-define_trait!(PrimitiveNBT: NBTBase, PrimitiveNBTBase);
