@@ -3,8 +3,11 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MUTF8Str, MutValue, MutableConfig, NBT,
-    OwnList, OwnString, OwnValue, OwnVec, RefValue, TagID, cold_path, mutable_tag_size,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MUTF8Str, NBT, OwnList, OwnString,
+    OwnValue, OwnVec, TagID, cold_path,
+    mutable::{
+        config::MutableConfig, size::mutable_tag_size, value_mut::MutValue, value_ref::RefValue,
+    },
 };
 
 #[repr(transparent)]

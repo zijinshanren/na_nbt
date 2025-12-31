@@ -3,8 +3,8 @@ use std::{hint::assert_unchecked, marker::PhantomData, mem::ManuallyDrop, ptr, s
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Error, OwnCompound, OwnList, OwnString, OwnValue, OwnVec, Result, SIZE_DYN, TagID,
-    cold_path, mutable_tag_size,
+    ByteOrder, Error, OwnCompound, OwnList, OwnString, OwnValue, OwnVec, Result, TagID, cold_path,
+    mutable::size::{SIZE_DYN, mutable_tag_size},
 };
 
 struct ListBuildGuard<O: ByteOrder> {

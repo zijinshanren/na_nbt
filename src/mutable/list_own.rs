@@ -3,9 +3,11 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, mem::ManuallyDrop, p
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MutValue, MutableConfig, NBT, NBTBase,
-    OwnCompound, OwnString, OwnTypedList, OwnValue, OwnVec, RefValue, TagID, cold_path,
-    mutable_tag_size,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, NBT, NBTBase, OwnCompound, OwnString,
+    OwnTypedList, OwnValue, OwnVec, TagID, cold_path,
+    mutable::{
+        config::MutableConfig, size::mutable_tag_size, value_mut::MutValue, value_ref::RefValue,
+    },
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String,

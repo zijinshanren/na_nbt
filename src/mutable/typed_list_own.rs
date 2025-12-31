@@ -3,8 +3,9 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, IntoNBT, MutableConfig, NBT, OwnCompound, OwnList, OwnString,
-    OwnVec, TagID, cold_path, mutable_tag_size,
+    ByteOrder, ConfigMut, ConfigRef, IntoNBT, NBT, OwnCompound, OwnList, OwnString, OwnVec, TagID,
+    cold_path,
+    mutable::{config::MutableConfig, size::mutable_tag_size},
 };
 
 #[repr(transparent)]

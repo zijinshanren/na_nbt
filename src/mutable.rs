@@ -19,27 +19,17 @@ mod write;
 
 use std::{any::TypeId, io::Read};
 
-pub use compound_mut::*;
-pub use compound_own::*;
-pub use compound_ref::*;
-pub use config::*;
-pub use into_nbt::*;
-pub use list_mut::*;
-pub use list_own::*;
-pub use list_ref::*;
-pub use read::*;
-pub use size::*;
-pub use string_ref::*;
-pub use typed_list_mut::*;
-pub use typed_list_own::*;
-pub use typed_list_ref::*;
-pub use value_mut::*;
-pub use value_own::*;
-pub use value_ref::*;
-pub use write::*;
+pub use compound_own::OwnCompound;
+pub use into_nbt::IntoNBT;
+pub use list_own::OwnList;
+pub use typed_list_own::OwnTypedList;
+pub use value_own::OwnValue;
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, Error, Result, cold_path};
+use crate::{
+    ByteOrder, Error, Result, cold_path,
+    mutable::read::{read_unsafe, read_unsafe_fallback},
+};
 
 pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<OwnValue<STORE>> {
     unsafe {

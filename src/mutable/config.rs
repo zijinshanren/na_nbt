@@ -3,10 +3,20 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, ListMut, ListRef, MUTF8Str, MutCompound,
-    MutCompoundIter, MutList, MutListIter, MutTypedList, MutTypedListIter, MutValue, MutVec, NBT,
-    NBTBase, OwnList, OwnValue, RefCompound, RefCompoundIter, RefList, RefListIter, RefString,
-    RefTypedList, RefTypedListIter, RefValue, SIZE_USIZE, TagID, cold_path, mutable_tag_size,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, ListMut, ListRef, MUTF8Str, MutVec, NBT, NBTBase,
+    OwnList, OwnValue, TagID, cold_path,
+    mutable::{
+        compound_mut::{MutCompound, MutCompoundIter},
+        compound_ref::{RefCompound, RefCompoundIter},
+        list_mut::{MutList, MutListIter},
+        list_ref::{RefList, RefListIter},
+        size::{SIZE_USIZE, mutable_tag_size},
+        string_ref::RefString,
+        typed_list_mut::{MutTypedList, MutTypedListIter},
+        typed_list_ref::{RefTypedList, RefTypedListIter},
+        value_mut::MutValue,
+        value_ref::RefValue,
+    },
     tag::List,
 };
 

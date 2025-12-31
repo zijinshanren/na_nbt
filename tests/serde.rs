@@ -487,7 +487,7 @@ fn test_enum_newtype_variants() {
         value: EnumNewtype::Int(42),
     });
     round_trip_both(&Wrapper {
-        value: EnumNewtype::Float(3.14),
+        value: EnumNewtype::Float(std::f32::consts::PI),
     });
 }
 
@@ -656,8 +656,8 @@ fn test_all_primitives_struct() {
         short_val: 32767,
         int_val: 2147483647,
         long_val: 9223372036854775807,
-        float_val: 3.14159,
-        double_val: 2.718281828459045,
+        float_val: std::f32::consts::PI,
+        double_val: std::f64::consts::E,
         string_val: "test string".to_string(),
         char_val: 'X',
         bool_val: true,
@@ -1176,7 +1176,10 @@ fn test_enum_as_map_key_standalone() {
     let result = std::panic::catch_unwind(|| {
         round_trip_both(&map);
     });
-    assert!(result.is_err(), "Expected deserialization to fail for enum keys");
+    assert!(
+        result.is_err(),
+        "Expected deserialization to fail for enum keys"
+    );
 }
 
 #[test]
@@ -1312,8 +1315,8 @@ fn test_byte_order_consistency_across_types() {
         short: 32767,
         int: 2147483647,
         long: 9223372036854775807,
-        float: 3.14159,
-        double: 2.718281828,
+        float: std::f32::consts::PI,
+        double: std::f64::consts::E,
     };
 
     let be_bytes = to_vec_be(&value).unwrap();
@@ -1627,8 +1630,8 @@ fn test_hashmap_with_mixed_numeric_keys_and_values() {
     bool_map.insert(false, 0);
 
     let mut str_map = HashMap::new();
-    str_map.insert("pi".to_string(), 3.14159);
-    str_map.insert("e".to_string(), 2.71828);
+    str_map.insert("pi".to_string(), std::f64::consts::PI);
+    str_map.insert("e".to_string(), std::f64::consts::E);
 
     let value = Complex {
         int_map,
@@ -1682,5 +1685,8 @@ fn test_unit_enum_serialization_as_key_string() {
         map.insert(Key::Beta, 2);
         round_trip_both(&map);
     });
-    assert!(result.is_err(), "Unit enum keys should fail - they serialize as Int not String");
+    assert!(
+        result.is_err(),
+        "Unit enum keys should fail - they serialize as Int not String"
+    );
 }

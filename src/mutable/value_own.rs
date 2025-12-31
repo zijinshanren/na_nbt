@@ -3,8 +3,13 @@ use std::{marker::PhantomData, mem::ManuallyDrop, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, GenericNBT, Index, MutCompound, MutList, MutValue, MutableConfig, NBT, OwnCompound,
-    OwnList, OwnString, OwnTypedList, OwnVec, RefCompound, RefList, RefString, RefValue, TagID,
+    ByteOrder, GenericNBT, Index, NBT, OwnCompound, OwnList, OwnString, OwnTypedList, OwnVec,
+    TagID,
+    mutable::{
+        compound_mut::MutCompound, compound_ref::RefCompound, config::MutableConfig,
+        list_mut::MutList, list_ref::RefList, string_ref::RefString, value_mut::MutValue,
+        value_ref::RefValue,
+    },
 };
 
 pub enum OwnValue<O: ByteOrder> {

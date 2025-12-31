@@ -3,8 +3,11 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, MapRef, MutableConfig, NBT, RefCompound, RefList, RefString, RefTypedList, TagID,
-    ValueBase, ValueRef, VisitRef,
+    ByteOrder, MapRef, NBT, TagID, ValueBase, ValueRef, VisitRef,
+    mutable::{
+        compound_ref::RefCompound, config::MutableConfig, list_ref::RefList, string_ref::RefString,
+        typed_list_ref::RefTypedList,
+    },
 };
 
 #[derive(Clone)]

@@ -3,9 +3,20 @@ use std::{any::TypeId, hint::unreachable_unchecked, io::Write, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Error, MutCompound, MutList, MutString, MutTypedList, MutValue, NBT, OwnCompound,
-    OwnList, OwnString, OwnTypedList, OwnValue, RefCompound, RefList, RefString, RefTypedList,
-    RefValue, Result, SIZE_DYN, SIZE_USIZE, TagID, Writable, cold_path, mutable_tag_size,
+    ByteOrder, Error, MutString, NBT, OwnCompound, OwnList, OwnString, OwnTypedList, OwnValue,
+    Result, TagID, Writable, cold_path,
+    mutable::{
+        compound_mut::MutCompound,
+        compound_ref::RefCompound,
+        list_mut::MutList,
+        list_ref::RefList,
+        size::{SIZE_DYN, SIZE_USIZE, mutable_tag_size},
+        string_ref::RefString,
+        typed_list_mut::MutTypedList,
+        typed_list_ref::RefTypedList,
+        value_mut::MutValue,
+        value_ref::RefValue,
+    },
 };
 
 macro_rules! change_endian {

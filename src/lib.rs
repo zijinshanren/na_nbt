@@ -5,19 +5,21 @@ pub use zerocopy::NativeEndian;
 pub mod error;
 mod immutable;
 pub mod index;
-pub mod mutable;
+mod mutable;
 pub mod nbt;
 #[cfg(feature = "serde")]
 mod ser_de;
-pub mod util;
+mod util;
 pub mod value;
 pub mod view;
-pub mod write;
+mod write;
 
 pub use error::*;
 pub use immutable::{read_borrowed, read_shared};
 pub use index::*;
-pub use mutable::*;
+pub use mutable::{
+    IntoNBT, OwnCompound, OwnList, OwnTypedList, OwnValue, read_owned, read_owned_from_reader,
+};
 pub use nbt::*;
 #[cfg(feature = "serde")]
 pub use ser_de::*;

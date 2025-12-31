@@ -3,9 +3,13 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, MapMut, MutCompound, MutList, MutString, MutTypedList, MutVec, MutableConfig, NBT,
-    RefCompound, RefList, RefString, RefValue, TagID, ValueBase, ValueMut, VisitMut,
+    ByteOrder, MapMut, MutString, MutVec, NBT, TagID, ValueBase, ValueMut, VisitMut,
     VisitMutShared,
+    mutable::{
+        compound_mut::MutCompound, compound_ref::RefCompound, config::MutableConfig,
+        list_mut::MutList, list_ref::RefList, string_ref::RefString, typed_list_mut::MutTypedList,
+        value_ref::RefValue,
+    },
 };
 
 pub enum MutValue<'s, O: ByteOrder> {
