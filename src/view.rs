@@ -25,13 +25,13 @@ pub struct MutVec<'a, T> {
     _marker: PhantomData<T>,
 }
 
-// SAFETY: VecView is Send/Sync if T is Send/Sync.
+// SAFETY: MutVec is Send/Sync if T is Send/Sync.
 // The raw pointer is only used for the Vec's buffer, which is guarded by the mutable references.
 unsafe impl<T: Send> Send for MutVec<'_, T> {}
 unsafe impl<T: Sync> Sync for MutVec<'_, T> {}
 
 impl<'a, T> MutVec<'a, T> {
-    /// Creates a new `VecView` from mutable references to a Vec's raw parts.
+    /// Creates a new `MutVec` from mutable references to a Vec's raw parts.
     ///
     /// # Safety
     ///
@@ -357,7 +357,7 @@ impl<'a, T> MutVec<'a, T> {
         self.with_vec(|v| v.append(other));
     }
 
-    /// Moves all elements from another `VecView` into `self`, leaving `other` empty.
+    /// Moves all elements from another `MutVec` into `self`, leaving `other` empty.
     #[inline]
     pub fn append_view(&mut self, other: &mut MutVec<'_, T>) {
         // Reconstruct other as a vec temporarily
@@ -585,7 +585,7 @@ impl Write for MutVec<'_, u8> {
 
 /// A view into a String's raw parts, allowing mutable access without owning the String.
 ///
-/// This is similar to `VecView<u8>` but maintains String's UTF-8 invariants.
+/// This is similar to `MutVec<u8>` but maintains String's UTF-8 invariants.
 #[repr(C)]
 pub struct MutString<'a> {
     pub(crate) ptr: &'a mut Unalign<usize>,
@@ -593,13 +593,13 @@ pub struct MutString<'a> {
     pub(crate) cap: &'a mut Unalign<usize>,
 }
 
-// SAFETY: StringView is Send/Sync because the underlying data is UTF-8 bytes.
+// SAFETY: MutString is Send/Sync because the underlying data is UTF-8 bytes.
 // The raw pointer is only used for the String's buffer, which is guarded by the mutable references.
 unsafe impl Send for MutString<'_> {}
 unsafe impl Sync for MutString<'_> {}
 
 impl<'a> MutString<'a> {
-    /// Creates a new `StringView` from mutable references to a String's raw parts.
+    /// Creates a new `MutString` from mutable references to a String's raw parts.
     ///
     /// # Safety
     ///
@@ -878,7 +878,7 @@ impl<'a> MutString<'a> {
     }
 }
 
-// ============ Trait Implementations for StringViewMut ============
+// ============ Trait Implementations for MutStringMut ============
 
 impl fmt::Debug for MutString<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -982,7 +982,7 @@ pub struct OwnVec<T> {
     _marker: PhantomData<T>,
 }
 
-// SAFETY: VecView is Send/Sync if T is Send/Sync.
+// SAFETY: OwnVec is Send/Sync if T is Send/Sync.
 // The raw pointer is only used for the Vec's buffer, which is guarded by the mutable references.
 unsafe impl<T: Send> Send for OwnVec<T> {}
 unsafe impl<T: Sync> Sync for OwnVec<T> {}
@@ -994,7 +994,7 @@ impl<T> Default for OwnVec<T> {
 }
 
 impl<T> OwnVec<T> {
-    /// Creates a new `VecView` from mutable references to a Vec's raw parts.
+    /// Creates a new `OwnVec` from raw parts.
     ///
     /// # Safety
     ///
@@ -1311,7 +1311,7 @@ impl<T> OwnVec<T> {
         self.with_vec(|v| v.append(other));
     }
 
-    /// Moves all elements from another `VecView` into `self`, leaving `other` empty.
+    /// Moves all elements from another `MutVec` into `self`, leaving `other` empty.
     #[inline]
     pub fn append_view(&mut self, other: &mut OwnVec<T>) {
         // Reconstruct other as a vec temporarily
@@ -1558,7 +1558,7 @@ impl<T> Drop for OwnVec<T> {
 
 /// A view into a String's raw parts, allowing mutable access without owning the String.
 ///
-/// This is similar to `VecView<u8>` but maintains String's MUTF-8 encoded invariants.
+/// This is similar to `MutVec<u8>` but maintains String's MUTF-8 encoded invariants.
 #[repr(C)]
 pub struct OwnString {
     pub(crate) ptr: Unalign<usize>,
@@ -1566,7 +1566,7 @@ pub struct OwnString {
     pub(crate) cap: Unalign<usize>,
 }
 
-// SAFETY: StringView is Send/Sync because the underlying data is UTF-8 bytes.
+// SAFETY: MutString is Send/Sync because the underlying data is UTF-8 bytes.
 // The raw pointer is only used for the String's buffer, which is guarded by the mutable references.
 unsafe impl Send for OwnString {}
 unsafe impl Sync for OwnString {}
@@ -1578,7 +1578,7 @@ impl Default for OwnString {
 }
 
 impl OwnString {
-    /// Creates a new `StringView` from mutable references to a String's raw parts.
+    /// Creates a new `MutString` from mutable references to a String's raw parts.
     ///
     /// # Safety
     ///
@@ -1857,7 +1857,7 @@ impl OwnString {
     }
 }
 
-// ============ Trait Implementations for StringViewOwn ============
+// ============ Trait Implementations for MutStringOwn ============
 
 impl fmt::Debug for OwnString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
