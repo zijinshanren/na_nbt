@@ -105,7 +105,7 @@ macro_rules! check_bounds {
 
 impl<'de, O: ByteOrder> Deserializer<'de, O> {
     /// Creates a new deserializer from a byte slice.
-    /// 
+    ///
     /// Parses the root tag header (tag ID + name) and advances past it.
     /// The remaining input starts at the first byte of the root value's payload.
     pub fn from_slice(input: &'de [u8]) -> Result<Self> {
