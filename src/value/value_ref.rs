@@ -1,3 +1,18 @@
+//! Read-only value traits for NBT values.
+//!
+//! This module defines traits for accessing NBT values without mutation.
+//! These traits provide methods for:
+//! - Type-safe access to typed values
+//! - Indexing into compounds and lists
+//! - Pattern matching through visitor patterns
+//!
+//! # Key Traits
+//!
+//! - [`ValueRef`] - Read-only access to any NBT value
+//! - [`ListRef`] - Read-only access to NBT lists
+//! - [`TypedListRef`] - Read-only access to typed NBT lists
+//! - [`CompoundRef`] - Read-only access to NBT compounds
+
 use crate::{
     CompoundBase, ConfigRef, GenericNBT, ListBase, MUTF8Str, MapRef, NBT, NBTBase, TagID,
     TypedListBase, ValueBase, VisitRef, cold_path,
@@ -8,6 +23,15 @@ use crate::{
     },
 };
 
+/// Trait for read-only access to NBT values.
+///
+/// This trait provides methods for accessing and inspecting NBT values
+/// without mutation. It's implemented by all value types returned by
+/// zero-copy reading operations.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
 pub trait ValueRef<'s>:
     ValueBase
     + Clone
@@ -79,6 +103,14 @@ pub trait ValueRef<'s>:
     fn map<R>(self, match_fn: impl FnOnce(MapRef<'s, Self::Config>) -> R) -> R;
 }
 
+/// Trait for read-only access to NBT lists.
+///
+/// This trait provides methods for accessing NBT lists,
+/// Also see [`TypedListRef`].
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
 pub trait ListRef<'s>:
     ListBase
     + IntoIterator<
@@ -222,6 +254,16 @@ pub trait ListRef<'s>:
     fn iter(&self) -> <Self::Config as ConfigRef>::ListIter<'s>;
 }
 
+/// Trait for read-only access to typed NBT lists.
+///
+/// This trait provides methods for accessing NBT lists,
+/// where all elements have the same type `T`. This provides type-safe
+/// access to list elements.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
+/// * `T` - The NBT tag type of all elements
 pub trait TypedListRef<'s, T: NBT>:
     TypedListBase<T>
     + IntoIterator<
@@ -251,6 +293,15 @@ pub trait TypedListRef<'s, T: NBT>:
     fn iter(&self) -> <Self::Config as ConfigRef>::TypedListIter<'s, T>;
 }
 
+/// Trait for read-only access to NBT compounds.
+///
+/// This trait provides methods for accessing NBT compound values,
+/// which are key-value maps where keys are MUTF-8 strings and values
+/// are any NBT type.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
 pub trait CompoundRef<'s>:
     CompoundBase
     + IntoIterator<

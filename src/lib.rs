@@ -9,7 +9,7 @@
 //! 1. **Borrowed**: [`read_borrowed`] - Zero-copy reading from a borrowed slice.
 //! ```rust
 //! use na_nbt::{BE, ValueRef, read_borrowed, tag};
-//! let data = include_bytes!("fuzz/in/level");
+//! let data = include_bytes!("../fuzz/in/level");
 //! let doc = read_borrowed::<BE>(data).unwrap();
 //! let nbt = doc.root();
 //! let o = nbt
@@ -31,8 +31,8 @@
 //! 2. **Shared**: [`read_shared`] - Zero-copy reading from a [`bytes::Bytes`] with shared ownership.
 //! ```rust
 //! use na_nbt::{BE, ValueRef, read_shared, tag};
-//! let data = include_bytes!("fuzz/in/level");
-//! let nbt = read_shared::<BE>(Bytes::copy_from_slice(data)).unwrap();
+//! let data = include_bytes!("../fuzz/in/level");
+//! let nbt = read_shared::<BE>(bytes::Bytes::copy_from_slice(data)).unwrap();
 //! let player = nbt
 //!     .get("Data")
 //!     .and_then(|d| d.get_::<tag::Compound>("Player"))
@@ -43,15 +43,15 @@
 //! 3. **Owned**: [`read_owned`] - Parses NBT into fully owned structures that can be modified.
 //! ```rust
 //! use na_nbt::{BE, ValueMut, Writable, read_owned, tag};
-//! let data = include_bytes!("fuzz/in/level");
+//! let data = include_bytes!("../fuzz/in/level");
 //! let mut nbt = read_owned::<BE, BE>(data).unwrap();
-//! let mut data = nbt.get_mut("Data")?;
-//! let mut player = data.get_mut("Player")?;
-//! player.get_mut("Health")?.into_::<tag::Short>()?.set(10);
-//! player.get_mut_::<tag::Short>("Health")?.set(10);
-//! *player.get_mut_::<tag::Byte>("Sleeping")? = 1;
-//! let file = File::create("new.nbt")?;
-//! nbt.write_to_writer::<BE>(file)?;
+//! let mut data = nbt.get_mut("Data").unwrap();
+//! let mut player = data.get_mut("Player").unwrap();
+//! player.get_mut("Health").unwrap().into_::<tag::Short>().unwrap().set(10);
+//! player.get_mut_::<tag::Short>("Health").unwrap().set(10);
+//! *player.get_mut_::<tag::Byte>("Sleeping").unwrap() = 1;
+//! let file = std::fs::File::create("new.nbt").unwrap();
+//! nbt.write_to_writer::<BE>(file).unwrap();
 //! ```
 //!
 //! # Generic functions and constructing NBT values
@@ -80,6 +80,8 @@
 //! ```
 //!
 //! ```rust
+//! use na_nbt::{ValueRef, VisitRef, ListBase, ValueBase};
+//!
 //! fn dump<'s>(value: &impl ValueRef<'s>, indent: usize) -> String {
 //!     let pad = "  ".repeat(indent);
 //!     value.visit(|v| match v {
@@ -125,6 +127,8 @@
 //!
 //! na_nbt provides serde support. For serde-to-NBT type mapping, see [`tag_probe`].
 //! ```rust
+//! use serde::{Deserialize, Serialize};
+//!
 //! #[derive(Serialize, Deserialize, Debug, PartialEq)]
 //! struct Address {
 //!     street: String,
@@ -177,7 +181,7 @@ use util::*;
 use value::*;
 pub use value::{
     CompoundBase, CompoundMut, CompoundRef, ListBase, ListMut, ListRef, MapMut, MapRef,
-    TypedListBase, TypedListMut, TypedListRef, ValueMut, ValueRef, VisitMut, VisitMutShared,
-    VisitRef, Writable,
+    TypedListBase, TypedListMut, TypedListRef, ValueBase, ValueMut, ValueRef, VisitMut,
+    VisitMutShared, VisitRef, Writable,
 };
 use view::*;

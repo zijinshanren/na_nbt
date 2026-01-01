@@ -1,6 +1,21 @@
+//! Mutable value traits for NBT values.
+//!
+//! This module defines traits for accessing and modifying NBT values.
+//! These traits provide methods for:
+//! - Reading values through shared or unique mutable references
+//! - Modifying list and compound contents
+//! - Pattern matching through visitor patterns
+//!
+//! # Key Traits
+//!
+//! - [`ValueMut`] - Mutable access to any NBT value
+//! - [`ListMut`] - Mutable access to NBT lists
+//! - [`TypedListMut`] - Mutable access to typed NBT lists
+//! - [`CompoundMut`] - Mutable access to NBT compounds
+
 use crate::{
     CompoundBase, ConfigMut, ConfigRef, GenericNBT, IntoNBT, ListBase, MUTF8Str, MapMut, NBT,
-    NBTBase, ValueOwn, TagID, TypedListBase, ValueBase, VisitMut, VisitMutShared, cold_path,
+    NBTBase, TagID, TypedListBase, ValueBase, ValueOwn, VisitMut, VisitMutShared, cold_path,
     index::Index,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
@@ -8,6 +23,15 @@ use crate::{
     },
 };
 
+/// Trait for mutable access to NBT values.
+///
+/// This trait provides methods for accessing and modifying NBT values.
+/// It combines read-only access through shared references with full
+/// mutation capabilities through unique mutable references.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
 pub trait ValueMut<'s>:
     ValueBase
     + From<<End as NBTBase>::TypeMut<'s, Self::Config>>
@@ -130,6 +154,15 @@ pub trait ValueMut<'s>:
     fn to_ref<'a>(&'a self) -> <Self::Config as ConfigRef>::Value<'a>;
 }
 
+/// Trait for mutable access to NBT lists.
+///
+/// This trait provides methods for accessing and modifying NBT lists.
+///
+/// Also see [`TypedListMut`].
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
 pub trait ListMut<'s>:
     ListBase
     + IntoIterator<
@@ -607,6 +640,16 @@ pub trait ListMut<'s>:
         's: 'a;
 }
 
+/// Trait for mutable access to typed NBT lists.
+///
+/// This trait provides methods for accessing and modifying NBT lists,
+/// where all elements have the same type `T`. This provides type-safe
+/// mutation of list elements.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
+/// * `T` - The NBT tag type of all elements
 pub trait TypedListMut<'s, T: NBT>:
     TypedListBase<T>
     + IntoIterator<
@@ -702,6 +745,15 @@ pub trait TypedListMut<'s, T: NBT>:
         's: 'a;
 }
 
+/// Trait for mutable access to NBT compounds.
+///
+/// This trait provides methods for accessing and modifying NBT compound values,
+/// which are key-value maps where keys are MUTF-8 strings and values
+/// are any NBT type.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
 pub trait CompoundMut<'s>:
     CompoundBase
     + IntoIterator<

@@ -1,3 +1,14 @@
+//! Base traits for NBT values.
+//!
+//! This module defines foundational traits that are used throughout
+//! the value system:
+//!
+//! - [`Writable`] - Trait for serializing NBT values to bytes
+//! - [`ValueBase`] - Base trait for all NBT values
+//! - [`ListBase`] - Base trait for NBT lists
+//! - [`TypedListBase`] - Base trait for typed NBT lists
+//! - [`CompoundBase`] - Base trait for NBT compounds
+
 use std::io::Write;
 
 use crate::{
@@ -9,12 +20,20 @@ use crate::{
     },
 };
 
+/// Trait for writing NBT values to bytes.
+///
+/// This trait provides methods for serializing NBT values to different
+/// output targets with configurable endianness.
 pub trait Writable {
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8>;
 
     fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()>;
 }
 
+/// Base trait for all NBT values.
+///
+/// This trait provides the minimal interface shared by all NBT value types,
+/// including methods for getting the tag ID and type checking.
 pub trait ValueBase: Writable + Send + Sync + Sized {
     fn tag_id(&self) -> TagID;
 
@@ -24,6 +43,10 @@ pub trait ValueBase: Writable + Send + Sync + Sized {
     }
 }
 
+/// Base trait for NBT lists.
+///
+/// This trait provides the minimal interface shared by all NBT list types,
+/// including methods for getting the element tag ID, list length, and checking emptiness.
 pub trait ListBase: Writable + Send + Sync + Sized {
     fn element_tag_id(&self) -> TagID;
 
@@ -41,6 +64,15 @@ pub trait ListBase: Writable + Send + Sync + Sized {
     }
 }
 
+/// Base trait for typed NBT lists.
+///
+/// This trait provides the minimal interface for homogeneous NBT lists
+/// where all elements have the same type `T`. The element tag ID is
+/// available as a constant for compile-time type checking.
+///
+/// # Type Parameters
+///
+/// * `T` - The NBT tag type of all elements
 pub trait TypedListBase<T: NBT>: Writable + Send + Sync + Sized {
     const ELEMENT_TAG_ID: TagID = T::TAG_ID;
 
@@ -52,6 +84,11 @@ pub trait TypedListBase<T: NBT>: Writable + Send + Sync + Sized {
     }
 }
 
+/// Base trait for NBT compounds.
+///
+/// This trait provides the minimal interface for NBT compound values,
+/// which are key-value maps where keys are MUTF-8 strings and values
+/// are any NBT type.
 pub trait CompoundBase: Writable + Send + Sync + Sized {}
 
 pub trait NBTInto: NBTBase {

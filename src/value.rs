@@ -13,6 +13,33 @@ use zerocopy::byteorder;
 
 use crate::{StringMut, VecMut};
 
+/// A reference variant for visiting NBT values.
+///
+/// This enum is used by the [`ValueRef::visit`] method to provide read-only
+/// access to the underlying NBT value. Each variant contains a reference
+/// to the corresponding NBT type.
+///
+/// # Type Parameters
+///
+/// * `'a` - Lifetime of the reference
+/// * `'s` - Lifetime of the source data
+/// * `C` - Configuration trait
+///
+/// # Example
+///
+/// ```rust
+/// use na_nbt::{VisitRef, ValueRef};
+///
+/// fn dump_value<'s, V: ValueRef<'s>>(value: &V) -> String {
+///     value.visit(|v| match v {
+///         VisitRef::End(_) => "End".to_string(),
+///         VisitRef::Byte(b) => format!("Byte({b})"),
+///         VisitRef::Int(i) => format!("Int({i})"),
+///         // ... other variants
+///         _ => "Other".to_string(),
+///     })
+/// }
+/// ```
 pub enum VisitRef<'a, 's: 'a, C: ConfigRef> {
     End(&'a ()),
     Byte(&'a i8),
@@ -29,6 +56,29 @@ pub enum VisitRef<'a, 's: 'a, C: ConfigRef> {
     LongArray(&'a C::LongArray<'s>),
 }
 
+/// An owned variant for mapping NBT values.
+///
+/// This enum is used by the [`ValueRef::map`] method to consume and transform
+/// NBT values. Each variant contains the owned (or borrowed) corresponding NBT type.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
+/// * `C` - Configuration trait
+///
+/// # Example
+///
+/// ```rust
+/// use na_nbt::{MapRef, ValueRef};
+///
+/// fn extract_int<'s, V: ValueRef<'s>>(value: V) -> Option<i32> {
+///     value.map(|v| match v {
+///         MapRef::Int(i) => Some(i),
+///         _ => None,
+///     })
+///     // or: value.into_::<tag::Int>()
+/// }
+/// ```
 pub enum MapRef<'s, C: ConfigRef> {
     End(()),
     Byte(i8),
@@ -45,6 +95,16 @@ pub enum MapRef<'s, C: ConfigRef> {
     LongArray(C::LongArray<'s>),
 }
 
+/// A shared mutable reference variant for visiting NBT values.
+///
+/// This enum is used by the [`ValueMut::visit_shared`] method to provide
+/// shared (read-only) mutable access to NBT values.
+///
+/// # Type Parameters
+///
+/// * `'a` - Lifetime of the outer reference
+/// * `'s` - Lifetime of the source data
+/// * `C` - Configuration trait
 pub enum VisitMutShared<'a, 's: 'a, C: ConfigMut> {
     End(&'a &'s mut ()),
     Byte(&'a &'s mut i8),
@@ -61,6 +121,16 @@ pub enum VisitMutShared<'a, 's: 'a, C: ConfigMut> {
     LongArray(&'a VecMut<'s, byteorder::I64<C::ByteOrder>>),
 }
 
+/// A unique mutable reference variant for visiting NBT values.
+///
+/// This enum is used by the [`ValueMut::visit`] method to provide exclusive
+/// mutable access to NBT values. This allows modifying the visited value.
+///
+/// # Type Parameters
+///
+/// * `'a` - Lifetime of the outer reference
+/// * `'s` - Lifetime of the source data
+/// * `C` - Configuration trait
 pub enum VisitMut<'a, 's: 'a, C: ConfigMut> {
     End(&'a mut &'s mut ()),
     Byte(&'a mut &'s mut i8),
@@ -77,6 +147,15 @@ pub enum VisitMut<'a, 's: 'a, C: ConfigMut> {
     LongArray(&'a mut VecMut<'s, byteorder::I64<C::ByteOrder>>),
 }
 
+/// An owned variant for mapping mutable NBT values.
+///
+/// This enum is used by the [`ValueMut::map`] method to consume and transform
+/// mutable NBT values. Each variant contains the corresponding mutable NBT type.
+///
+/// # Type Parameters
+///
+/// * `'s` - Lifetime of the source data
+/// * `C` - Configuration trait
 pub enum MapMut<'s, C: ConfigMut> {
     End(&'s mut ()),
     Byte(&'s mut i8),
