@@ -27,3 +27,7 @@ lto = true
 [[bench]]
 harness = false
 name = "compare"
+
+[[bench]]
+harness = false
+name = "compare_hypixel"

@@ -1097,7 +1097,14 @@ impl<'a, O: ByteOrder> ser::SerializeMap for MapSerializer<'a, O> {
             );
         }
         let tag_id = tag_of(value);
-        unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos.unwrap()) = tag_id as u8 };
+        #[cfg(debug_assertions)]
+        {
+            unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos.unwrap()) = tag_id as u8 };
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            unsafe { *self.serializer.vec.get_unchecked_mut(self.tag_pos) = tag_id as u8 };
+        }
         value.serialize(&mut *self.serializer)?;
         #[cfg(debug_assertions)]
         {
