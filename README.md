@@ -3,7 +3,7 @@
 A high-performance NBT (Named Binary Tag) library for Rust with full mutation support and serde integration.
 see [documentation](https://docs.rs/na_nbt) for more details.
 
-> ⚠️ **Note:** This crate is under active development. Version 0.2.0 will come within days. APIs will change.
+> ⚠️ **Note:** This crate is under active development. APIs may change between versions.
 > Issues and contributions are welcome!
 
 ## Features
