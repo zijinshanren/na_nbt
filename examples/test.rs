@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use na_nbt::{
-    BigEndian, LittleEndian, Writable, read_borrowed, read_owned, read_owned_from_reader,
-    read_shared,
+    BigEndian, LittleEndian, TypedListRef, ValueMut, Writable, read_borrowed, read_owned,
+    read_owned_from_reader, read_shared,
 };
 use na_nbt::{from_slice_be, from_slice_le, to_vec_be, to_vec_le};
 use serde::{Deserialize, Serialize};
@@ -258,24 +258,24 @@ pub fn test_direct(data: &[u8]) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let data = include_bytes!(
-        r"D:\cmp\na_nbt\fuzz\hfuzz_workspace\hongg\input\001aa16f5e6b102f778a7dfbf96ba661.00001000.honggfuzz.cov"
-    );
-    test_serde(data);
-    test_direct(data);
+    // let data = include_bytes!(
+    //     r"D:\cmp\na_nbt\fuzz\hfuzz_workspace\hongg\input\001aa16f5e6b102f778a7dfbf96ba661.00001000.honggfuzz.cov"
+    // );
+    // test_serde(data);
+    // test_direct(data);
+    
+    // let dir = r"D:\cmp\na_nbt\fuzz\hfuzz_workspace\hongg\input";
 
-    let dir = r"D:\cmp\na_nbt\fuzz\hfuzz_workspace\hongg\input";
-
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() {
-            println!("Testing: {}", path.display());
-            let data = fs::read(path)?;
-            test_serde(&data);
-            test_direct(&data);
-        }
-    }
+    // for entry in fs::read_dir(dir)? {
+    //     let entry = entry?;
+    //     let path = entry.path();
+    //     if path.is_file() {
+    //         println!("Testing: {}", path.display());
+    //         let data = fs::read(path)?;
+    //         test_serde(&data);
+    //         test_direct(&data);
+    //     }
+    // }
 
     // test_direct(data);
     // test_serde(data);

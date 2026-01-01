@@ -3,13 +3,13 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, MutVec, NBT, TypedListBase, TypedListMut, cold_path,
+    ByteOrder, ConfigMut, ConfigRef, VecMut, NBT, TypedListBase, TypedListMut, cold_path,
     mutable::{config::MutableConfig, size::mutable_tag_size, typed_list_ref::RefTypedListIter},
 };
 
 #[repr(transparent)]
 pub struct MutTypedList<'s, O: ByteOrder, T: NBT> {
-    pub(crate) data: MutVec<'s, u8>,
+    pub(crate) data: VecMut<'s, u8>,
     pub(crate) _marker: PhantomData<(O, T)>,
 }
 

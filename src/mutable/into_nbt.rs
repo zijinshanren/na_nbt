@@ -1,7 +1,9 @@
+use std::{marker::PhantomData, mem::ManuallyDrop, ptr};
+
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, NBT, NBTBase, OwnCompound, OwnList, OwnString, OwnVec,
+    ByteOrder, CompoundOwn, ListOwn, NBT, NBTBase, StringOwn, TypedListOwn, VecOwn,
     tag::{
         Byte, ByteArray, Compound, Double, Float, Int, IntArray, List, Long, LongArray, Short,
         String,
@@ -131,7 +133,16 @@ impl<O: ByteOrder> IntoNBT<O> for &[i8] {
     }
 }
 
-impl<O: ByteOrder> IntoNBT<O> for OwnVec<i8> {
+impl<O: ByteOrder, const N: usize> IntoNBT<O> for [i8; N] {
+    type Tag = ByteArray;
+
+    #[inline]
+    fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
+        self.as_slice().into()
+    }
+}
+
+impl<O: ByteOrder> IntoNBT<O> for VecOwn<i8> {
     type Tag = ByteArray;
 
     #[inline]
@@ -158,7 +169,7 @@ impl<O: ByteOrder> IntoNBT<O> for &str {
     }
 }
 
-impl<O: ByteOrder> IntoNBT<O> for OwnString {
+impl<O: ByteOrder> IntoNBT<O> for StringOwn {
     type Tag = String;
 
     #[inline]
@@ -167,7 +178,7 @@ impl<O: ByteOrder> IntoNBT<O> for OwnString {
     }
 }
 
-impl<O: ByteOrder> IntoNBT<O> for OwnList<O> {
+impl<O: ByteOrder> IntoNBT<O> for ListOwn<O> {
     type Tag = List;
 
     #[inline]
@@ -176,7 +187,20 @@ impl<O: ByteOrder> IntoNBT<O> for OwnList<O> {
     }
 }
 
-impl<O: ByteOrder> IntoNBT<O> for OwnCompound<O> {
+impl<O: ByteOrder, T: NBT> IntoNBT<O> for TypedListOwn<O, T> {
+    type Tag = List;
+
+    #[inline]
+    fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
+        let me = ManuallyDrop::new(self);
+        ListOwn {
+            data: unsafe { ptr::read(&me.data) },
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<O: ByteOrder> IntoNBT<O> for CompoundOwn<O> {
     type Tag = Compound;
 
     #[inline]
@@ -203,7 +227,16 @@ impl<O: ByteOrder> IntoNBT<O> for &[byteorder::I32<O>] {
     }
 }
 
-impl<O: ByteOrder> IntoNBT<O> for OwnVec<byteorder::I32<O>> {
+impl<O: ByteOrder, const N: usize> IntoNBT<O> for [byteorder::I32<O>; N] {
+    type Tag = IntArray;
+
+    #[inline]
+    fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
+        self.as_slice().into()
+    }
+}
+
+impl<O: ByteOrder> IntoNBT<O> for VecOwn<byteorder::I32<O>> {
     type Tag = IntArray;
 
     #[inline]
@@ -230,7 +263,16 @@ impl<O: ByteOrder> IntoNBT<O> for &[byteorder::I64<O>] {
     }
 }
 
-impl<O: ByteOrder> IntoNBT<O> for OwnVec<byteorder::I64<O>> {
+impl<O: ByteOrder, const N: usize> IntoNBT<O> for [byteorder::I64<O>; N] {
+    type Tag = LongArray;
+
+    #[inline]
+    fn into_nbt(self) -> <Self::Tag as NBTBase>::Type<O> {
+        self.as_slice().into()
+    }
+}
+
+impl<O: ByteOrder> IntoNBT<O> for VecOwn<byteorder::I64<O>> {
     type Tag = LongArray;
 
     #[inline]

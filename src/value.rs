@@ -11,7 +11,7 @@ pub use value_mut::*;
 pub use value_ref::*;
 use zerocopy::byteorder;
 
-use crate::{MutString, MutVec};
+use crate::{StringMut, VecMut};
 
 pub enum VisitRef<'a, 's: 'a, C: ConfigRef> {
     End(&'a ()),
@@ -53,12 +53,12 @@ pub enum VisitMutShared<'a, 's: 'a, C: ConfigMut> {
     Long(&'a &'s mut byteorder::I64<C::ByteOrder>),
     Float(&'a &'s mut byteorder::F32<C::ByteOrder>),
     Double(&'a &'s mut byteorder::F64<C::ByteOrder>),
-    ByteArray(&'a MutVec<'s, i8>),
-    String(&'a MutString<'s>),
+    ByteArray(&'a VecMut<'s, i8>),
+    String(&'a StringMut<'s>),
     List(&'a C::ListMut<'s>),
     Compound(&'a C::CompoundMut<'s>),
-    IntArray(&'a MutVec<'s, byteorder::I32<C::ByteOrder>>),
-    LongArray(&'a MutVec<'s, byteorder::I64<C::ByteOrder>>),
+    IntArray(&'a VecMut<'s, byteorder::I32<C::ByteOrder>>),
+    LongArray(&'a VecMut<'s, byteorder::I64<C::ByteOrder>>),
 }
 
 pub enum VisitMut<'a, 's: 'a, C: ConfigMut> {
@@ -69,12 +69,12 @@ pub enum VisitMut<'a, 's: 'a, C: ConfigMut> {
     Long(&'a mut &'s mut byteorder::I64<C::ByteOrder>),
     Float(&'a mut &'s mut byteorder::F32<C::ByteOrder>),
     Double(&'a mut &'s mut byteorder::F64<C::ByteOrder>),
-    ByteArray(&'a mut MutVec<'s, i8>),
-    String(&'a mut MutString<'s>),
+    ByteArray(&'a mut VecMut<'s, i8>),
+    String(&'a mut StringMut<'s>),
     List(&'a mut C::ListMut<'s>),
     Compound(&'a mut C::CompoundMut<'s>),
-    IntArray(&'a mut MutVec<'s, byteorder::I32<C::ByteOrder>>),
-    LongArray(&'a mut MutVec<'s, byteorder::I64<C::ByteOrder>>),
+    IntArray(&'a mut VecMut<'s, byteorder::I32<C::ByteOrder>>),
+    LongArray(&'a mut VecMut<'s, byteorder::I64<C::ByteOrder>>),
 }
 
 pub enum MapMut<'s, C: ConfigMut> {
@@ -85,10 +85,10 @@ pub enum MapMut<'s, C: ConfigMut> {
     Long(&'s mut byteorder::I64<C::ByteOrder>),
     Float(&'s mut byteorder::F32<C::ByteOrder>),
     Double(&'s mut byteorder::F64<C::ByteOrder>),
-    ByteArray(MutVec<'s, i8>),
-    String(MutString<'s>),
+    ByteArray(VecMut<'s, i8>),
+    String(StringMut<'s>),
     List(C::ListMut<'s>),
     Compound(C::CompoundMut<'s>),
-    IntArray(MutVec<'s, byteorder::I32<C::ByteOrder>>),
-    LongArray(MutVec<'s, byteorder::I64<C::ByteOrder>>),
+    IntArray(VecMut<'s, byteorder::I32<C::ByteOrder>>),
+    LongArray(VecMut<'s, byteorder::I64<C::ByteOrder>>),
 }

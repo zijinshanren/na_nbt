@@ -3,7 +3,7 @@ use std::{any::TypeId, hint::unreachable_unchecked, io::Write, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Error, MutString, NBT, OwnCompound, OwnList, OwnString, OwnTypedList, OwnValue,
+    ByteOrder, Error, StringMut, NBT, CompoundOwn, ListOwn, StringOwn, TypedListOwn, ValueOwn,
     Result, TagID, Writable, cold_path,
     mutable::{
         compound_mut::MutCompound,
@@ -1375,7 +1375,7 @@ impl<'s, O: ByteOrder> Writable for RefCompound<'s, O> {
     }
 }
 
-impl<'s> Writable for MutString<'s> {
+impl<'s> Writable for StringMut<'s> {
     #[inline]
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         self.as_mutf8_str().write_to_vec::<TARGET>()
@@ -1518,7 +1518,7 @@ impl<'s, O: ByteOrder> Writable for MutCompound<'s, O> {
     }
 }
 
-impl Writable for OwnString {
+impl Writable for StringOwn {
     #[inline]
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         self.as_mutf8_str().write_to_vec::<TARGET>()
@@ -1530,45 +1530,45 @@ impl Writable for OwnString {
     }
 }
 
-impl<O: ByteOrder> Writable for OwnValue<O> {
+impl<O: ByteOrder> Writable for ValueOwn<O> {
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         match self {
-            OwnValue::End(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::Byte(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::Short(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::Int(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::Long(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::Float(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::Double(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::ByteArray(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::String(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::List(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::Compound(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::IntArray(v) => v.write_to_vec::<TARGET>(),
-            OwnValue::LongArray(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::End(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Byte(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Short(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Int(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Long(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Float(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Double(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::ByteArray(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::String(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::List(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Compound(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::IntArray(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::LongArray(v) => v.write_to_vec::<TARGET>(),
         }
     }
 
     fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
         match self {
-            OwnValue::End(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::Byte(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::Short(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::Int(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::Long(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::Float(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::Double(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::ByteArray(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::String(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::List(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::Compound(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::IntArray(v) => v.write_to_writer::<TARGET>(writer),
-            OwnValue::LongArray(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::End(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Byte(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Short(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Int(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Long(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Float(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Double(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::ByteArray(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::String(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::List(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Compound(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::IntArray(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::LongArray(v) => v.write_to_writer::<TARGET>(writer),
         }
     }
 }
 
-impl<O: ByteOrder> Writable for OwnList<O> {
+impl<O: ByteOrder> Writable for ListOwn<O> {
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
@@ -1599,7 +1599,7 @@ impl<O: ByteOrder> Writable for OwnList<O> {
     }
 }
 
-impl<O: ByteOrder, T: NBT> Writable for OwnTypedList<O, T> {
+impl<O: ByteOrder, T: NBT> Writable for TypedListOwn<O, T> {
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();
@@ -1630,7 +1630,7 @@ impl<O: ByteOrder, T: NBT> Writable for OwnTypedList<O, T> {
     }
 }
 
-impl<O: ByteOrder> Writable for OwnCompound<O> {
+impl<O: ByteOrder> Writable for CompoundOwn<O> {
     fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
         unsafe {
             let payload = self.data.as_ptr();

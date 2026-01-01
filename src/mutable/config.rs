@@ -3,8 +3,8 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, ListMut, ListRef, MUTF8Str, MutVec, NBT, NBTBase,
-    OwnList, OwnValue, TagID, cold_path,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, ListMut, ListRef, MUTF8Str, VecMut, NBT, NBTBase,
+    ListOwn, ValueOwn, TagID, cold_path,
     mutable::{
         compound_mut::{MutCompound, MutCompoundIter},
         compound_ref::{RefCompound, RefCompoundIter},
@@ -20,7 +20,7 @@ use crate::{
     tag::List,
 };
 
-unsafe fn list_decrease<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
+unsafe fn list_decrease<O: ByteOrder>(data: &mut VecMut<'_, u8>) {
     unsafe {
         ptr::write(
             data.as_mut_ptr().add(1).cast(),
@@ -31,7 +31,7 @@ unsafe fn list_decrease<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
     }
 }
 
-unsafe fn list_increase<O: ByteOrder>(data: &mut MutVec<'_, u8>) {
+unsafe fn list_increase<O: ByteOrder>(data: &mut VecMut<'_, u8>) {
     unsafe {
         let len = byteorder::U32::<O>::from_bytes(*data.as_ptr().add(1).cast()).get();
         assert!(len < u32::MAX, "list length too long");
@@ -162,7 +162,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
     type CompoundMut<'doc> = MutCompound<'doc, O>;
     type CompoundIterMut<'doc> = MutCompoundIter<'doc, O>;
 
-    type WriteParams<'a> = MutVec<'a, u8>;
+    type WriteParams<'a> = VecMut<'a, u8>;
 
     #[allow(forgetting_references)]
     #[allow(clippy::forget_non_drop)]
@@ -198,7 +198,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
                             let ptr_ref = &mut *(data.cast());
                             let len_ref = &mut *(data.add(SIZE_USIZE).cast());
                             let cap_ref = &mut *(data.add(SIZE_USIZE * 2).cast());
-                            Some(MutVec::<<T::Element as NBTBase>::Type<O>>::new(
+                            Some(VecMut::<<T::Element as NBTBase>::Type<O>>::new(
                                 ptr_ref, len_ref, cap_ref,
                             ))
                         })
@@ -246,7 +246,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
                     params
                         .as_mut_ptr()
                         .add(len_bytes - tag_size)
-                        .cast::<OwnList<O>>(),
+                        .cast::<ListOwn<O>>(),
                 )
                 .typed_::<T::Element>()?;
                 params.set_len(len_bytes - tag_size);
@@ -301,7 +301,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
                 let tag_size = mutable_tag_size(T::TAG_ID);
                 let pos_bytes = index * tag_size + 1 + 4;
                 let len_bytes = params.len();
-                let value = ptr::read(params.as_mut_ptr().add(pos_bytes).cast::<OwnList<O>>())
+                let value = ptr::read(params.as_mut_ptr().add(pos_bytes).cast::<ListOwn<O>>())
                     .typed_::<T::Element>()?;
                 let start = params.as_mut_ptr().add(pos_bytes);
                 ptr::copy(start.add(tag_size), start, len_bytes - pos_bytes - tag_size);
@@ -354,7 +354,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
     unsafe fn compound_remove<'a>(
         mut params: Self::WriteParams<'a>,
         key: &MUTF8Str,
-    ) -> Option<OwnValue<Self::ByteOrder>> {
+    ) -> Option<ValueOwn<Self::ByteOrder>> {
         unsafe {
             let key_bytes = key.as_bytes();
             let mut ptr = params.as_mut_ptr();
@@ -376,7 +376,7 @@ impl<O: ByteOrder> ConfigMut for MutableConfig<O> {
                 if key_bytes == name_bytes {
                     let tag_size = mutable_tag_size(tag_id);
                     let pos_bytes = ptr.byte_offset_from_unsigned(params.as_mut_ptr());
-                    let value = OwnValue::<O>::read(tag_id, ptr);
+                    let value = ValueOwn::<O>::read(tag_id, ptr);
                     let len_bytes = params.len();
                     ptr::copy(
                         ptr.add(tag_size),

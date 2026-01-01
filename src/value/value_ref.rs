@@ -1,6 +1,7 @@
 use crate::{
-    CompoundBase, ConfigRef, GenericNBT, Index, ListBase, MUTF8Str, MapRef, NBT, NBTBase, TagID,
+    CompoundBase, ConfigRef, GenericNBT, ListBase, MUTF8Str, MapRef, NBT, NBTBase, TagID,
     TypedListBase, ValueBase, VisitRef, cold_path,
+    index::Index,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,

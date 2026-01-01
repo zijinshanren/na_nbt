@@ -18,20 +18,20 @@ use zerocopy::Unalign;
 use crate::MUTF8Str;
 
 #[repr(C)]
-pub struct MutVec<'a, T> {
+pub struct VecMut<'a, T> {
     pub(crate) ptr: &'a mut Unalign<usize>,
     pub(crate) len: &'a mut Unalign<usize>,
     pub(crate) cap: &'a mut Unalign<usize>,
     _marker: PhantomData<T>,
 }
 
-// SAFETY: MutVec is Send/Sync if T is Send/Sync.
+// SAFETY: VecMut is Send/Sync if T is Send/Sync.
 // The raw pointer is only used for the Vec's buffer, which is guarded by the mutable references.
-unsafe impl<T: Send> Send for MutVec<'_, T> {}
-unsafe impl<T: Sync> Sync for MutVec<'_, T> {}
+unsafe impl<T: Send> Send for VecMut<'_, T> {}
+unsafe impl<T: Sync> Sync for VecMut<'_, T> {}
 
-impl<'a, T> MutVec<'a, T> {
-    /// Creates a new `MutVec` from mutable references to a Vec's raw parts.
+impl<'a, T> VecMut<'a, T> {
+    /// Creates a new `VecMut` from mutable references to a Vec's raw parts.
     ///
     /// # Safety
     ///
@@ -74,14 +74,16 @@ impl<'a, T> MutVec<'a, T> {
         result
     }
 
-    /// Returns the new clone of this [`MutVec<T>`].
+    /// Returns the new clone of this [`VecMut<T>`].
     ///
     /// # Safety
     ///
-    /// .
+    /// The returned view references the same underlying vector parts as `self`.
+    /// Using both views simultaneously can cause undefined behavior if they're
+    /// used to create overlapping mutable references to the same data.
     #[inline]
     pub unsafe fn new_clone(&mut self) -> Self {
-        MutVec {
+        VecMut {
             ptr: unsafe { &mut *(self.ptr as *mut _) },
             len: unsafe { &mut *(self.len as *mut _) },
             cap: unsafe { &mut *(self.cap as *mut _) },
@@ -357,9 +359,9 @@ impl<'a, T> MutVec<'a, T> {
         self.with_vec(|v| v.append(other));
     }
 
-    /// Moves all elements from another `MutVec` into `self`, leaving `other` empty.
+    /// Moves all elements from another `VecMut` into `self`, leaving `other` empty.
     #[inline]
-    pub fn append_view(&mut self, other: &mut MutVec<'_, T>) {
+    pub fn append_view(&mut self, other: &mut VecMut<'_, T>) {
         // Reconstruct other as a vec temporarily
         let mut other_vec = unsafe {
             ManuallyDrop::new(Vec::from_raw_parts(
@@ -417,7 +419,7 @@ impl<'a, T> MutVec<'a, T> {
 
 // ============ Trait Implementations ============
 
-impl<T> Deref for MutVec<'_, T> {
+impl<T> Deref for VecMut<'_, T> {
     type Target = [T];
 
     #[inline]
@@ -426,14 +428,14 @@ impl<T> Deref for MutVec<'_, T> {
     }
 }
 
-impl<T> DerefMut for MutVec<'_, T> {
+impl<T> DerefMut for VecMut<'_, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T, I: SliceIndex<[T]>> Index<I> for MutVec<'_, T> {
+impl<T, I: SliceIndex<[T]>> Index<I> for VecMut<'_, T> {
     type Output = I::Output;
 
     #[inline]
@@ -442,100 +444,100 @@ impl<T, I: SliceIndex<[T]>> Index<I> for MutVec<'_, T> {
     }
 }
 
-impl<T, I: SliceIndex<[T]>> IndexMut<I> for MutVec<'_, T> {
+impl<T, I: SliceIndex<[T]>> IndexMut<I> for VecMut<'_, T> {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         IndexMut::index_mut(self.as_mut_slice(), index)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for MutVec<'_, T> {
+impl<T: fmt::Debug> fmt::Debug for VecMut<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.as_slice(), f)
     }
 }
 
-impl<T: PartialEq> PartialEq for MutVec<'_, T> {
+impl<T: PartialEq> PartialEq for VecMut<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<Vec<T>> for MutVec<'_, T> {
+impl<T: PartialEq> PartialEq<Vec<T>> for VecMut<'_, T> {
     fn eq(&self, other: &Vec<T>) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<[T]> for MutVec<'_, T> {
+impl<T: PartialEq> PartialEq<[T]> for VecMut<'_, T> {
     fn eq(&self, other: &[T]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for MutVec<'_, T> {
+impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for VecMut<'_, T> {
     fn eq(&self, other: &[T; N]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq> PartialEq<&[T]> for MutVec<'_, T> {
+impl<T: PartialEq> PartialEq<&[T]> for VecMut<'_, T> {
     fn eq(&self, other: &&[T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: PartialEq> PartialEq<&mut [T]> for MutVec<'_, T> {
+impl<T: PartialEq> PartialEq<&mut [T]> for VecMut<'_, T> {
     fn eq(&self, other: &&mut [T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: Eq> Eq for MutVec<'_, T> {}
+impl<T: Eq> Eq for VecMut<'_, T> {}
 
-impl<T: PartialOrd> PartialOrd for MutVec<'_, T> {
+impl<T: PartialOrd> PartialOrd for VecMut<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
 
-impl<T: Ord> Ord for MutVec<'_, T> {
+impl<T: Ord> Ord for VecMut<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_slice().cmp(other.as_slice())
     }
 }
 
-impl<T: Hash> Hash for MutVec<'_, T> {
+impl<T: Hash> Hash for VecMut<'_, T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state);
     }
 }
 
-impl<T> Borrow<[T]> for MutVec<'_, T> {
+impl<T> Borrow<[T]> for VecMut<'_, T> {
     fn borrow(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> BorrowMut<[T]> for MutVec<'_, T> {
+impl<T> BorrowMut<[T]> for VecMut<'_, T> {
     fn borrow_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T> AsRef<[T]> for MutVec<'_, T> {
+impl<T> AsRef<[T]> for VecMut<'_, T> {
     fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[T]> for MutVec<'_, T> {
+impl<T> AsMut<[T]> for VecMut<'_, T> {
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<'a, T> IntoIterator for &'a MutVec<'_, T> {
+impl<'a, T> IntoIterator for &'a VecMut<'_, T> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
@@ -544,7 +546,7 @@ impl<'a, T> IntoIterator for &'a MutVec<'_, T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut MutVec<'_, T> {
+impl<'a, T> IntoIterator for &'a mut VecMut<'_, T> {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
@@ -553,19 +555,19 @@ impl<'a, T> IntoIterator for &'a mut MutVec<'_, T> {
     }
 }
 
-impl<T> Extend<T> for MutVec<'_, T> {
+impl<T> Extend<T> for VecMut<'_, T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl<'a, T: Copy + 'a> Extend<&'a T> for MutVec<'_, T> {
+impl<'a, T: Copy + 'a> Extend<&'a T> for VecMut<'_, T> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl Write for MutVec<'_, u8> {
+impl Write for VecMut<'_, u8> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.with_vec(|v| v.write(buf))
     }
@@ -583,23 +585,34 @@ impl Write for MutVec<'_, u8> {
     }
 }
 
-/// A view into a String's raw parts, allowing mutable access without owning the String.
+/// A mutable view into a String's MUTF-8 encoded raw parts.
 ///
-/// This is similar to `MutVec<u8>` but maintains String's UTF-8 invariants.
+/// `StringMut` provides temporary mutable access to a MUTF-8 string's data.
+/// Unlike `VecMut<u8>`, it maintains MUTF-8 encoding invariants and provides
+/// string-specific methods.
+///
+/// # Type Parameters
+///
+/// * `'a` - Lifetime of the underlying mutable references
+///
+/// # MUTF-8 Encoding
+///
+/// This type operates on MUTF-8 (Modified UTF-8) encoded strings, where null
+/// characters are represented as `0xC0 0x80` instead of `0x00`.
 #[repr(C)]
-pub struct MutString<'a> {
+pub struct StringMut<'a> {
     pub(crate) ptr: &'a mut Unalign<usize>,
     pub(crate) len: &'a mut Unalign<usize>,
     pub(crate) cap: &'a mut Unalign<usize>,
 }
 
-// SAFETY: MutString is Send/Sync because the underlying data is UTF-8 bytes.
+// SAFETY: StringMut is Send/Sync because the underlying data is MUTF-8 bytes.
 // The raw pointer is only used for the String's buffer, which is guarded by the mutable references.
-unsafe impl Send for MutString<'_> {}
-unsafe impl Sync for MutString<'_> {}
+unsafe impl Send for StringMut<'_> {}
+unsafe impl Sync for StringMut<'_> {}
 
-impl<'a> MutString<'a> {
-    /// Creates a new `MutString` from mutable references to a String's raw parts.
+impl<'a> StringMut<'a> {
+    /// Creates a new `StringMut` from mutable references to a String's raw parts.
     ///
     /// # Safety
     ///
@@ -878,71 +891,71 @@ impl<'a> MutString<'a> {
     }
 }
 
-// ============ Trait Implementations for MutStringMut ============
+// ============ Trait Implementations for StringMutMut ============
 
-impl fmt::Debug for MutString<'_> {
+impl fmt::Debug for StringMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl fmt::Display for MutString<'_> {
+impl fmt::Display for StringMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl PartialEq for MutString<'_> {
+impl PartialEq for StringMut<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.as_bytes() == other.as_bytes()
     }
 }
 
-impl PartialEq<String> for MutString<'_> {
+impl PartialEq<String> for StringMut<'_> {
     fn eq(&self, other: &String) -> bool {
         &*self.decode_lossy() == other.as_str()
     }
 }
 
-impl PartialEq<str> for MutString<'_> {
+impl PartialEq<str> for StringMut<'_> {
     fn eq(&self, other: &str) -> bool {
         &*self.decode_lossy() == other
     }
 }
 
-impl PartialEq<&str> for MutString<'_> {
+impl PartialEq<&str> for StringMut<'_> {
     fn eq(&self, other: &&str) -> bool {
         &*self.decode_lossy() == *other
     }
 }
 
-impl Eq for MutString<'_> {}
+impl Eq for StringMut<'_> {}
 
-impl PartialOrd for MutString<'_> {
+impl PartialOrd for StringMut<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for MutString<'_> {
+impl Ord for StringMut<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_bytes().cmp(other.as_bytes())
     }
 }
 
-impl Hash for MutString<'_> {
+impl Hash for StringMut<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_bytes().hash(state);
     }
 }
 
-impl AsRef<[u8]> for MutString<'_> {
+impl AsRef<[u8]> for StringMut<'_> {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl Write for MutString<'_> {
+impl Write for StringMut<'_> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match std::str::from_utf8(buf) {
             Ok(s) => {
@@ -975,26 +988,26 @@ impl Write for MutString<'_> {
 }
 
 #[repr(C)]
-pub struct OwnVec<T> {
+pub struct VecOwn<T> {
     pub(crate) ptr: Unalign<usize>,
     pub(crate) len: Unalign<usize>,
     pub(crate) cap: Unalign<usize>,
     _marker: PhantomData<T>,
 }
 
-// SAFETY: OwnVec is Send/Sync if T is Send/Sync.
-// The raw pointer is only used for the Vec's buffer, which is guarded by the mutable references.
-unsafe impl<T: Send> Send for OwnVec<T> {}
-unsafe impl<T: Sync> Sync for OwnVec<T> {}
+// SAFETY: VecOwn is Send/Sync if T is Send/Sync.
+// The raw pointer is only used for the Vec's buffer, which is owned by this struct.
+unsafe impl<T: Send> Send for VecOwn<T> {}
+unsafe impl<T: Sync> Sync for VecOwn<T> {}
 
-impl<T> Default for OwnVec<T> {
+impl<T> Default for VecOwn<T> {
     fn default() -> Self {
         vec![].into()
     }
 }
 
-impl<T> OwnVec<T> {
-    /// Creates a new `OwnVec` from raw parts.
+impl<T> VecOwn<T> {
+    /// Creates a new `VecOwn` from raw parts.
     ///
     /// # Safety
     ///
@@ -1015,8 +1028,8 @@ impl<T> OwnVec<T> {
     }
 
     #[inline]
-    pub const fn to_mut<'a>(&'a mut self) -> MutVec<'a, T> {
-        MutVec {
+    pub const fn to_mut<'a>(&'a mut self) -> VecMut<'a, T> {
+        VecMut {
             ptr: &mut self.ptr,
             len: &mut self.len,
             cap: &mut self.cap,
@@ -1311,9 +1324,9 @@ impl<T> OwnVec<T> {
         self.with_vec(|v| v.append(other));
     }
 
-    /// Moves all elements from another `MutVec` into `self`, leaving `other` empty.
+    /// Moves all elements from another `VecMut` into `self`, leaving `other` empty.
     #[inline]
-    pub fn append_view(&mut self, other: &mut OwnVec<T>) {
+    pub fn append_view(&mut self, other: &mut VecOwn<T>) {
         // Reconstruct other as a vec temporarily
         let mut other_vec = unsafe {
             ManuallyDrop::new(Vec::from_raw_parts(
@@ -1366,7 +1379,7 @@ impl<T> OwnVec<T> {
 
 // ============ Trait Implementations ============
 
-impl<T> Deref for OwnVec<T> {
+impl<T> Deref for VecOwn<T> {
     type Target = [T];
 
     #[inline]
@@ -1375,14 +1388,14 @@ impl<T> Deref for OwnVec<T> {
     }
 }
 
-impl<T> DerefMut for OwnVec<T> {
+impl<T> DerefMut for VecOwn<T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T, I: SliceIndex<[T]>> Index<I> for OwnVec<T> {
+impl<T, I: SliceIndex<[T]>> Index<I> for VecOwn<T> {
     type Output = I::Output;
 
     #[inline]
@@ -1391,100 +1404,100 @@ impl<T, I: SliceIndex<[T]>> Index<I> for OwnVec<T> {
     }
 }
 
-impl<T, I: SliceIndex<[T]>> IndexMut<I> for OwnVec<T> {
+impl<T, I: SliceIndex<[T]>> IndexMut<I> for VecOwn<T> {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         IndexMut::index_mut(self.as_mut_slice(), index)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for OwnVec<T> {
+impl<T: fmt::Debug> fmt::Debug for VecOwn<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.as_slice(), f)
     }
 }
 
-impl<T: PartialEq> PartialEq for OwnVec<T> {
+impl<T: PartialEq> PartialEq for VecOwn<T> {
     fn eq(&self, other: &Self) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<Vec<T>> for OwnVec<T> {
+impl<T: PartialEq> PartialEq<Vec<T>> for VecOwn<T> {
     fn eq(&self, other: &Vec<T>) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<[T]> for OwnVec<T> {
+impl<T: PartialEq> PartialEq<[T]> for VecOwn<T> {
     fn eq(&self, other: &[T]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for OwnVec<T> {
+impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for VecOwn<T> {
     fn eq(&self, other: &[T; N]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq> PartialEq<&[T]> for OwnVec<T> {
+impl<T: PartialEq> PartialEq<&[T]> for VecOwn<T> {
     fn eq(&self, other: &&[T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: PartialEq> PartialEq<&mut [T]> for OwnVec<T> {
+impl<T: PartialEq> PartialEq<&mut [T]> for VecOwn<T> {
     fn eq(&self, other: &&mut [T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: Eq> Eq for OwnVec<T> {}
+impl<T: Eq> Eq for VecOwn<T> {}
 
-impl<T: PartialOrd> PartialOrd for OwnVec<T> {
+impl<T: PartialOrd> PartialOrd for VecOwn<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
 
-impl<T: Ord> Ord for OwnVec<T> {
+impl<T: Ord> Ord for VecOwn<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_slice().cmp(other.as_slice())
     }
 }
 
-impl<T: Hash> Hash for OwnVec<T> {
+impl<T: Hash> Hash for VecOwn<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state);
     }
 }
 
-impl<T> Borrow<[T]> for OwnVec<T> {
+impl<T> Borrow<[T]> for VecOwn<T> {
     fn borrow(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> BorrowMut<[T]> for OwnVec<T> {
+impl<T> BorrowMut<[T]> for VecOwn<T> {
     fn borrow_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T> AsRef<[T]> for OwnVec<T> {
+impl<T> AsRef<[T]> for VecOwn<T> {
     fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[T]> for OwnVec<T> {
+impl<T> AsMut<[T]> for VecOwn<T> {
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<'a, T> IntoIterator for &'a OwnVec<T> {
+impl<'a, T> IntoIterator for &'a VecOwn<T> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
@@ -1493,7 +1506,7 @@ impl<'a, T> IntoIterator for &'a OwnVec<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut OwnVec<T> {
+impl<'a, T> IntoIterator for &'a mut VecOwn<T> {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
@@ -1502,19 +1515,19 @@ impl<'a, T> IntoIterator for &'a mut OwnVec<T> {
     }
 }
 
-impl<T> Extend<T> for OwnVec<T> {
+impl<T> Extend<T> for VecOwn<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl<'a, T: Copy + 'a> Extend<&'a T> for OwnVec<T> {
+impl<'a, T: Copy + 'a> Extend<&'a T> for VecOwn<T> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl Write for OwnVec<u8> {
+impl Write for VecOwn<u8> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.with_vec(|v| v.write(buf))
     }
@@ -1532,10 +1545,10 @@ impl Write for OwnVec<u8> {
     }
 }
 
-impl<T> From<Vec<T>> for OwnVec<T> {
+impl<T> From<Vec<T>> for VecOwn<T> {
     fn from(value: Vec<T>) -> Self {
         let mut me = ManuallyDrop::new(value);
-        OwnVec {
+        VecOwn {
             ptr: Unalign::new(me.as_mut_ptr().expose_provenance()),
             len: Unalign::new(me.len()),
             cap: Unalign::new(me.capacity()),
@@ -1544,41 +1557,38 @@ impl<T> From<Vec<T>> for OwnVec<T> {
     }
 }
 
-impl<T: Clone> From<&[T]> for OwnVec<T> {
+impl<T: Clone> From<&[T]> for VecOwn<T> {
     fn from(value: &[T]) -> Self {
         value.to_vec().into()
     }
 }
 
-impl<T> Drop for OwnVec<T> {
+impl<T> Drop for VecOwn<T> {
     fn drop(&mut self) {
         unsafe { Vec::from_raw_parts(self.as_mut_ptr(), self.len.get(), self.cap.get()) };
     }
 }
 
-/// A view into a String's raw parts, allowing mutable access without owning the String.
-///
-/// This is similar to `MutVec<u8>` but maintains String's MUTF-8 encoded invariants.
 #[repr(C)]
-pub struct OwnString {
+pub struct StringOwn {
     pub(crate) ptr: Unalign<usize>,
     pub(crate) len: Unalign<usize>,
     pub(crate) cap: Unalign<usize>,
 }
 
-// SAFETY: MutString is Send/Sync because the underlying data is UTF-8 bytes.
-// The raw pointer is only used for the String's buffer, which is guarded by the mutable references.
-unsafe impl Send for OwnString {}
-unsafe impl Sync for OwnString {}
+// SAFETY: StringOwn is Send/Sync because the underlying data is MUTF-8 bytes.
+// The raw pointer is only used for the String's buffer, which is owned by this struct.
+unsafe impl Send for StringOwn {}
+unsafe impl Sync for StringOwn {}
 
-impl Default for OwnString {
+impl Default for StringOwn {
     fn default() -> Self {
         vec![].into()
     }
 }
 
-impl OwnString {
-    /// Creates a new `MutString` from mutable references to a String's raw parts.
+impl StringOwn {
+    /// Creates a new `StringMut` from mutable references to a String's raw parts.
     ///
     /// # Safety
     ///
@@ -1594,8 +1604,8 @@ impl OwnString {
     }
 
     #[inline]
-    pub const fn to_mut<'a>(&'a mut self) -> MutString<'a> {
-        MutString {
+    pub const fn to_mut<'a>(&'a mut self) -> StringMut<'a> {
+        StringMut {
             ptr: &mut self.ptr,
             len: &mut self.len,
             cap: &mut self.cap,
@@ -1857,71 +1867,71 @@ impl OwnString {
     }
 }
 
-// ============ Trait Implementations for MutStringOwn ============
+// ============ Trait Implementations for StringMutOwn ============
 
-impl fmt::Debug for OwnString {
+impl fmt::Debug for StringOwn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl fmt::Display for OwnString {
+impl fmt::Display for StringOwn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl PartialEq for OwnString {
+impl PartialEq for StringOwn {
     fn eq(&self, other: &Self) -> bool {
         self.as_bytes() == other.as_bytes()
     }
 }
 
-impl PartialEq<String> for OwnString {
+impl PartialEq<String> for StringOwn {
     fn eq(&self, other: &String) -> bool {
         &*self.decode_lossy() == other.as_str()
     }
 }
 
-impl PartialEq<str> for OwnString {
+impl PartialEq<str> for StringOwn {
     fn eq(&self, other: &str) -> bool {
         &*self.decode_lossy() == other
     }
 }
 
-impl PartialEq<&str> for OwnString {
+impl PartialEq<&str> for StringOwn {
     fn eq(&self, other: &&str) -> bool {
         &*self.decode_lossy() == *other
     }
 }
 
-impl Eq for OwnString {}
+impl Eq for StringOwn {}
 
-impl PartialOrd for OwnString {
+impl PartialOrd for StringOwn {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for OwnString {
+impl Ord for StringOwn {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_bytes().cmp(other.as_bytes())
     }
 }
 
-impl Hash for OwnString {
+impl Hash for StringOwn {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_bytes().hash(state);
     }
 }
 
-impl AsRef<[u8]> for OwnString {
+impl AsRef<[u8]> for StringOwn {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl Write for OwnString {
+impl Write for StringOwn {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match std::str::from_utf8(buf) {
             Ok(s) => {
@@ -1953,10 +1963,10 @@ impl Write for OwnString {
     }
 }
 
-impl From<Vec<u8>> for OwnString {
+impl From<Vec<u8>> for StringOwn {
     fn from(value: Vec<u8>) -> Self {
         let mut encoded = ManuallyDrop::new(value);
-        OwnString {
+        StringOwn {
             ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
             len: Unalign::new(encoded.len()),
             cap: Unalign::new(encoded.capacity()),
@@ -1964,31 +1974,31 @@ impl From<Vec<u8>> for OwnString {
     }
 }
 
-impl From<&[u8]> for OwnString {
+impl From<&[u8]> for StringOwn {
     fn from(value: &[u8]) -> Self {
         value.to_vec().into()
     }
 }
 
-impl From<String> for OwnString {
+impl From<String> for StringOwn {
     fn from(value: String) -> Self {
         simd_cesu8::mutf8::encode(&value).into_owned().into()
     }
 }
 
-impl From<&str> for OwnString {
+impl From<&str> for StringOwn {
     fn from(value: &str) -> Self {
         simd_cesu8::mutf8::encode(value).into_owned().into()
     }
 }
 
-impl From<&MUTF8Str> for OwnString {
+impl From<&MUTF8Str> for StringOwn {
     fn from(value: &MUTF8Str) -> Self {
         value.as_bytes().into()
     }
 }
 
-impl Drop for OwnString {
+impl Drop for StringOwn {
     fn drop(&mut self) {
         // Drop as Vec<u8> since internal format is mutf8, not UTF-8
         unsafe {

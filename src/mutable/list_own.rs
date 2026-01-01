@@ -3,8 +3,8 @@ use std::{hint::unreachable_unchecked, marker::PhantomData, mem::ManuallyDrop, p
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, NBT, NBTBase, OwnCompound, OwnString,
-    OwnTypedList, OwnValue, OwnVec, TagID, cold_path,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, NBT, NBTBase, CompoundOwn, StringOwn,
+    TypedListOwn, ValueOwn, VecOwn, TagID, cold_path,
     mutable::{
         config::MutableConfig, size::mutable_tag_size, value_mut::MutValue, value_ref::RefValue,
     },
@@ -15,12 +15,12 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub struct OwnList<O: ByteOrder> {
-    pub(crate) data: OwnVec<u8>,
+pub struct ListOwn<O: ByteOrder> {
+    pub(crate) data: VecOwn<u8>,
     pub(crate) _marker: PhantomData<O>,
 }
 
-impl<O: ByteOrder> Default for OwnList<O> {
+impl<O: ByteOrder> Default for ListOwn<O> {
     fn default() -> Self {
         Self {
             data: vec![0, 0, 0, 0, 0].into(),
@@ -29,7 +29,7 @@ impl<O: ByteOrder> Default for OwnList<O> {
     }
 }
 
-impl<O: ByteOrder> OwnList<O> {
+impl<O: ByteOrder> ListOwn<O> {
     #[inline]
     fn _to_read_params<'a>(&'a self) -> <MutableConfig<O> as ConfigRef>::ReadParams<'a> {
         unsafe { self.data.as_ptr().add(1 + 4) }
@@ -339,7 +339,7 @@ impl<O: ByteOrder> OwnList<O> {
     }
 
     #[inline]
-    pub fn pop(&mut self) -> Option<OwnValue<O>> {
+    pub fn pop(&mut self) -> Option<ValueOwn<O>> {
         if self.is_empty() {
             cold_path();
             return None;
@@ -436,7 +436,7 @@ impl<O: ByteOrder> OwnList<O> {
     }
 
     #[inline]
-    pub fn remove(&mut self, index: usize) -> Option<OwnValue<O>> {
+    pub fn remove(&mut self, index: usize) -> Option<ValueOwn<O>> {
         if index >= self.len() {
             cold_path();
             return None;
@@ -518,10 +518,10 @@ impl<O: ByteOrder> OwnList<O> {
     }
 
     #[inline]
-    pub fn typed_<T: NBT>(self) -> Option<OwnTypedList<O, T>> {
+    pub fn typed_<T: NBT>(self) -> Option<TypedListOwn<O, T>> {
         let me = ManuallyDrop::new(self);
         me.element_is_::<T>().then(|| {
-            let mut new = OwnTypedList {
+            let mut new = TypedListOwn {
                 data: unsafe { ptr::read(&me.data) },
                 _marker: PhantomData,
             };
@@ -531,7 +531,7 @@ impl<O: ByteOrder> OwnList<O> {
     }
 }
 
-impl<O: ByteOrder> Drop for OwnList<O> {
+impl<O: ByteOrder> Drop for ListOwn<O> {
     fn drop(&mut self) {
         unsafe {
             let mut ptr = self.data.as_mut_ptr();
@@ -549,37 +549,37 @@ impl<O: ByteOrder> Drop for OwnList<O> {
             match tag_id {
                 TagID::ByteArray => {
                     for _ in 0..len {
-                        ptr::read(ptr.cast::<OwnVec<i8>>());
+                        ptr::read(ptr.cast::<VecOwn<i8>>());
                         ptr = ptr.add(mutable_tag_size(tag_id));
                     }
                 }
                 TagID::String => {
                     for _ in 0..len {
-                        ptr::read(ptr.cast::<OwnString>());
+                        ptr::read(ptr.cast::<StringOwn>());
                         ptr = ptr.add(mutable_tag_size(tag_id));
                     }
                 }
                 TagID::List => {
                     for _ in 0..len {
-                        ptr::read(ptr.cast::<OwnList<O>>());
+                        ptr::read(ptr.cast::<ListOwn<O>>());
                         ptr = ptr.add(mutable_tag_size(tag_id));
                     }
                 }
                 TagID::Compound => {
                     for _ in 0..len {
-                        ptr::read(ptr.cast::<OwnCompound<O>>());
+                        ptr::read(ptr.cast::<CompoundOwn<O>>());
                         ptr = ptr.add(mutable_tag_size(tag_id));
                     }
                 }
                 TagID::IntArray => {
                     for _ in 0..len {
-                        ptr::read(ptr.cast::<OwnVec<byteorder::I32<O>>>());
+                        ptr::read(ptr.cast::<VecOwn<byteorder::I32<O>>>());
                         ptr = ptr.add(mutable_tag_size(tag_id));
                     }
                 }
                 TagID::LongArray => {
                     for _ in 0..len {
-                        ptr::read(ptr.cast::<OwnVec<byteorder::I64<O>>>());
+                        ptr::read(ptr.cast::<VecOwn<byteorder::I64<O>>>());
                         ptr = ptr.add(mutable_tag_size(tag_id));
                     }
                 }

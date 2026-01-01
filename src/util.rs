@@ -5,7 +5,7 @@ use std::{
 
 use simd_cesu8::DecodingError;
 
-use crate::OwnString;
+use crate::StringOwn;
 
 #[inline(always)]
 #[cold]
@@ -18,6 +18,11 @@ impl<T: zerocopy::ByteOrder + Send + Sync + 'static> ByteOrder for T {}
 pub(crate) static EMPTY_LIST: [u8; 5] = [0; 5];
 pub(crate) static EMPTY_COMPOUND: [u8; 1] = [0];
 
+/// A MUTF-8 (Modified UTF-8) encoded string slice.
+///
+/// MUTF-8 is an encoding used by Java.
+///
+/// This type is used for NBT string values and keys, which are encoded in MUTF-8.
 #[repr(transparent)]
 pub struct MUTF8Str([u8]);
 
@@ -28,26 +33,38 @@ impl Default for &MUTF8Str {
     }
 }
 
-impl Borrow<MUTF8Str> for OwnString {
+impl Borrow<MUTF8Str> for StringOwn {
     fn borrow(&self) -> &MUTF8Str {
         self.as_mutf8_str()
     }
 }
 
 impl ToOwned for MUTF8Str {
-    type Owned = OwnString;
+    type Owned = StringOwn;
 
     fn to_owned(&self) -> Self::Owned {
-        OwnString::from(self)
+        StringOwn::from(self)
     }
 }
 
 impl MUTF8Str {
-    /// .
+    /// Creates a `&MUTF8Str` from a byte slice without validation.
     ///
     /// # Safety
     ///
-    /// .
+    /// The caller must ensure that `bytes` contains valid MUTF-8 encoded data.
+    ///
+    /// MUTF-8 (Modified UTF-8) is an encoding used by Java.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use na_nbt::MUTF8Str;
+    ///
+    /// // Valid MUTF-8: standard ASCII
+    /// let valid = b"hello";
+    /// let s = unsafe { MUTF8Str::from_mutf8_unchecked(valid) };
+    /// ```
     #[inline]
     pub const unsafe fn from_mutf8_unchecked(bytes: &[u8]) -> &Self {
         unsafe { mem::transmute(bytes) }
@@ -58,26 +75,31 @@ impl MUTF8Str {
         &self.0
     }
 
+    /// see [`simd_cesu8::mutf8::decode_lossy`]
     #[inline]
     pub fn decode_lossy(&self) -> Cow<'_, str> {
         simd_cesu8::mutf8::decode_lossy(&self.0)
     }
 
+    /// see [`simd_cesu8::mutf8::decode_strict`]
     #[inline]
     pub fn decode_strict(&self) -> Result<Cow<'_, str>, DecodingError> {
         simd_cesu8::mutf8::decode_strict(&self.0)
     }
 
+    /// see [`simd_cesu8::mutf8::decode`]
     #[inline]
     pub fn decode(&self) -> Result<Cow<'_, str>, DecodingError> {
         simd_cesu8::mutf8::decode(&self.0)
     }
 
+    /// see [`simd_cesu8::mutf8::decode_lossy_strict`]
     #[inline]
     pub fn decode_lossy_strict(&self) -> Cow<'_, str> {
         simd_cesu8::mutf8::decode_lossy_strict(&self.0)
     }
 
+    /// Calls [`Self::decode_lossy`] and converts the result to a [`String`].
     #[inline]
     pub fn to_utf8_string(&self) -> String {
         self.decode_lossy().into_owned()

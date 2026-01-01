@@ -3,20 +3,20 @@ use std::{marker::PhantomData, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, MUTF8Str, NBT, OwnList, OwnString,
-    OwnValue, OwnVec, TagID, cold_path,
+    ByteOrder, ConfigMut, ConfigRef, GenericNBT, IntoNBT, ListOwn, MUTF8Str, NBT, StringOwn,
+    VecOwn, TagID, ValueOwn, cold_path,
     mutable::{
         config::MutableConfig, size::mutable_tag_size, value_mut::MutValue, value_ref::RefValue,
     },
 };
 
 #[repr(transparent)]
-pub struct OwnCompound<O: ByteOrder> {
-    pub(crate) data: OwnVec<u8>,
+pub struct CompoundOwn<O: ByteOrder> {
+    pub(crate) data: VecOwn<u8>,
     pub(crate) _marker: PhantomData<O>,
 }
 
-impl<O: ByteOrder> Default for OwnCompound<O> {
+impl<O: ByteOrder> Default for CompoundOwn<O> {
     fn default() -> Self {
         Self {
             data: vec![0].into(),
@@ -25,7 +25,7 @@ impl<O: ByteOrder> Default for OwnCompound<O> {
     }
 }
 
-impl<O: ByteOrder> OwnCompound<O> {
+impl<O: ByteOrder> CompoundOwn<O> {
     #[inline]
     fn _to_read_params<'a>(&'a self) -> <MutableConfig<O> as ConfigRef>::ReadParams<'a> {
         self.data.as_ptr()
@@ -95,7 +95,7 @@ impl<O: ByteOrder> OwnCompound<O> {
         &mut self,
         key: &str,
         value: impl IntoNBT<O, Tag = T>,
-    ) -> Option<OwnValue<O>> {
+    ) -> Option<ValueOwn<O>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
             let key = MUTF8Str::from_mutf8_unchecked(&key);
@@ -110,7 +110,7 @@ impl<O: ByteOrder> OwnCompound<O> {
     }
 
     #[inline]
-    pub fn remove(&mut self, key: &str) -> Option<OwnValue<O>> {
+    pub fn remove(&mut self, key: &str) -> Option<ValueOwn<O>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
             let key = MUTF8Str::from_mutf8_unchecked(&key);
@@ -119,7 +119,7 @@ impl<O: ByteOrder> OwnCompound<O> {
     }
 }
 
-impl<O: ByteOrder> Drop for OwnCompound<O> {
+impl<O: ByteOrder> Drop for CompoundOwn<O> {
     fn drop(&mut self) {
         unsafe {
             let mut ptr = self.data.as_mut_ptr();
@@ -143,22 +143,22 @@ impl<O: ByteOrder> Drop for OwnCompound<O> {
 
                 match tag_id {
                     TagID::ByteArray => {
-                        ptr::read(ptr.cast::<OwnVec<i8>>());
+                        ptr::read(ptr.cast::<VecOwn<i8>>());
                     }
                     TagID::String => {
-                        ptr::read(ptr.cast::<OwnString>());
+                        ptr::read(ptr.cast::<StringOwn>());
                     }
                     TagID::List => {
-                        ptr::read(ptr.cast::<OwnList<O>>());
+                        ptr::read(ptr.cast::<ListOwn<O>>());
                     }
                     TagID::Compound => {
-                        ptr::read(ptr.cast::<OwnCompound<O>>());
+                        ptr::read(ptr.cast::<CompoundOwn<O>>());
                     }
                     TagID::IntArray => {
-                        ptr::read(ptr.cast::<OwnVec<byteorder::I32<O>>>());
+                        ptr::read(ptr.cast::<VecOwn<byteorder::I32<O>>>());
                     }
                     TagID::LongArray => {
-                        ptr::read(ptr.cast::<OwnVec<byteorder::I64<O>>>());
+                        ptr::read(ptr.cast::<VecOwn<byteorder::I64<O>>>());
                     }
                     _ => (),
                 }

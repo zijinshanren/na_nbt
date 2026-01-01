@@ -3,7 +3,7 @@ use std::{marker::PhantomData, ptr, slice};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, CompoundBase, CompoundMut, ConfigMut, ConfigRef, MUTF8Str, MutVec, TagID, cold_path,
+    ByteOrder, CompoundBase, CompoundMut, ConfigMut, ConfigRef, MUTF8Str, VecMut, TagID, cold_path,
     mutable::{
         compound_ref::RefCompoundIter, config::MutableConfig, size::mutable_tag_size,
         string_ref::RefString, value_mut::MutValue,
@@ -12,7 +12,7 @@ use crate::{
 
 #[repr(transparent)]
 pub struct MutCompound<'s, O: ByteOrder> {
-    pub(crate) data: MutVec<'s, u8>,
+    pub(crate) data: VecMut<'s, u8>,
     pub(crate) _marker: PhantomData<O>,
 }
 

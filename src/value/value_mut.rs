@@ -1,6 +1,7 @@
 use crate::{
-    CompoundBase, ConfigMut, ConfigRef, GenericNBT, Index, IntoNBT, ListBase, MUTF8Str, MapMut,
-    NBT, NBTBase, OwnValue, TagID, TypedListBase, ValueBase, VisitMut, VisitMutShared, cold_path,
+    CompoundBase, ConfigMut, ConfigRef, GenericNBT, IntoNBT, ListBase, MUTF8Str, MapMut, NBT,
+    NBTBase, ValueOwn, TagID, TypedListBase, ValueBase, VisitMut, VisitMutShared, cold_path,
+    index::Index,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
         String, TypedList,
@@ -426,7 +427,7 @@ pub trait ListMut<'s>:
     }
 
     #[inline]
-    fn pop(&mut self) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
+    fn pop(&mut self) -> Option<ValueOwn<<Self::Config as ConfigRef>::ByteOrder>> {
         if self.is_empty() {
             cold_path();
             return None;
@@ -511,7 +512,7 @@ pub trait ListMut<'s>:
     }
 
     #[inline]
-    fn remove(&mut self, index: usize) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
+    fn remove(&mut self, index: usize) -> Option<ValueOwn<<Self::Config as ConfigRef>::ByteOrder>> {
         if index >= self.len() {
             cold_path();
             return None;
@@ -794,7 +795,7 @@ pub trait CompoundMut<'s>:
         &mut self,
         key: &str,
         value: impl IntoNBT<<Self::Config as ConfigRef>::ByteOrder, Tag = T>,
-    ) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
+    ) -> Option<ValueOwn<<Self::Config as ConfigRef>::ByteOrder>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
             let key = MUTF8Str::from_mutf8_unchecked(&key);
@@ -805,7 +806,7 @@ pub trait CompoundMut<'s>:
     }
 
     #[inline]
-    fn remove(&mut self, key: &str) -> Option<OwnValue<<Self::Config as ConfigRef>::ByteOrder>> {
+    fn remove(&mut self, key: &str) -> Option<ValueOwn<<Self::Config as ConfigRef>::ByteOrder>> {
         unsafe {
             let key = simd_cesu8::mutf8::encode(key);
             let key = MUTF8Str::from_mutf8_unchecked(&key);

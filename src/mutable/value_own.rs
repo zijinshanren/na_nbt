@@ -3,8 +3,8 @@ use std::{marker::PhantomData, mem::ManuallyDrop, ptr};
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, GenericNBT, Index, NBT, OwnCompound, OwnList, OwnString, OwnTypedList, OwnVec,
-    TagID,
+    ByteOrder, GenericNBT, NBT, CompoundOwn, ListOwn, StringOwn, TypedListOwn, VecOwn, TagID,
+    index::Index,
     mutable::{
         compound_mut::MutCompound, compound_ref::RefCompound, config::MutableConfig,
         list_mut::MutList, list_ref::RefList, string_ref::RefString, value_mut::MutValue,
@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-pub enum OwnValue<O: ByteOrder> {
+pub enum ValueOwn<O: ByteOrder> {
     End(()),
     Byte(i8),
     Short(byteorder::I16<O>),
@@ -20,61 +20,61 @@ pub enum OwnValue<O: ByteOrder> {
     Long(byteorder::I64<O>),
     Float(byteorder::F32<O>),
     Double(byteorder::F64<O>),
-    ByteArray(OwnVec<i8>),
-    String(OwnString),
-    List(OwnList<O>),
-    Compound(OwnCompound<O>),
-    IntArray(OwnVec<byteorder::I32<O>>),
-    LongArray(OwnVec<byteorder::I64<O>>),
+    ByteArray(VecOwn<i8>),
+    String(StringOwn),
+    List(ListOwn<O>),
+    Compound(CompoundOwn<O>),
+    IntArray(VecOwn<byteorder::I32<O>>),
+    LongArray(VecOwn<byteorder::I64<O>>),
 }
 
-impl<O: ByteOrder> Default for OwnValue<O> {
+impl<O: ByteOrder> Default for ValueOwn<O> {
     #[inline]
     fn default() -> Self {
         Self::End(())
     }
 }
 
-impl<O: ByteOrder> OwnValue<O> {
+impl<O: ByteOrder> ValueOwn<O> {
     #[allow(clippy::unit_arg)]
     pub(crate) unsafe fn read(tag_id: TagID, src: *mut u8) -> Self {
         unsafe {
             match tag_id {
-                TagID::End => OwnValue::End(ptr::read(src.cast())),
-                TagID::Byte => OwnValue::Byte(ptr::read(src.cast())),
-                TagID::Short => OwnValue::Short(ptr::read(src.cast())),
-                TagID::Int => OwnValue::Int(ptr::read(src.cast())),
-                TagID::Long => OwnValue::Long(ptr::read(src.cast())),
-                TagID::Float => OwnValue::Float(ptr::read(src.cast())),
-                TagID::Double => OwnValue::Double(ptr::read(src.cast())),
-                TagID::ByteArray => OwnValue::ByteArray(ptr::read(src.cast())),
-                TagID::String => OwnValue::String(ptr::read(src.cast())),
-                TagID::List => OwnValue::List(ptr::read(src.cast())),
-                TagID::Compound => OwnValue::Compound(ptr::read(src.cast())),
-                TagID::IntArray => OwnValue::IntArray(ptr::read(src.cast())),
-                TagID::LongArray => OwnValue::LongArray(ptr::read(src.cast())),
+                TagID::End => ValueOwn::End(ptr::read(src.cast())),
+                TagID::Byte => ValueOwn::Byte(ptr::read(src.cast())),
+                TagID::Short => ValueOwn::Short(ptr::read(src.cast())),
+                TagID::Int => ValueOwn::Int(ptr::read(src.cast())),
+                TagID::Long => ValueOwn::Long(ptr::read(src.cast())),
+                TagID::Float => ValueOwn::Float(ptr::read(src.cast())),
+                TagID::Double => ValueOwn::Double(ptr::read(src.cast())),
+                TagID::ByteArray => ValueOwn::ByteArray(ptr::read(src.cast())),
+                TagID::String => ValueOwn::String(ptr::read(src.cast())),
+                TagID::List => ValueOwn::List(ptr::read(src.cast())),
+                TagID::Compound => ValueOwn::Compound(ptr::read(src.cast())),
+                TagID::IntArray => ValueOwn::IntArray(ptr::read(src.cast())),
+                TagID::LongArray => ValueOwn::LongArray(ptr::read(src.cast())),
             }
         }
     }
 }
 
-impl<O: ByteOrder> OwnValue<O> {
+impl<O: ByteOrder> ValueOwn<O> {
     #[inline]
     pub fn tag_id(&self) -> TagID {
         match self {
-            OwnValue::End(_) => TagID::End,
-            OwnValue::Byte(_) => TagID::Byte,
-            OwnValue::Short(_) => TagID::Short,
-            OwnValue::Int(_) => TagID::Int,
-            OwnValue::Long(_) => TagID::Long,
-            OwnValue::Float(_) => TagID::Float,
-            OwnValue::Double(_) => TagID::Double,
-            OwnValue::ByteArray(_) => TagID::ByteArray,
-            OwnValue::String(_) => TagID::String,
-            OwnValue::List(_) => TagID::List,
-            OwnValue::Compound(_) => TagID::Compound,
-            OwnValue::IntArray(_) => TagID::IntArray,
-            OwnValue::LongArray(_) => TagID::LongArray,
+            ValueOwn::End(_) => TagID::End,
+            ValueOwn::Byte(_) => TagID::Byte,
+            ValueOwn::Short(_) => TagID::Short,
+            ValueOwn::Int(_) => TagID::Int,
+            ValueOwn::Long(_) => TagID::Long,
+            ValueOwn::Float(_) => TagID::Float,
+            ValueOwn::Double(_) => TagID::Double,
+            ValueOwn::ByteArray(_) => TagID::ByteArray,
+            ValueOwn::String(_) => TagID::String,
+            ValueOwn::List(_) => TagID::List,
+            ValueOwn::Compound(_) => TagID::Compound,
+            ValueOwn::IntArray(_) => TagID::IntArray,
+            ValueOwn::LongArray(_) => TagID::LongArray,
         }
     }
 
@@ -88,11 +88,11 @@ impl<O: ByteOrder> OwnValue<O> {
         index.index_dispatch(
             self,
             |value, index| match value {
-                OwnValue::List(value) => value.get(index),
+                ValueOwn::List(value) => value.get(index),
                 _ => None,
             },
             |value, key| match value {
-                OwnValue::Compound(value) => value.get(key),
+                ValueOwn::Compound(value) => value.get(key),
                 _ => None,
             },
         )
@@ -106,11 +106,11 @@ impl<O: ByteOrder> OwnValue<O> {
         index.index_dispatch(
             self,
             |value, index| match value {
-                OwnValue::List(value) => value.get_::<T>(index),
+                ValueOwn::List(value) => value.get_::<T>(index),
                 _ => None,
             },
             |value, key| match value {
-                OwnValue::Compound(value) => value.get_::<T>(key),
+                ValueOwn::Compound(value) => value.get_::<T>(key),
                 _ => None,
             },
         )
@@ -121,11 +121,11 @@ impl<O: ByteOrder> OwnValue<O> {
         index.index_dispatch_mut(
             self,
             |value, index| match value {
-                OwnValue::List(value) => value.get_mut(index),
+                ValueOwn::List(value) => value.get_mut(index),
                 _ => None,
             },
             |value, key| match value {
-                OwnValue::Compound(value) => value.get_mut(key),
+                ValueOwn::Compound(value) => value.get_mut(key),
                 _ => None,
             },
         )
@@ -139,11 +139,11 @@ impl<O: ByteOrder> OwnValue<O> {
         index.index_dispatch_mut(
             self,
             |value, index| match value {
-                OwnValue::List(value) => value.get_mut_::<T>(index),
+                ValueOwn::List(value) => value.get_mut_::<T>(index),
                 _ => None,
             },
             |value, key| match value {
-                OwnValue::Compound(value) => value.get_mut_::<T>(key),
+                ValueOwn::Compound(value) => value.get_mut_::<T>(key),
                 _ => None,
             },
         )
@@ -153,152 +153,152 @@ impl<O: ByteOrder> OwnValue<O> {
     #[allow(clippy::unit_arg)]
     pub fn to_ref<'a>(&'a self) -> RefValue<'a, O> {
         match self {
-            OwnValue::End(value) => RefValue::End(*value),
-            OwnValue::Byte(value) => RefValue::Byte(*value),
-            OwnValue::Short(value) => RefValue::Short(value.get()),
-            OwnValue::Int(value) => RefValue::Int(value.get()),
-            OwnValue::Long(value) => RefValue::Long(value.get()),
-            OwnValue::Float(value) => RefValue::Float(value.get()),
-            OwnValue::Double(value) => RefValue::Double(value.get()),
-            OwnValue::ByteArray(value) => RefValue::ByteArray(value),
-            OwnValue::String(value) => RefValue::String(RefString {
+            ValueOwn::End(value) => RefValue::End(*value),
+            ValueOwn::Byte(value) => RefValue::Byte(*value),
+            ValueOwn::Short(value) => RefValue::Short(value.get()),
+            ValueOwn::Int(value) => RefValue::Int(value.get()),
+            ValueOwn::Long(value) => RefValue::Long(value.get()),
+            ValueOwn::Float(value) => RefValue::Float(value.get()),
+            ValueOwn::Double(value) => RefValue::Double(value.get()),
+            ValueOwn::ByteArray(value) => RefValue::ByteArray(value),
+            ValueOwn::String(value) => RefValue::String(RefString {
                 data: value.as_mutf8_str(),
             }),
-            OwnValue::List(value) => RefValue::List(RefList {
+            ValueOwn::List(value) => RefValue::List(RefList {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             }),
-            OwnValue::Compound(value) => RefValue::Compound(RefCompound {
+            ValueOwn::Compound(value) => RefValue::Compound(RefCompound {
                 data: value.data.as_ptr(),
                 _marker: PhantomData,
             }),
-            OwnValue::IntArray(value) => RefValue::IntArray(value),
-            OwnValue::LongArray(value) => RefValue::LongArray(value),
+            ValueOwn::IntArray(value) => RefValue::IntArray(value),
+            ValueOwn::LongArray(value) => RefValue::LongArray(value),
         }
     }
 
     #[inline]
     pub fn to_mut<'a>(&'a mut self) -> MutValue<'a, O> {
         match self {
-            OwnValue::End(value) => MutValue::End(&mut *value),
-            OwnValue::Byte(value) => MutValue::Byte(&mut *value),
-            OwnValue::Short(value) => MutValue::Short(&mut *value),
-            OwnValue::Int(value) => MutValue::Int(&mut *value),
-            OwnValue::Long(value) => MutValue::Long(&mut *value),
-            OwnValue::Float(value) => MutValue::Float(&mut *value),
-            OwnValue::Double(value) => MutValue::Double(&mut *value),
-            OwnValue::ByteArray(value) => MutValue::ByteArray(value.to_mut()),
-            OwnValue::String(value) => MutValue::String(value.to_mut()),
-            OwnValue::List(value) => MutValue::List(MutList {
+            ValueOwn::End(value) => MutValue::End(&mut *value),
+            ValueOwn::Byte(value) => MutValue::Byte(&mut *value),
+            ValueOwn::Short(value) => MutValue::Short(&mut *value),
+            ValueOwn::Int(value) => MutValue::Int(&mut *value),
+            ValueOwn::Long(value) => MutValue::Long(&mut *value),
+            ValueOwn::Float(value) => MutValue::Float(&mut *value),
+            ValueOwn::Double(value) => MutValue::Double(&mut *value),
+            ValueOwn::ByteArray(value) => MutValue::ByteArray(value.to_mut()),
+            ValueOwn::String(value) => MutValue::String(value.to_mut()),
+            ValueOwn::List(value) => MutValue::List(MutList {
                 data: value.data.to_mut(),
                 _marker: PhantomData,
             }),
-            OwnValue::Compound(value) => MutValue::Compound(MutCompound {
+            ValueOwn::Compound(value) => MutValue::Compound(MutCompound {
                 data: value.data.to_mut(),
                 _marker: PhantomData,
             }),
-            OwnValue::IntArray(value) => MutValue::IntArray(value.to_mut()),
-            OwnValue::LongArray(value) => MutValue::LongArray(value.to_mut()),
+            ValueOwn::IntArray(value) => MutValue::IntArray(value.to_mut()),
+            ValueOwn::LongArray(value) => MutValue::LongArray(value.to_mut()),
         }
     }
 }
 
-impl<O: ByteOrder> From<()> for OwnValue<O> {
+impl<O: ByteOrder> From<()> for ValueOwn<O> {
     #[inline]
     fn from(value: ()) -> Self {
-        OwnValue::End(value)
+        ValueOwn::End(value)
     }
 }
 
-impl<O: ByteOrder> From<i8> for OwnValue<O> {
+impl<O: ByteOrder> From<i8> for ValueOwn<O> {
     #[inline]
     fn from(value: i8) -> Self {
-        OwnValue::Byte(value)
+        ValueOwn::Byte(value)
     }
 }
 
-impl<O: ByteOrder> From<byteorder::I16<O>> for OwnValue<O> {
+impl<O: ByteOrder> From<byteorder::I16<O>> for ValueOwn<O> {
     #[inline]
     fn from(value: byteorder::I16<O>) -> Self {
-        OwnValue::Short(value)
+        ValueOwn::Short(value)
     }
 }
 
-impl<O: ByteOrder> From<byteorder::I32<O>> for OwnValue<O> {
+impl<O: ByteOrder> From<byteorder::I32<O>> for ValueOwn<O> {
     #[inline]
     fn from(value: byteorder::I32<O>) -> Self {
-        OwnValue::Int(value)
+        ValueOwn::Int(value)
     }
 }
 
-impl<O: ByteOrder> From<byteorder::I64<O>> for OwnValue<O> {
+impl<O: ByteOrder> From<byteorder::I64<O>> for ValueOwn<O> {
     #[inline]
     fn from(value: byteorder::I64<O>) -> Self {
-        OwnValue::Long(value)
+        ValueOwn::Long(value)
     }
 }
 
-impl<O: ByteOrder> From<byteorder::F32<O>> for OwnValue<O> {
+impl<O: ByteOrder> From<byteorder::F32<O>> for ValueOwn<O> {
     #[inline]
     fn from(value: byteorder::F32<O>) -> Self {
-        OwnValue::Float(value)
+        ValueOwn::Float(value)
     }
 }
 
-impl<O: ByteOrder> From<byteorder::F64<O>> for OwnValue<O> {
+impl<O: ByteOrder> From<byteorder::F64<O>> for ValueOwn<O> {
     #[inline]
     fn from(value: byteorder::F64<O>) -> Self {
-        OwnValue::Double(value)
+        ValueOwn::Double(value)
     }
 }
 
-impl<O: ByteOrder> From<OwnVec<i8>> for OwnValue<O> {
+impl<O: ByteOrder> From<VecOwn<i8>> for ValueOwn<O> {
     #[inline]
-    fn from(value: OwnVec<i8>) -> Self {
-        OwnValue::ByteArray(value)
+    fn from(value: VecOwn<i8>) -> Self {
+        ValueOwn::ByteArray(value)
     }
 }
 
-impl<O: ByteOrder> From<OwnString> for OwnValue<O> {
+impl<O: ByteOrder> From<StringOwn> for ValueOwn<O> {
     #[inline]
-    fn from(value: OwnString) -> Self {
-        OwnValue::String(value)
+    fn from(value: StringOwn) -> Self {
+        ValueOwn::String(value)
     }
 }
 
-impl<O: ByteOrder> From<OwnList<O>> for OwnValue<O> {
+impl<O: ByteOrder> From<ListOwn<O>> for ValueOwn<O> {
     #[inline]
-    fn from(value: OwnList<O>) -> Self {
-        OwnValue::List(value)
+    fn from(value: ListOwn<O>) -> Self {
+        ValueOwn::List(value)
     }
 }
 
-impl<O: ByteOrder> From<OwnCompound<O>> for OwnValue<O> {
+impl<O: ByteOrder> From<CompoundOwn<O>> for ValueOwn<O> {
     #[inline]
-    fn from(value: OwnCompound<O>) -> Self {
-        OwnValue::Compound(value)
+    fn from(value: CompoundOwn<O>) -> Self {
+        ValueOwn::Compound(value)
     }
 }
 
-impl<O: ByteOrder> From<OwnVec<byteorder::I32<O>>> for OwnValue<O> {
+impl<O: ByteOrder> From<VecOwn<byteorder::I32<O>>> for ValueOwn<O> {
     #[inline]
-    fn from(value: OwnVec<byteorder::I32<O>>) -> Self {
-        OwnValue::IntArray(value)
+    fn from(value: VecOwn<byteorder::I32<O>>) -> Self {
+        ValueOwn::IntArray(value)
     }
 }
 
-impl<O: ByteOrder> From<OwnVec<byteorder::I64<O>>> for OwnValue<O> {
+impl<O: ByteOrder> From<VecOwn<byteorder::I64<O>>> for ValueOwn<O> {
     #[inline]
-    fn from(value: OwnVec<byteorder::I64<O>>) -> Self {
-        OwnValue::LongArray(value)
+    fn from(value: VecOwn<byteorder::I64<O>>) -> Self {
+        ValueOwn::LongArray(value)
     }
 }
 
-impl<O: ByteOrder, T: NBT> From<OwnTypedList<O, T>> for OwnValue<O> {
+impl<O: ByteOrder, T: NBT> From<TypedListOwn<O, T>> for ValueOwn<O> {
     #[inline]
-    fn from(value: OwnTypedList<O, T>) -> Self {
+    fn from(value: TypedListOwn<O, T>) -> Self {
         let me = ManuallyDrop::new(value);
-        OwnValue::List(OwnList {
+        ValueOwn::List(ListOwn {
             data: unsafe { ptr::read(&me.data) },
             _marker: PhantomData,
         })

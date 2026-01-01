@@ -1,7 +1,11 @@
-use crate::{ByteOrder, ConfigMut, ConfigRef, Error, NBTInto, NBTRef, cold_path};
+use crate::{ByteOrder, ConfigMut, ConfigRef, Error, cold_path};
 
 pub mod tag;
 
+/// NBT tag type identifier.
+///
+/// Each NBT value begins with a single byte indicating its type. This enum
+/// provides type-safe representations of those tag IDs.
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum TagID {
@@ -62,7 +66,6 @@ impl TagID {
     /// Returns `true` if this is a primitive tag type.
     ///
     /// Primitive tags are: End, Byte, Short, Int, Long, Float, Double.
-    /// These tags store their values directly without additional structure.
     ///
     /// # Example
     ///
@@ -90,7 +93,6 @@ impl TagID {
     /// Returns `true` if this is an array tag type.
     ///
     /// Array tags are: ByteArray, IntArray, LongArray.
-    /// These store contiguous sequences of primitive values.
     ///
     /// # Example
     ///
@@ -109,7 +111,6 @@ impl TagID {
     /// Returns `true` if this is a composite tag type.
     ///
     /// Composite tags are: List, Compound.
-    /// These contain other NBT values as children.
     ///
     /// # Example
     ///
@@ -160,14 +161,11 @@ pub trait NBTBase: private::Sealed + Send + Sync + Sized + Clone + Copy + 'stati
     ) -> R;
 }
 
-macro_rules! define_trait {
-    ($name:ident: $first:path $(, $rest:path)*) => {
-        pub trait $name: $first $(+ $rest)* {}
+pub trait GenericNBT: NBTBase + crate::NBTInto {}
 
-        impl<T: $first $(+ $rest)*> $name for T {}
-    };
-}
+impl<T: NBTBase + crate::NBTInto> GenericNBT for T {}
 
-define_trait!(GenericNBT: NBTBase, NBTInto);
+#[allow(clippy::upper_case_acronyms)]
+pub trait NBT: GenericNBT + crate::NBTRef {}
 
-define_trait!(NBT: GenericNBT, NBTRef);
+impl<T: GenericNBT + crate::NBTRef> NBT for T {}

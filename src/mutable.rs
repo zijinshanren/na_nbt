@@ -19,11 +19,11 @@ mod write;
 
 use std::{any::TypeId, io::Read};
 
-pub use compound_own::OwnCompound;
+pub use compound_own::CompoundOwn;
 pub use into_nbt::IntoNBT;
-pub use list_own::OwnList;
-pub use typed_list_own::OwnTypedList;
-pub use value_own::OwnValue;
+pub use list_own::ListOwn;
+pub use typed_list_own::TypedListOwn;
+pub use value_own::ValueOwn;
 use zerocopy::byteorder;
 
 use crate::{
@@ -31,7 +31,7 @@ use crate::{
     mutable::read::{read_unsafe, read_unsafe_fallback},
 };
 
-pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<OwnValue<STORE>> {
+pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<ValueOwn<STORE>> {
     unsafe {
         macro_rules! check_bounds {
             ($required:expr) => {
@@ -52,7 +52,7 @@ pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<
 
         if tag_id == 0 {
             cold_path();
-            return Ok(OwnValue::End(()));
+            return Ok(ValueOwn::End(()));
         }
 
         check_bounds!(1 + 2);
@@ -63,7 +63,7 @@ pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<
 
         let value = if TypeId::of::<SOURCE>() == TypeId::of::<STORE>() {
             let result = read_unsafe::<SOURCE>(tag_id, &mut current_pos, end_pos)?;
-            Ok(std::mem::transmute::<OwnValue<SOURCE>, OwnValue<STORE>>(
+            Ok(std::mem::transmute::<ValueOwn<SOURCE>, ValueOwn<STORE>>(
                 result,
             ))
         } else {
@@ -83,7 +83,7 @@ pub fn read_owned<SOURCE: ByteOrder, STORE: ByteOrder>(source: &[u8]) -> Result<
 
 pub fn read_owned_from_reader<SOURCE: ByteOrder, STORE: ByteOrder>(
     mut reader: impl Read,
-) -> Result<OwnValue<STORE>> {
+) -> Result<ValueOwn<STORE>> {
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf).map_err(Error::IO)?;
 

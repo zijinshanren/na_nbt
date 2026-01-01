@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use na_nbt::{
-    BigEndian, CompoundRef, ListBase, ListRef, LittleEndian, OwnCompound, OwnList, OwnValue,
+    BigEndian, CompoundOwn, CompoundRef, ListBase, ListOwn, ListRef, LittleEndian, ValueOwn,
     ValueRef, VisitRef, Writable, from_slice_be, from_slice_le, read_borrowed, read_owned,
     read_shared,
 };
@@ -479,7 +479,7 @@ fn test_serde_read_write() {
 #[test]
 fn test_complex_nbt_round_trip() {
     // Create a complex NBT structure
-    let mut root = OwnCompound::<BigEndian>::default();
+    let mut root = CompoundOwn::<BigEndian>::default();
 
     // Add primitives
     root.insert("byte", 42i8);
@@ -511,26 +511,26 @@ fn test_complex_nbt_round_trip() {
     root.insert("long_array", long_data);
 
     // Add list of ints
-    let mut int_list = OwnList::<BigEndian>::default();
+    let mut int_list = ListOwn::<BigEndian>::default();
     for i in 0..5 {
         int_list.push(i * 10);
     }
     root.insert("int_list", int_list);
 
     // Add list of strings
-    let mut string_list = OwnList::<BigEndian>::default();
+    let mut string_list = ListOwn::<BigEndian>::default();
     string_list.push("alpha");
     string_list.push("beta");
     string_list.push("gamma");
     root.insert("string_list", string_list);
 
     // Add nested compound
-    let mut nested = OwnCompound::<BigEndian>::default();
+    let mut nested = CompoundOwn::<BigEndian>::default();
     nested.insert("id", 999i32);
     nested.insert("name", "nested_compound");
 
     // Add doubly nested compound
-    let mut deep = OwnCompound::<BigEndian>::default();
+    let mut deep = CompoundOwn::<BigEndian>::default();
     deep.insert("value", 42i32);
     deep.insert("flag", 1i8);
     nested.insert("deep", deep);
@@ -538,9 +538,9 @@ fn test_complex_nbt_round_trip() {
     root.insert("nested", nested);
 
     // Add list of compounds
-    let mut compound_list = OwnList::<BigEndian>::default();
+    let mut compound_list = ListOwn::<BigEndian>::default();
     for i in 0..3 {
-        let mut item = OwnCompound::<BigEndian>::default();
+        let mut item = CompoundOwn::<BigEndian>::default();
         item.insert("index", i);
         item.insert("name", format!("item_{}", i).as_str());
         compound_list.push(item);
@@ -548,9 +548,9 @@ fn test_complex_nbt_round_trip() {
     root.insert("compound_list", compound_list);
 
     // Add nested list (list of lists)
-    let mut nested_list = OwnList::<BigEndian>::default();
+    let mut nested_list = ListOwn::<BigEndian>::default();
     for i in 0..2 {
-        let mut inner = OwnList::<BigEndian>::default();
+        let mut inner = ListOwn::<BigEndian>::default();
         for j in 0..3 {
             inner.push(i * 10 + j);
         }
@@ -559,6 +559,6 @@ fn test_complex_nbt_round_trip() {
     root.insert("nested_list", nested_list);
 
     // Convert to OwnValue for writing
-    let value = OwnValue::<BigEndian>::Compound(root);
+    let value = ValueOwn::<BigEndian>::Compound(root);
     test_round(&value.to_ref());
 }

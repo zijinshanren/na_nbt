@@ -1,5 +1,5 @@
 use crate::{
-    CompoundMut, ConfigRef, GenericNBT, ListMut, MUTF8Str, NBT, OwnValue, TagID, TypedListMut,
+    CompoundMut, ConfigRef, GenericNBT, ListMut, MUTF8Str, NBT, ValueOwn, TagID, TypedListMut,
     ValueMut,
     tag::{
         Byte, ByteArray, Compound, Double, End, Float, Int, IntArray, List, Long, LongArray, Short,
@@ -126,5 +126,5 @@ pub trait ConfigMut: ConfigRef {
     unsafe fn compound_remove<'a>(
         params: Self::WriteParams<'a>,
         key: &MUTF8Str,
-    ) -> Option<OwnValue<Self::ByteOrder>>;
+    ) -> Option<ValueOwn<Self::ByteOrder>>;
 }

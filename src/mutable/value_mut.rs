@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, MapMut, MutString, MutVec, NBT, TagID, ValueBase, ValueMut, VisitMut,
+    ByteOrder, MapMut, StringMut, VecMut, NBT, TagID, ValueBase, ValueMut, VisitMut,
     VisitMutShared,
     mutable::{
         compound_mut::MutCompound, compound_ref::RefCompound, config::MutableConfig,
@@ -20,12 +20,12 @@ pub enum MutValue<'s, O: ByteOrder> {
     Long(&'s mut byteorder::I64<O>),
     Float(&'s mut byteorder::F32<O>),
     Double(&'s mut byteorder::F64<O>),
-    ByteArray(MutVec<'s, i8>),
-    String(MutString<'s>),
+    ByteArray(VecMut<'s, i8>),
+    String(StringMut<'s>),
     List(MutList<'s, O>),
     Compound(MutCompound<'s, O>),
-    IntArray(MutVec<'s, byteorder::I32<O>>),
-    LongArray(MutVec<'s, byteorder::I64<O>>),
+    IntArray(VecMut<'s, byteorder::I32<O>>),
+    LongArray(VecMut<'s, byteorder::I64<O>>),
 }
 
 impl<'s, O: ByteOrder> ValueBase for MutValue<'s, O> {
@@ -192,16 +192,16 @@ impl<'s, O: ByteOrder> From<&'s mut byteorder::F64<O>> for MutValue<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> From<MutVec<'s, i8>> for MutValue<'s, O> {
+impl<'s, O: ByteOrder> From<VecMut<'s, i8>> for MutValue<'s, O> {
     #[inline]
-    fn from(value: MutVec<'s, i8>) -> Self {
+    fn from(value: VecMut<'s, i8>) -> Self {
         MutValue::ByteArray(value)
     }
 }
 
-impl<'s, O: ByteOrder> From<MutString<'s>> for MutValue<'s, O> {
+impl<'s, O: ByteOrder> From<StringMut<'s>> for MutValue<'s, O> {
     #[inline]
-    fn from(value: MutString<'s>) -> Self {
+    fn from(value: StringMut<'s>) -> Self {
         MutValue::String(value)
     }
 }
@@ -220,16 +220,16 @@ impl<'s, O: ByteOrder> From<MutCompound<'s, O>> for MutValue<'s, O> {
     }
 }
 
-impl<'s, O: ByteOrder> From<MutVec<'s, byteorder::I32<O>>> for MutValue<'s, O> {
+impl<'s, O: ByteOrder> From<VecMut<'s, byteorder::I32<O>>> for MutValue<'s, O> {
     #[inline]
-    fn from(value: MutVec<'s, byteorder::I32<O>>) -> Self {
+    fn from(value: VecMut<'s, byteorder::I32<O>>) -> Self {
         MutValue::IntArray(value)
     }
 }
 
-impl<'s, O: ByteOrder> From<MutVec<'s, byteorder::I64<O>>> for MutValue<'s, O> {
+impl<'s, O: ByteOrder> From<VecMut<'s, byteorder::I64<O>>> for MutValue<'s, O> {
     #[inline]
-    fn from(value: MutVec<'s, byteorder::I64<O>>) -> Self {
+    fn from(value: VecMut<'s, byteorder::I64<O>>) -> Self {
         MutValue::LongArray(value)
     }
 }
