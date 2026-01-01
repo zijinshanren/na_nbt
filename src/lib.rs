@@ -65,6 +65,8 @@
 //! 3. Own: [`ValueOwn`], [`ListOwn`], [`CompoundOwn`] and [`TypedListOwn`].
 //!
 //! ```rust
+//! use na_nbt::{CompoundMut, CompoundOwn, TypedListOwn};
+//! 
 //! fn example<'s>(nbt: &mut impl CompoundMut<'s>) {
 //!     let mut comp = CompoundOwn::default();
 //!     comp.insert("Int", 1);
@@ -80,7 +82,7 @@
 //! ```
 //!
 //! ```rust
-//! use na_nbt::{ValueRef, VisitRef, ListBase, ValueBase};
+//! use na_nbt::{ValueRef, VisitRef, ListBase, ValueBase, CompoundRef, ListRef};
 //!
 //! fn dump<'s>(value: &impl ValueRef<'s>, indent: usize) -> String {
 //!     let pad = "  ".repeat(indent);
