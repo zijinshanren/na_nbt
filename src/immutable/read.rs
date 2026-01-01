@@ -1,9 +1,9 @@
 use std::hint::{assert_unchecked, unreachable_unchecked};
 
-use zerocopy::{ByteOrder, byteorder};
+use zerocopy::byteorder;
 
 use crate::{
-    Error, Result, cold_path,
+    ByteOrder, Error, Result, cold_path,
     immutable::mark::{Cache, Mark},
 };
 
@@ -30,7 +30,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
     ];
 
     #[inline(always)]
-    unsafe fn tag_size(tag_id: u8) -> usize {
+    const unsafe fn tag_size(tag_id: u8) -> usize {
         unsafe { assert_unchecked(tag_id < 13) };
         TAG_SIZE[tag_id as usize]
     }
@@ -46,7 +46,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
         ($bytes_read:expr, $len:expr) => {
             if $bytes_read > $len {
                 cold_path();
-                return Err(Error::EndOfFile);
+                return Err(Error::EOF);
             }
         };
     }
@@ -113,7 +113,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                     cur.cache.list_current_length = 0;
                 } else {
                     cold_path();
-                    return Err(Error::InvalidTagType(element_type));
+                    return Err(Error::INVALID(element_type));
                 }
                 label = Label::ListItemBegin;
             }};
@@ -144,7 +144,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                 check_bounds!(bytes_read, len);
                 if bytes_read < len {
                     cold_path();
-                    return Err(Error::TrailingData(len - bytes_read));
+                    return Err(Error::REMAIN(len - bytes_read));
                 }
                 return Ok(f(mark));
             }
@@ -158,7 +158,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                 check_bounds!(bytes_read, len);
                 if bytes_read < len {
                     cold_path();
-                    return Err(Error::TrailingData(len - bytes_read));
+                    return Err(Error::REMAIN(len - bytes_read));
                 }
                 return Ok(f(mark));
             }
@@ -171,7 +171,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                 check_bounds!(bytes_read, len);
                 if bytes_read < len {
                     cold_path();
-                    return Err(Error::TrailingData(len - bytes_read));
+                    return Err(Error::REMAIN(len - bytes_read));
                 }
                 return Ok(f(mark));
             }
@@ -179,7 +179,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
             10 => comp_begin!(),
             _ => {
                 cold_path();
-                return Err(Error::InvalidTagType(root_tag));
+                return Err(Error::INVALID(root_tag));
             }
         }
 
@@ -204,7 +204,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             cold_path();
                             if bytes_read < len {
                                 cold_path();
-                                return Err(Error::TrailingData(len - bytes_read));
+                                return Err(Error::REMAIN(len - bytes_read));
                             }
                             return Ok(f(mark));
                         }
@@ -272,7 +272,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                         }
                         _ => {
                             cold_path();
-                            return Err(Error::InvalidTagType(tag_id));
+                            return Err(Error::INVALID(tag_id));
                         }
                     }
                 },
@@ -291,7 +291,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                             cold_path();
                             if bytes_read < len {
                                 cold_path();
-                                return Err(Error::TrailingData(len - bytes_read));
+                                return Err(Error::REMAIN(len - bytes_read));
                             }
                             return Ok(f(mark));
                         }
@@ -347,7 +347,7 @@ pub unsafe fn read_unsafe<O: ByteOrder, R>(
                         }
                         _ => {
                             cold_path();
-                            return Err(Error::InvalidTagType(element_type));
+                            return Err(Error::INVALID(element_type));
                         }
                     }
                 },

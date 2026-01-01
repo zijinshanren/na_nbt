@@ -12,22 +12,26 @@ use std::{
     slice::{self, SliceIndex},
 };
 
+use simd_cesu8::DecodingError;
 use zerocopy::Unalign;
 
-pub struct VecViewMut<'a, T> {
+use crate::MUTF8Str;
+
+#[repr(C)]
+pub struct VecMut<'a, T> {
     pub(crate) ptr: &'a mut Unalign<usize>,
     pub(crate) len: &'a mut Unalign<usize>,
     pub(crate) cap: &'a mut Unalign<usize>,
     _marker: PhantomData<T>,
 }
 
-// SAFETY: VecView is Send/Sync if T is Send/Sync.
+// SAFETY: VecMut is Send/Sync if T is Send/Sync.
 // The raw pointer is only used for the Vec's buffer, which is guarded by the mutable references.
-unsafe impl<T: Send> Send for VecViewMut<'_, T> {}
-unsafe impl<T: Sync> Sync for VecViewMut<'_, T> {}
+unsafe impl<T: Send> Send for VecMut<'_, T> {}
+unsafe impl<T: Sync> Sync for VecMut<'_, T> {}
 
-impl<'a, T> VecViewMut<'a, T> {
-    /// Creates a new `VecView` from mutable references to a Vec's raw parts.
+impl<'a, T> VecMut<'a, T> {
+    /// Creates a new `VecMut` from mutable references to a Vec's raw parts.
     ///
     /// # Safety
     ///
@@ -68,6 +72,23 @@ impl<'a, T> VecViewMut<'a, T> {
         self.len.set(vec.len());
         self.cap.set(vec.capacity());
         result
+    }
+
+    /// Returns the new clone of this [`VecMut<T>`].
+    ///
+    /// # Safety
+    ///
+    /// The returned view references the same underlying vector parts as `self`.
+    /// Using both views simultaneously can cause undefined behavior if they're
+    /// used to create overlapping mutable references to the same data.
+    #[inline]
+    pub unsafe fn new_clone(&mut self) -> Self {
+        VecMut {
+            ptr: unsafe { &mut *(self.ptr as *mut _) },
+            len: unsafe { &mut *(self.len as *mut _) },
+            cap: unsafe { &mut *(self.cap as *mut _) },
+            _marker: PhantomData,
+        }
     }
 
     // ============ Basic accessors ============
@@ -338,9 +359,9 @@ impl<'a, T> VecViewMut<'a, T> {
         self.with_vec(|v| v.append(other));
     }
 
-    /// Moves all elements from another `VecView` into `self`, leaving `other` empty.
+    /// Moves all elements from another `VecMut` into `self`, leaving `other` empty.
     #[inline]
-    pub fn append_view(&mut self, other: &mut VecViewMut<'_, T>) {
+    pub fn append_view(&mut self, other: &mut VecMut<'_, T>) {
         // Reconstruct other as a vec temporarily
         let mut other_vec = unsafe {
             ManuallyDrop::new(Vec::from_raw_parts(
@@ -398,7 +419,7 @@ impl<'a, T> VecViewMut<'a, T> {
 
 // ============ Trait Implementations ============
 
-impl<T> Deref for VecViewMut<'_, T> {
+impl<T> Deref for VecMut<'_, T> {
     type Target = [T];
 
     #[inline]
@@ -407,14 +428,14 @@ impl<T> Deref for VecViewMut<'_, T> {
     }
 }
 
-impl<T> DerefMut for VecViewMut<'_, T> {
+impl<T> DerefMut for VecMut<'_, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T, I: SliceIndex<[T]>> Index<I> for VecViewMut<'_, T> {
+impl<T, I: SliceIndex<[T]>> Index<I> for VecMut<'_, T> {
     type Output = I::Output;
 
     #[inline]
@@ -423,100 +444,100 @@ impl<T, I: SliceIndex<[T]>> Index<I> for VecViewMut<'_, T> {
     }
 }
 
-impl<T, I: SliceIndex<[T]>> IndexMut<I> for VecViewMut<'_, T> {
+impl<T, I: SliceIndex<[T]>> IndexMut<I> for VecMut<'_, T> {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         IndexMut::index_mut(self.as_mut_slice(), index)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for VecViewMut<'_, T> {
+impl<T: fmt::Debug> fmt::Debug for VecMut<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.as_slice(), f)
     }
 }
 
-impl<T: PartialEq> PartialEq for VecViewMut<'_, T> {
+impl<T: PartialEq> PartialEq for VecMut<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<Vec<T>> for VecViewMut<'_, T> {
+impl<T: PartialEq> PartialEq<Vec<T>> for VecMut<'_, T> {
     fn eq(&self, other: &Vec<T>) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<[T]> for VecViewMut<'_, T> {
+impl<T: PartialEq> PartialEq<[T]> for VecMut<'_, T> {
     fn eq(&self, other: &[T]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for VecViewMut<'_, T> {
+impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for VecMut<'_, T> {
     fn eq(&self, other: &[T; N]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq> PartialEq<&[T]> for VecViewMut<'_, T> {
+impl<T: PartialEq> PartialEq<&[T]> for VecMut<'_, T> {
     fn eq(&self, other: &&[T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: PartialEq> PartialEq<&mut [T]> for VecViewMut<'_, T> {
+impl<T: PartialEq> PartialEq<&mut [T]> for VecMut<'_, T> {
     fn eq(&self, other: &&mut [T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: Eq> Eq for VecViewMut<'_, T> {}
+impl<T: Eq> Eq for VecMut<'_, T> {}
 
-impl<T: PartialOrd> PartialOrd for VecViewMut<'_, T> {
+impl<T: PartialOrd> PartialOrd for VecMut<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
 
-impl<T: Ord> Ord for VecViewMut<'_, T> {
+impl<T: Ord> Ord for VecMut<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_slice().cmp(other.as_slice())
     }
 }
 
-impl<T: Hash> Hash for VecViewMut<'_, T> {
+impl<T: Hash> Hash for VecMut<'_, T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state);
     }
 }
 
-impl<T> Borrow<[T]> for VecViewMut<'_, T> {
+impl<T> Borrow<[T]> for VecMut<'_, T> {
     fn borrow(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> BorrowMut<[T]> for VecViewMut<'_, T> {
+impl<T> BorrowMut<[T]> for VecMut<'_, T> {
     fn borrow_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T> AsRef<[T]> for VecViewMut<'_, T> {
+impl<T> AsRef<[T]> for VecMut<'_, T> {
     fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[T]> for VecViewMut<'_, T> {
+impl<T> AsMut<[T]> for VecMut<'_, T> {
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<'a, T> IntoIterator for &'a VecViewMut<'_, T> {
+impl<'a, T> IntoIterator for &'a VecMut<'_, T> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
@@ -525,7 +546,7 @@ impl<'a, T> IntoIterator for &'a VecViewMut<'_, T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut VecViewMut<'_, T> {
+impl<'a, T> IntoIterator for &'a mut VecMut<'_, T> {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
@@ -534,19 +555,19 @@ impl<'a, T> IntoIterator for &'a mut VecViewMut<'_, T> {
     }
 }
 
-impl<T> Extend<T> for VecViewMut<'_, T> {
+impl<T> Extend<T> for VecMut<'_, T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl<'a, T: Copy + 'a> Extend<&'a T> for VecViewMut<'_, T> {
+impl<'a, T: Copy + 'a> Extend<&'a T> for VecMut<'_, T> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl Write for VecViewMut<'_, u8> {
+impl Write for VecMut<'_, u8> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.with_vec(|v| v.write(buf))
     }
@@ -564,22 +585,34 @@ impl Write for VecViewMut<'_, u8> {
     }
 }
 
-/// A view into a String's raw parts, allowing mutable access without owning the String.
+/// A mutable view into a String's MUTF-8 encoded raw parts.
 ///
-/// This is similar to `VecView<u8>` but maintains String's UTF-8 invariants.
-pub struct StringViewMut<'a> {
+/// `StringMut` provides temporary mutable access to a MUTF-8 string's data.
+/// Unlike `VecMut<u8>`, it maintains MUTF-8 encoding invariants and provides
+/// string-specific methods.
+///
+/// # Type Parameters
+///
+/// * `'a` - Lifetime of the underlying mutable references
+///
+/// # MUTF-8 Encoding
+///
+/// This type operates on MUTF-8 (Modified UTF-8) encoded strings, where null
+/// characters are represented as `0xC0 0x80` instead of `0x00`.
+#[repr(C)]
+pub struct StringMut<'a> {
     pub(crate) ptr: &'a mut Unalign<usize>,
     pub(crate) len: &'a mut Unalign<usize>,
     pub(crate) cap: &'a mut Unalign<usize>,
 }
 
-// SAFETY: StringView is Send/Sync because the underlying data is UTF-8 bytes.
+// SAFETY: StringMut is Send/Sync because the underlying data is MUTF-8 bytes.
 // The raw pointer is only used for the String's buffer, which is guarded by the mutable references.
-unsafe impl Send for StringViewMut<'_> {}
-unsafe impl Sync for StringViewMut<'_> {}
+unsafe impl Send for StringMut<'_> {}
+unsafe impl Sync for StringMut<'_> {}
 
-impl<'a> StringViewMut<'a> {
-    /// Creates a new `StringView` from mutable references to a String's raw parts.
+impl<'a> StringMut<'a> {
+    /// Creates a new `StringMut` from mutable references to a String's raw parts.
     ///
     /// # Safety
     ///
@@ -674,15 +707,35 @@ impl<'a> StringViewMut<'a> {
 
     /// Returns a byte slice of this String's contents (mutf8 encoded).
     #[inline]
-    pub fn as_mutf8_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
     }
 
+    #[inline]
+    pub fn as_mutf8_str(&self) -> &MUTF8Str {
+        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_bytes()) }
+    }
+
     /// Decodes the mutf8 content and returns the decoded string.
     #[inline]
-    pub fn decode(&self) -> std::borrow::Cow<'_, str> {
-        simd_cesu8::mutf8::decode_lossy(self.as_mutf8_bytes())
+    pub fn decode_lossy(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_strict(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode_strict(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_lossy_strict(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy_strict(self.as_bytes())
     }
 
     /// Returns a raw pointer to the String's buffer.
@@ -838,71 +891,71 @@ impl<'a> StringViewMut<'a> {
     }
 }
 
-// ============ Trait Implementations for StringViewMut ============
+// ============ Trait Implementations for StringMutMut ============
 
-impl fmt::Debug for StringViewMut<'_> {
+impl fmt::Debug for StringMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&*self.decode(), f)
+        fmt::Debug::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl fmt::Display for StringViewMut<'_> {
+impl fmt::Display for StringMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&*self.decode(), f)
+        fmt::Display::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl PartialEq for StringViewMut<'_> {
+impl PartialEq for StringMut<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_mutf8_bytes() == other.as_mutf8_bytes()
+        self.as_bytes() == other.as_bytes()
     }
 }
 
-impl PartialEq<String> for StringViewMut<'_> {
+impl PartialEq<String> for StringMut<'_> {
     fn eq(&self, other: &String) -> bool {
-        &*self.decode() == other.as_str()
+        &*self.decode_lossy() == other.as_str()
     }
 }
 
-impl PartialEq<str> for StringViewMut<'_> {
+impl PartialEq<str> for StringMut<'_> {
     fn eq(&self, other: &str) -> bool {
-        &*self.decode() == other
+        &*self.decode_lossy() == other
     }
 }
 
-impl PartialEq<&str> for StringViewMut<'_> {
+impl PartialEq<&str> for StringMut<'_> {
     fn eq(&self, other: &&str) -> bool {
-        &*self.decode() == *other
+        &*self.decode_lossy() == *other
     }
 }
 
-impl Eq for StringViewMut<'_> {}
+impl Eq for StringMut<'_> {}
 
-impl PartialOrd for StringViewMut<'_> {
+impl PartialOrd for StringMut<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for StringViewMut<'_> {
+impl Ord for StringMut<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.as_mutf8_bytes().cmp(other.as_mutf8_bytes())
+        self.as_bytes().cmp(other.as_bytes())
     }
 }
 
-impl Hash for StringViewMut<'_> {
+impl Hash for StringMut<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_mutf8_bytes().hash(state);
+        self.as_bytes().hash(state);
     }
 }
 
-impl AsRef<[u8]> for StringViewMut<'_> {
+impl AsRef<[u8]> for StringMut<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.as_mutf8_bytes()
+        self.as_bytes()
     }
 }
 
-impl Write for StringViewMut<'_> {
+impl Write for StringMut<'_> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match std::str::from_utf8(buf) {
             Ok(s) => {
@@ -935,20 +988,26 @@ impl Write for StringViewMut<'_> {
 }
 
 #[repr(C)]
-pub struct VecViewOwn<T> {
+pub struct VecOwn<T> {
     pub(crate) ptr: Unalign<usize>,
     pub(crate) len: Unalign<usize>,
     pub(crate) cap: Unalign<usize>,
     _marker: PhantomData<T>,
 }
 
-// SAFETY: VecView is Send/Sync if T is Send/Sync.
-// The raw pointer is only used for the Vec's buffer, which is guarded by the mutable references.
-unsafe impl<T: Send> Send for VecViewOwn<T> {}
-unsafe impl<T: Sync> Sync for VecViewOwn<T> {}
+// SAFETY: VecOwn is Send/Sync if T is Send/Sync.
+// The raw pointer is only used for the Vec's buffer, which is owned by this struct.
+unsafe impl<T: Send> Send for VecOwn<T> {}
+unsafe impl<T: Sync> Sync for VecOwn<T> {}
 
-impl<T> VecViewOwn<T> {
-    /// Creates a new `VecView` from mutable references to a Vec's raw parts.
+impl<T> Default for VecOwn<T> {
+    fn default() -> Self {
+        vec![].into()
+    }
+}
+
+impl<T> VecOwn<T> {
+    /// Creates a new `VecOwn` from raw parts.
     ///
     /// # Safety
     ///
@@ -964,6 +1023,16 @@ impl<T> VecViewOwn<T> {
             ptr,
             len,
             cap,
+            _marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub const fn to_mut<'a>(&'a mut self) -> VecMut<'a, T> {
+        VecMut {
+            ptr: &mut self.ptr,
+            len: &mut self.len,
+            cap: &mut self.cap,
             _marker: PhantomData,
         }
     }
@@ -1255,9 +1324,9 @@ impl<T> VecViewOwn<T> {
         self.with_vec(|v| v.append(other));
     }
 
-    /// Moves all elements from another `VecView` into `self`, leaving `other` empty.
+    /// Moves all elements from another `VecMut` into `self`, leaving `other` empty.
     #[inline]
-    pub fn append_view(&mut self, other: &mut VecViewOwn<T>) {
+    pub fn append_view(&mut self, other: &mut VecOwn<T>) {
         // Reconstruct other as a vec temporarily
         let mut other_vec = unsafe {
             ManuallyDrop::new(Vec::from_raw_parts(
@@ -1310,7 +1379,7 @@ impl<T> VecViewOwn<T> {
 
 // ============ Trait Implementations ============
 
-impl<T> Deref for VecViewOwn<T> {
+impl<T> Deref for VecOwn<T> {
     type Target = [T];
 
     #[inline]
@@ -1319,14 +1388,14 @@ impl<T> Deref for VecViewOwn<T> {
     }
 }
 
-impl<T> DerefMut for VecViewOwn<T> {
+impl<T> DerefMut for VecOwn<T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T, I: SliceIndex<[T]>> Index<I> for VecViewOwn<T> {
+impl<T, I: SliceIndex<[T]>> Index<I> for VecOwn<T> {
     type Output = I::Output;
 
     #[inline]
@@ -1335,100 +1404,100 @@ impl<T, I: SliceIndex<[T]>> Index<I> for VecViewOwn<T> {
     }
 }
 
-impl<T, I: SliceIndex<[T]>> IndexMut<I> for VecViewOwn<T> {
+impl<T, I: SliceIndex<[T]>> IndexMut<I> for VecOwn<T> {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         IndexMut::index_mut(self.as_mut_slice(), index)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for VecViewOwn<T> {
+impl<T: fmt::Debug> fmt::Debug for VecOwn<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.as_slice(), f)
     }
 }
 
-impl<T: PartialEq> PartialEq for VecViewOwn<T> {
+impl<T: PartialEq> PartialEq for VecOwn<T> {
     fn eq(&self, other: &Self) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<Vec<T>> for VecViewOwn<T> {
+impl<T: PartialEq> PartialEq<Vec<T>> for VecOwn<T> {
     fn eq(&self, other: &Vec<T>) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl<T: PartialEq> PartialEq<[T]> for VecViewOwn<T> {
+impl<T: PartialEq> PartialEq<[T]> for VecOwn<T> {
     fn eq(&self, other: &[T]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for VecViewOwn<T> {
+impl<T: PartialEq, const N: usize> PartialEq<[T; N]> for VecOwn<T> {
     fn eq(&self, other: &[T; N]) -> bool {
         self.as_slice() == other
     }
 }
 
-impl<T: PartialEq> PartialEq<&[T]> for VecViewOwn<T> {
+impl<T: PartialEq> PartialEq<&[T]> for VecOwn<T> {
     fn eq(&self, other: &&[T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: PartialEq> PartialEq<&mut [T]> for VecViewOwn<T> {
+impl<T: PartialEq> PartialEq<&mut [T]> for VecOwn<T> {
     fn eq(&self, other: &&mut [T]) -> bool {
         self.as_slice() == *other
     }
 }
 
-impl<T: Eq> Eq for VecViewOwn<T> {}
+impl<T: Eq> Eq for VecOwn<T> {}
 
-impl<T: PartialOrd> PartialOrd for VecViewOwn<T> {
+impl<T: PartialOrd> PartialOrd for VecOwn<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
 
-impl<T: Ord> Ord for VecViewOwn<T> {
+impl<T: Ord> Ord for VecOwn<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_slice().cmp(other.as_slice())
     }
 }
 
-impl<T: Hash> Hash for VecViewOwn<T> {
+impl<T: Hash> Hash for VecOwn<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state);
     }
 }
 
-impl<T> Borrow<[T]> for VecViewOwn<T> {
+impl<T> Borrow<[T]> for VecOwn<T> {
     fn borrow(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> BorrowMut<[T]> for VecViewOwn<T> {
+impl<T> BorrowMut<[T]> for VecOwn<T> {
     fn borrow_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T> AsRef<[T]> for VecViewOwn<T> {
+impl<T> AsRef<[T]> for VecOwn<T> {
     fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T> AsMut<[T]> for VecViewOwn<T> {
+impl<T> AsMut<[T]> for VecOwn<T> {
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<'a, T> IntoIterator for &'a VecViewOwn<T> {
+impl<'a, T> IntoIterator for &'a VecOwn<T> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
@@ -1437,7 +1506,7 @@ impl<'a, T> IntoIterator for &'a VecViewOwn<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut VecViewOwn<T> {
+impl<'a, T> IntoIterator for &'a mut VecOwn<T> {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
@@ -1446,19 +1515,19 @@ impl<'a, T> IntoIterator for &'a mut VecViewOwn<T> {
     }
 }
 
-impl<T> Extend<T> for VecViewOwn<T> {
+impl<T> Extend<T> for VecOwn<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl<'a, T: Copy + 'a> Extend<&'a T> for VecViewOwn<T> {
+impl<'a, T: Copy + 'a> Extend<&'a T> for VecOwn<T> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.with_vec(|v| v.extend(iter));
     }
 }
 
-impl Write for VecViewOwn<u8> {
+impl Write for VecOwn<u8> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.with_vec(|v| v.write(buf))
     }
@@ -1476,16 +1545,10 @@ impl Write for VecViewOwn<u8> {
     }
 }
 
-impl<T: Clone> From<&[T]> for VecViewOwn<T> {
-    fn from(value: &[T]) -> Self {
-        value.to_vec().into()
-    }
-}
-
-impl<T> From<Vec<T>> for VecViewOwn<T> {
+impl<T> From<Vec<T>> for VecOwn<T> {
     fn from(value: Vec<T>) -> Self {
         let mut me = ManuallyDrop::new(value);
-        VecViewOwn {
+        VecOwn {
             ptr: Unalign::new(me.as_mut_ptr().expose_provenance()),
             len: Unalign::new(me.len()),
             cap: Unalign::new(me.capacity()),
@@ -1494,29 +1557,38 @@ impl<T> From<Vec<T>> for VecViewOwn<T> {
     }
 }
 
-impl<T> Drop for VecViewOwn<T> {
+impl<T: Clone> From<&[T]> for VecOwn<T> {
+    fn from(value: &[T]) -> Self {
+        value.to_vec().into()
+    }
+}
+
+impl<T> Drop for VecOwn<T> {
     fn drop(&mut self) {
         unsafe { Vec::from_raw_parts(self.as_mut_ptr(), self.len.get(), self.cap.get()) };
     }
 }
 
-/// A view into a String's raw parts, allowing mutable access without owning the String.
-///
-/// This is similar to `VecView<u8>` but maintains String's MUTF-8 encoded invariants.
 #[repr(C)]
-pub struct StringViewOwn {
+pub struct StringOwn {
     pub(crate) ptr: Unalign<usize>,
     pub(crate) len: Unalign<usize>,
     pub(crate) cap: Unalign<usize>,
 }
 
-// SAFETY: StringView is Send/Sync because the underlying data is UTF-8 bytes.
-// The raw pointer is only used for the String's buffer, which is guarded by the mutable references.
-unsafe impl Send for StringViewOwn {}
-unsafe impl Sync for StringViewOwn {}
+// SAFETY: StringOwn is Send/Sync because the underlying data is MUTF-8 bytes.
+// The raw pointer is only used for the String's buffer, which is owned by this struct.
+unsafe impl Send for StringOwn {}
+unsafe impl Sync for StringOwn {}
 
-impl StringViewOwn {
-    /// Creates a new `StringView` from mutable references to a String's raw parts.
+impl Default for StringOwn {
+    fn default() -> Self {
+        vec![].into()
+    }
+}
+
+impl StringOwn {
+    /// Creates a new `StringMut` from mutable references to a String's raw parts.
     ///
     /// # Safety
     ///
@@ -1529,6 +1601,15 @@ impl StringViewOwn {
     pub unsafe fn new(ptr: Unalign<usize>, len: Unalign<usize>, cap: Unalign<usize>) -> Self {
         debug_assert!(len.get() <= cap.get());
         Self { ptr, len, cap }
+    }
+
+    #[inline]
+    pub const fn to_mut<'a>(&'a mut self) -> StringMut<'a> {
+        StringMut {
+            ptr: &mut self.ptr,
+            len: &mut self.len,
+            cap: &mut self.cap,
+        }
     }
 
     /// Temporarily decodes mutf8 to a String, calls a closure on it, then encodes back to mutf8.
@@ -1607,15 +1688,35 @@ impl StringViewOwn {
 
     /// Returns a byte slice of this String's contents (mutf8 encoded).
     #[inline]
-    pub fn as_mutf8_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         // SAFETY: ptr is valid for len bytes
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len.get()) }
     }
 
+    #[inline]
+    pub fn as_mutf8_str(&self) -> &MUTF8Str {
+        unsafe { MUTF8Str::from_mutf8_unchecked(self.as_bytes()) }
+    }
+
     /// Decodes the mutf8 content and returns the decoded string.
     #[inline]
-    pub fn decode(&self) -> std::borrow::Cow<'_, str> {
-        simd_cesu8::mutf8::decode_lossy(self.as_mutf8_bytes())
+    pub fn decode_lossy(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_strict(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode_strict(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode(&self) -> std::result::Result<std::borrow::Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode(self.as_bytes())
+    }
+
+    #[inline]
+    pub fn decode_lossy_strict(&self) -> std::borrow::Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy_strict(self.as_bytes())
     }
 
     /// Returns a raw pointer to the String's buffer.
@@ -1766,71 +1867,71 @@ impl StringViewOwn {
     }
 }
 
-// ============ Trait Implementations for StringViewOwn ============
+// ============ Trait Implementations for StringMutOwn ============
 
-impl fmt::Debug for StringViewOwn {
+impl fmt::Debug for StringOwn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&*self.decode(), f)
+        fmt::Debug::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl fmt::Display for StringViewOwn {
+impl fmt::Display for StringOwn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&*self.decode(), f)
+        fmt::Display::fmt(&*self.decode_lossy(), f)
     }
 }
 
-impl PartialEq for StringViewOwn {
+impl PartialEq for StringOwn {
     fn eq(&self, other: &Self) -> bool {
-        self.as_mutf8_bytes() == other.as_mutf8_bytes()
+        self.as_bytes() == other.as_bytes()
     }
 }
 
-impl PartialEq<String> for StringViewOwn {
+impl PartialEq<String> for StringOwn {
     fn eq(&self, other: &String) -> bool {
-        &*self.decode() == other.as_str()
+        &*self.decode_lossy() == other.as_str()
     }
 }
 
-impl PartialEq<str> for StringViewOwn {
+impl PartialEq<str> for StringOwn {
     fn eq(&self, other: &str) -> bool {
-        &*self.decode() == other
+        &*self.decode_lossy() == other
     }
 }
 
-impl PartialEq<&str> for StringViewOwn {
+impl PartialEq<&str> for StringOwn {
     fn eq(&self, other: &&str) -> bool {
-        &*self.decode() == *other
+        &*self.decode_lossy() == *other
     }
 }
 
-impl Eq for StringViewOwn {}
+impl Eq for StringOwn {}
 
-impl PartialOrd for StringViewOwn {
+impl PartialOrd for StringOwn {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for StringViewOwn {
+impl Ord for StringOwn {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.as_mutf8_bytes().cmp(other.as_mutf8_bytes())
+        self.as_bytes().cmp(other.as_bytes())
     }
 }
 
-impl Hash for StringViewOwn {
+impl Hash for StringOwn {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_mutf8_bytes().hash(state);
+        self.as_bytes().hash(state);
     }
 }
 
-impl AsRef<[u8]> for StringViewOwn {
+impl AsRef<[u8]> for StringOwn {
     fn as_ref(&self) -> &[u8] {
-        self.as_mutf8_bytes()
+        self.as_bytes()
     }
 }
 
-impl Write for StringViewOwn {
+impl Write for StringOwn {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match std::str::from_utf8(buf) {
             Ok(s) => {
@@ -1862,21 +1963,10 @@ impl Write for StringViewOwn {
     }
 }
 
-impl From<&[u8]> for StringViewOwn {
-    fn from(value: &[u8]) -> Self {
-        let mut encoded = ManuallyDrop::new(value.to_vec());
-        StringViewOwn {
-            ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
-            len: Unalign::new(encoded.len()),
-            cap: Unalign::new(encoded.capacity()),
-        }
-    }
-}
-
-impl From<Vec<u8>> for StringViewOwn {
+impl From<Vec<u8>> for StringOwn {
     fn from(value: Vec<u8>) -> Self {
         let mut encoded = ManuallyDrop::new(value);
-        StringViewOwn {
+        StringOwn {
             ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
             len: Unalign::new(encoded.len()),
             cap: Unalign::new(encoded.capacity()),
@@ -1884,29 +1974,31 @@ impl From<Vec<u8>> for StringViewOwn {
     }
 }
 
-impl From<&str> for StringViewOwn {
-    fn from(value: &str) -> Self {
-        let mut encoded = ManuallyDrop::new(simd_cesu8::mutf8::encode(value).into_owned());
-        StringViewOwn {
-            ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
-            len: Unalign::new(encoded.len()),
-            cap: Unalign::new(encoded.capacity()),
-        }
+impl From<&[u8]> for StringOwn {
+    fn from(value: &[u8]) -> Self {
+        value.to_vec().into()
     }
 }
 
-impl From<String> for StringViewOwn {
+impl From<String> for StringOwn {
     fn from(value: String) -> Self {
-        let mut encoded = ManuallyDrop::new(simd_cesu8::mutf8::encode(&value).into_owned());
-        StringViewOwn {
-            ptr: Unalign::new(encoded.as_mut_ptr().expose_provenance()),
-            len: Unalign::new(encoded.len()),
-            cap: Unalign::new(encoded.capacity()),
-        }
+        simd_cesu8::mutf8::encode(&value).into_owned().into()
     }
 }
 
-impl Drop for StringViewOwn {
+impl From<&str> for StringOwn {
+    fn from(value: &str) -> Self {
+        simd_cesu8::mutf8::encode(value).into_owned().into()
+    }
+}
+
+impl From<&MUTF8Str> for StringOwn {
+    fn from(value: &MUTF8Str) -> Self {
+        value.as_bytes().into()
+    }
+}
+
+impl Drop for StringOwn {
     fn drop(&mut self) {
         // Drop as Vec<u8> since internal format is mutf8, not UTF-8
         unsafe {
@@ -1916,746 +2008,5 @@ impl Drop for StringViewOwn {
                 self.cap.get(),
             ));
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::mem::ManuallyDrop;
-    use zerocopy::Unalign;
-
-    #[test]
-    fn vec_view_own_basic_ops() {
-        let vec = vec![1u8, 2, 3, 4];
-        let mut v = VecViewOwn::from(vec);
-        assert_eq!(v.len(), 4);
-        v.push(5);
-        assert_eq!(v.len(), 5);
-        assert_eq!(v.as_slice(), &[1u8, 2, 3, 4, 5]);
-
-        assert_eq!(v.pop(), Some(5));
-        assert_eq!(v.len(), 4);
-
-        v.insert(0, 0);
-        assert_eq!(v.as_slice(), &[0u8, 1, 2, 3, 4]);
-
-        let removed = v.remove(2);
-        assert_eq!(removed, 2);
-    }
-
-    #[test]
-    fn string_view_own_basic_ops() {
-        let s = String::from("Hello");
-        let mut v = StringViewOwn::from(s);
-        assert_eq!(v.len(), 5);
-        v.push_str(" world");
-        assert_eq!(v.decode().to_string(), "Hello world");
-        assert_eq!(v.pop(), Some('d'));
-        v.insert_str(6, "Rust ");
-        assert!(v.decode().to_string().contains("Rust"));
-    }
-
-    #[test]
-    fn vec_view_mut_safe_ops() {
-        let vec = vec![10u8, 20, 30];
-        let mut mv = ManuallyDrop::new(vec);
-        let mut ptr = Unalign::new(mv.as_mut_ptr().expose_provenance());
-        let mut len = Unalign::new(mv.len());
-        let mut cap = Unalign::new(mv.capacity());
-
-        let mut view = unsafe { VecViewMut::new(&mut ptr, &mut len, &mut cap) };
-        assert_eq!(view.len(), 3);
-        view.push(40);
-        assert_eq!(view.len(), 4);
-        view.push(50);
-        assert_eq!(view.as_slice(), &[10u8, 20, 30, 40, 50]);
-
-        // Reconstruct Vec back for drop to avoid leak
-        let restore =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore);
-    }
-
-    #[test]
-    fn string_view_mut_safe_ops() {
-        let s = String::from("abc");
-        let mut ms = ManuallyDrop::new(s);
-        let mut ptr = Unalign::new(unsafe { ms.as_mut_vec().as_mut_ptr().expose_provenance() });
-        let mut len = Unalign::new(ms.len());
-        let mut cap = Unalign::new(ms.capacity());
-        let mut view = unsafe { StringViewMut::new(&mut ptr, &mut len, &mut cap) };
-
-        assert_eq!(view.len(), 3);
-        view.push_str("de");
-        assert_eq!(view.decode().to_string(), "abcde");
-
-        // restore into a Vec so it is dropped correctly
-        let restore_vec =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore_vec);
-    }
-
-    // ========== VecViewOwn extended tests ==========
-
-    #[test]
-    fn vec_view_own_reserve_shrink() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.reserve(100);
-        assert!(v.capacity() >= 103);
-        v.shrink_to_fit();
-        assert!(v.capacity() <= 10);
-    }
-
-    #[test]
-    fn vec_view_own_truncate_clear() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4, 5]);
-        v.truncate(3);
-        assert_eq!(v.as_slice(), &[1, 2, 3]);
-        v.clear();
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn vec_view_own_swap_remove() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4]);
-        let removed = v.swap_remove(1);
-        assert_eq!(removed, 2);
-        assert_eq!(v.len(), 3);
-    }
-
-    #[test]
-    fn vec_view_own_retain() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4, 5, 6]);
-        v.retain(|&x| x % 2 == 0);
-        assert_eq!(v.as_slice(), &[2, 4, 6]);
-    }
-
-    #[test]
-    fn vec_view_own_dedup() {
-        let mut v = VecViewOwn::from(vec![1u8, 1, 2, 2, 3]);
-        v.dedup();
-        assert_eq!(v.as_slice(), &[1, 2, 3]);
-    }
-
-    #[test]
-    fn vec_view_own_extend_from_slice() {
-        let mut v = VecViewOwn::from(vec![1u8, 2]);
-        v.extend_from_slice(&[3, 4, 5]);
-        assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
-    }
-
-    #[test]
-    fn vec_view_own_resize() {
-        let mut v = VecViewOwn::from(vec![1u8, 2]);
-        v.resize(5, 0);
-        assert_eq!(v.as_slice(), &[1, 2, 0, 0, 0]);
-    }
-
-    #[test]
-    fn vec_view_own_split_off() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4, 5]);
-        let tail = v.split_off(3);
-        assert_eq!(v.as_slice(), &[1, 2, 3]);
-        assert_eq!(tail, vec![4, 5]);
-    }
-
-    #[test]
-    fn vec_view_own_drain_drop() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4, 5]);
-        v.drain_drop(1..4);
-        assert_eq!(v.as_slice(), &[1, 5]);
-    }
-
-    #[test]
-    fn vec_view_own_append() {
-        let mut v = VecViewOwn::from(vec![1u8, 2]);
-        let mut other = vec![3, 4, 5];
-        v.append(&mut other);
-        assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
-        assert!(other.is_empty());
-    }
-
-    #[test]
-    fn vec_view_own_pop_if() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        let popped = v.pop_if(|x| *x > 2);
-        assert_eq!(popped, Some(3));
-        let not_popped = v.pop_if(|x| *x > 10);
-        assert!(not_popped.is_none());
-    }
-
-    #[test]
-    fn vec_view_own_index() {
-        let v = VecViewOwn::from(vec![1u8, 2, 3]);
-        assert_eq!(v[0], 1);
-        assert_eq!(v[1], 2);
-        assert_eq!(v[2], 3);
-    }
-
-    #[test]
-    fn vec_view_own_index_mut() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v[0] = 10;
-        assert_eq!(v[0], 10);
-    }
-
-    #[test]
-    fn vec_view_own_debug() {
-        let v = VecViewOwn::from(vec![1u8, 2, 3]);
-        let debug = format!("{:?}", v);
-        assert!(debug.contains("1"));
-    }
-
-    #[test]
-    fn vec_view_own_eq() {
-        let v1 = VecViewOwn::from(vec![1u8, 2, 3]);
-        let v2 = VecViewOwn::from(vec![1u8, 2, 3]);
-        assert!(v1 == v2);
-    }
-
-    #[test]
-    fn vec_view_own_iter() {
-        let v = VecViewOwn::from(vec![1u8, 2, 3]);
-        let collected: Vec<&u8> = v.iter().collect();
-        assert_eq!(collected, vec![&1, &2, &3]);
-    }
-
-    #[test]
-    fn vec_view_own_as_mut_slice() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        // Test as_mut_slice
-        let slice = v.as_mut_slice();
-        slice[0] = 10;
-        assert_eq!(v.as_slice(), &[10, 2, 3]);
-    }
-
-    // ========== StringViewOwn extended tests ==========
-
-    #[test]
-    fn string_view_own_push_pop() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.push('!');
-        assert_eq!(v.decode().to_string(), "Hello!");
-        assert_eq!(v.pop(), Some('!'));
-    }
-
-    #[test]
-    fn string_view_own_insert_remove() {
-        let mut v = StringViewOwn::from(String::from("Hllo"));
-        v.insert(1, 'e');
-        assert_eq!(v.decode().to_string(), "Hello");
-        let removed = v.remove(1);
-        assert_eq!(removed, 'e');
-    }
-
-    #[test]
-    fn string_view_own_truncate_clear() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.truncate(3);
-        assert_eq!(v.decode().to_string(), "Hel");
-        v.clear();
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn string_view_own_split_off() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        let tail = v.split_off(3);
-        assert_eq!(v.decode().to_string(), "Hel");
-        assert_eq!(tail, "lo");
-    }
-
-    #[test]
-    fn string_view_own_retain() {
-        let mut v = StringViewOwn::from(String::from("Hello123"));
-        v.retain(|c| c.is_alphabetic());
-        assert_eq!(v.decode().to_string(), "Hello");
-    }
-
-    #[test]
-    fn string_view_own_reserve_shrink() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.reserve(100);
-        assert!(v.capacity() >= 105);
-        v.shrink_to_fit();
-        assert!(v.capacity() < 20);
-    }
-
-    #[test]
-    fn string_view_own_replace_range() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.replace_range(1..4, "i");
-        assert_eq!(v.decode().to_string(), "Hio");
-    }
-
-    #[test]
-    fn string_view_own_debug() {
-        let v = StringViewOwn::from(String::from("Hello"));
-        let debug = format!("{:?}", v);
-        assert!(debug.contains("Hello"));
-    }
-
-    #[test]
-    fn string_view_own_eq() {
-        let v1 = StringViewOwn::from(String::from("Hello"));
-        let v2 = StringViewOwn::from(String::from("Hello"));
-        assert!(v1 == v2);
-    }
-
-    #[test]
-    fn string_view_own_write() {
-        use std::io::Write;
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        write!(v, " world").unwrap();
-        assert_eq!(v.decode().to_string(), "Hello world");
-    }
-
-    #[test]
-    fn string_view_own_as_mutf8_bytes() {
-        let v = StringViewOwn::from(String::from("ABC"));
-        assert_eq!(v.as_mutf8_bytes(), b"ABC");
-    }
-
-    // ========== VecViewMut extended tests ==========
-
-    #[test]
-    fn vec_view_mut_reserve_truncate() {
-        let vec = vec![10u8, 20, 30];
-        let mut mv = ManuallyDrop::new(vec);
-        let mut ptr = Unalign::new(mv.as_mut_ptr().expose_provenance());
-        let mut len = Unalign::new(mv.len());
-        let mut cap = Unalign::new(mv.capacity());
-
-        let mut view: VecViewMut<'_, u8> = unsafe { VecViewMut::new(&mut ptr, &mut len, &mut cap) };
-        view.reserve(50);
-        assert!(view.capacity() >= 53);
-        view.truncate(2);
-        assert_eq!(view.as_slice(), &[10u8, 20]);
-
-        let restore =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore);
-    }
-
-    #[test]
-    fn vec_view_mut_clear_pop() {
-        let vec = vec![10u8, 20, 30];
-        let mut mv = ManuallyDrop::new(vec);
-        let mut ptr = Unalign::new(mv.as_mut_ptr().expose_provenance());
-        let mut len = Unalign::new(mv.len());
-        let mut cap = Unalign::new(mv.capacity());
-
-        let mut view: VecViewMut<u8> = unsafe { VecViewMut::new(&mut ptr, &mut len, &mut cap) };
-        assert_eq!(view.pop(), Some(30));
-        view.clear();
-        assert!(view.is_empty());
-
-        let restore =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore);
-    }
-
-    #[test]
-    fn vec_view_mut_insert_remove() {
-        let vec = vec![10u8, 30];
-        let mut mv = ManuallyDrop::new(vec);
-        let mut ptr = Unalign::new(mv.as_mut_ptr().expose_provenance());
-        let mut len = Unalign::new(mv.len());
-        let mut cap = Unalign::new(mv.capacity());
-
-        let mut view: VecViewMut<u8> = unsafe { VecViewMut::new(&mut ptr, &mut len, &mut cap) };
-        view.insert(1, 20);
-        assert_eq!(view.as_slice(), &[10, 20, 30]);
-        let removed = view.remove(1);
-        assert_eq!(removed, 20);
-
-        let restore =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore);
-    }
-
-    #[test]
-    fn vec_view_mut_extend_from_slice() {
-        let vec = vec![1u8, 2];
-        let mut mv = ManuallyDrop::new(vec);
-        let mut ptr = Unalign::new(mv.as_mut_ptr().expose_provenance());
-        let mut len = Unalign::new(mv.len());
-        let mut cap = Unalign::new(mv.capacity());
-
-        let mut view: VecViewMut<u8> = unsafe { VecViewMut::new(&mut ptr, &mut len, &mut cap) };
-        view.extend_from_slice(&[3, 4, 5]);
-        assert_eq!(view.as_slice(), &[1, 2, 3, 4, 5]);
-
-        let restore =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore);
-    }
-
-    // ========== StringViewMut extended tests ==========
-
-    #[test]
-    fn string_view_mut_push_pop() {
-        let s = String::from("Hello");
-        let mut ms = ManuallyDrop::new(s);
-        let mut ptr = Unalign::new(unsafe { ms.as_mut_vec().as_mut_ptr().expose_provenance() });
-        let mut len = Unalign::new(ms.len());
-        let mut cap = Unalign::new(ms.capacity());
-        let mut view = unsafe { StringViewMut::new(&mut ptr, &mut len, &mut cap) };
-
-        view.push('!');
-        assert_eq!(view.decode().to_string(), "Hello!");
-        assert_eq!(view.pop(), Some('!'));
-
-        let restore_vec =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore_vec);
-    }
-
-    #[test]
-    fn string_view_mut_truncate_clear() {
-        let s = String::from("Hello");
-        let mut ms = ManuallyDrop::new(s);
-        let mut ptr = Unalign::new(unsafe { ms.as_mut_vec().as_mut_ptr().expose_provenance() });
-        let mut len = Unalign::new(ms.len());
-        let mut cap = Unalign::new(ms.capacity());
-        let mut view = unsafe { StringViewMut::new(&mut ptr, &mut len, &mut cap) };
-
-        view.truncate(3);
-        assert_eq!(view.decode().to_string(), "Hel");
-        view.clear();
-        assert!(view.is_empty());
-
-        let restore_vec =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore_vec);
-    }
-
-    // ========== Edge-case tests ==========
-
-    #[test]
-    fn vec_view_own_drain_drop_empty_range() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4, 5]);
-        v.drain_drop(2..2); // empty range
-        assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
-    }
-
-    #[test]
-    fn vec_view_own_drain_drop_full() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.drain_drop(..);
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn vec_view_own_drain_drop_from_start() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4]);
-        v.drain_drop(..2);
-        assert_eq!(v.as_slice(), &[3, 4]);
-    }
-
-    #[test]
-    fn vec_view_own_drain_drop_to_end() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4]);
-        v.drain_drop(2..);
-        assert_eq!(v.as_slice(), &[1, 2]);
-    }
-
-    #[test]
-    fn vec_view_own_drain_drop_on_empty() {
-        let mut v: VecViewOwn<u8> = VecViewOwn::from(vec![]);
-        v.drain_drop(..);
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn vec_view_own_splice_drop_empty_replace() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.splice_drop(1..2, std::iter::empty());
-        assert_eq!(v.as_slice(), &[1, 3]);
-    }
-
-    #[test]
-    fn vec_view_own_splice_drop_insert_at_start() {
-        let mut v = VecViewOwn::from(vec![3u8, 4]);
-        v.splice_drop(0..0, vec![1, 2]);
-        assert_eq!(v.as_slice(), &[1, 2, 3, 4]);
-    }
-
-    #[test]
-    fn vec_view_own_splice_drop_replace_all() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.splice_drop(.., vec![4, 5]);
-        assert_eq!(v.as_slice(), &[4, 5]);
-    }
-
-    #[test]
-    fn vec_view_own_pop_empty() {
-        let mut v: VecViewOwn<u8> = VecViewOwn::from(vec![]);
-        assert_eq!(v.pop(), None);
-    }
-
-    #[test]
-    fn vec_view_own_pop_if_empty() {
-        let mut v: VecViewOwn<u8> = VecViewOwn::from(vec![]);
-        assert_eq!(v.pop_if(|_| true), None);
-    }
-
-    #[test]
-    fn vec_view_own_truncate_longer_than_len() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.truncate(100); // truncate to larger than len is no-op
-        assert_eq!(v.as_slice(), &[1, 2, 3]);
-    }
-
-    #[test]
-    fn vec_view_own_resize_smaller() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3, 4, 5]);
-        v.resize(2, 0);
-        assert_eq!(v.as_slice(), &[1, 2]);
-    }
-
-    #[test]
-    fn vec_view_own_resize_with_closure() {
-        let mut v = VecViewOwn::from(vec![1u8]);
-        let mut counter = 0u8;
-        v.resize_with(4, || {
-            counter += 1;
-            counter + 1
-        });
-        assert_eq!(v.as_slice(), &[1, 2, 3, 4]);
-    }
-
-    #[test]
-    fn vec_view_own_dedup_no_consecutive() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 1, 2, 1]);
-        v.dedup();
-        assert_eq!(v.as_slice(), &[1, 2, 1, 2, 1]); // no change - no consecutive dups
-    }
-
-    #[test]
-    fn vec_view_own_dedup_by() {
-        let mut v = VecViewOwn::from(vec![1u8, 3, 2, 4, 5, 7]);
-        v.dedup_by(|a, b| *a % 2 == *b % 2); // same parity removes consecutive same-parity
-        // 1,3 same parity -> remove 3
-        // 1,2 different parity -> keep
-        // 2,4 same parity -> remove 4
-        // 2,5 different parity -> keep
-        // 5,7 same parity -> remove 7
-        assert_eq!(v.as_slice(), &[1, 2, 5]);
-    }
-
-    #[test]
-    fn vec_view_own_dedup_by_key() {
-        let mut v = VecViewOwn::from(vec![10u8, 11, 20, 21, 30]);
-        v.dedup_by_key(|x| *x / 10); // group by tens
-        assert_eq!(v.as_slice(), &[10, 20, 30]);
-    }
-
-    #[test]
-    fn vec_view_own_extend_from_within() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.extend_from_within(0..2);
-        assert_eq!(v.as_slice(), &[1, 2, 3, 1, 2]);
-    }
-
-    #[test]
-    fn vec_view_own_shrink_to() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.reserve(100);
-        let cap_before = v.capacity();
-        v.shrink_to(10);
-        assert!(v.capacity() < cap_before);
-        assert!(v.capacity() >= 10);
-    }
-
-    #[test]
-    fn vec_view_own_spare_capacity() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.reserve(10);
-        let spare = v.spare_capacity_mut();
-        assert!(spare.len() >= 10);
-    }
-
-    #[test]
-    fn vec_view_own_try_reserve() {
-        let mut v = VecViewOwn::from(vec![1u8, 2]);
-        assert!(v.try_reserve(10).is_ok());
-        assert!(v.capacity() >= 12);
-    }
-
-    #[test]
-    fn vec_view_own_try_reserve_exact() {
-        let mut v = VecViewOwn::from(vec![1u8, 2]);
-        assert!(v.try_reserve_exact(10).is_ok());
-        assert!(v.capacity() >= 12);
-    }
-
-    #[test]
-    fn vec_view_own_split_off_at_zero() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        let tail = v.split_off(0);
-        assert!(v.is_empty());
-        assert_eq!(tail, vec![1, 2, 3]);
-    }
-
-    #[test]
-    fn vec_view_own_split_off_at_end() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        let tail = v.split_off(3);
-        assert_eq!(v.as_slice(), &[1, 2, 3]);
-        assert!(tail.is_empty());
-    }
-
-    #[test]
-    fn vec_view_own_retain_all() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.retain(|_| true);
-        assert_eq!(v.as_slice(), &[1, 2, 3]);
-    }
-
-    #[test]
-    fn vec_view_own_retain_none() {
-        let mut v = VecViewOwn::from(vec![1u8, 2, 3]);
-        v.retain(|_| false);
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn vec_view_own_append_empty() {
-        let mut v = VecViewOwn::from(vec![1u8, 2]);
-        let mut other: Vec<u8> = vec![];
-        v.append(&mut other);
-        assert_eq!(v.as_slice(), &[1, 2]);
-    }
-
-    #[test]
-    fn vec_view_own_append_to_empty() {
-        let mut v: VecViewOwn<u8> = VecViewOwn::from(vec![]);
-        let mut other = vec![1u8, 2, 3];
-        v.append(&mut other);
-        assert_eq!(v.as_slice(), &[1, 2, 3]);
-        assert!(other.is_empty());
-    }
-
-    #[test]
-    fn string_view_own_drain_drop() {
-        let mut v = StringViewOwn::from(String::from("Hello World"));
-        v.drain_drop(5..6); // remove space
-        assert_eq!(v.decode().to_string(), "HelloWorld");
-    }
-
-    #[test]
-    fn string_view_own_drain_drop_empty_range() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.drain_drop(2..2);
-        assert_eq!(v.decode().to_string(), "Hello");
-    }
-
-    #[test]
-    fn string_view_own_drain_drop_all() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.drain_drop(..);
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn string_view_own_pop_empty() {
-        let mut v = StringViewOwn::from(String::new());
-        assert_eq!(v.pop(), None);
-    }
-
-    #[test]
-    fn string_view_own_truncate_at_zero() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.truncate(0);
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn string_view_own_retain_all() {
-        let mut v = StringViewOwn::from(String::from("Hello123"));
-        v.retain(|_| true);
-        assert_eq!(v.decode().to_string(), "Hello123");
-    }
-
-    #[test]
-    fn string_view_own_retain_none() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.retain(|_| false);
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn string_view_own_replace_range_empty() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.replace_range(2..2, "X"); // insert without removing
-        assert_eq!(v.decode().to_string(), "HeXllo");
-    }
-
-    #[test]
-    fn string_view_own_replace_range_all() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        v.replace_range(.., "World");
-        assert_eq!(v.decode().to_string(), "World");
-    }
-
-    #[test]
-    fn string_view_own_split_off_at_zero() {
-        let mut v = StringViewOwn::from(String::from("Hello"));
-        let tail = v.split_off(0);
-        assert!(v.is_empty());
-        assert_eq!(tail, "Hello");
-    }
-
-    #[test]
-    fn vec_view_mut_drain_drop() {
-        let vec = vec![1u8, 2, 3, 4, 5];
-        let mut mv = ManuallyDrop::new(vec);
-        let mut ptr = Unalign::new(mv.as_mut_ptr().expose_provenance());
-        let mut len = Unalign::new(mv.len());
-        let mut cap = Unalign::new(mv.capacity());
-
-        let mut view: VecViewMut<u8> = unsafe { VecViewMut::new(&mut ptr, &mut len, &mut cap) };
-        view.drain_drop(1..3);
-        assert_eq!(view.as_slice(), &[1, 4, 5]);
-
-        let restore =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore);
-    }
-
-    #[test]
-    fn vec_view_mut_splice_drop() {
-        let vec = vec![1u8, 2, 3];
-        let mut mv = ManuallyDrop::new(vec);
-        let mut ptr = Unalign::new(mv.as_mut_ptr().expose_provenance());
-        let mut len = Unalign::new(mv.len());
-        let mut cap = Unalign::new(mv.capacity());
-
-        let mut view: VecViewMut<u8> = unsafe { VecViewMut::new(&mut ptr, &mut len, &mut cap) };
-        view.splice_drop(1..2, vec![10, 20]);
-        assert_eq!(view.as_slice(), &[1, 10, 20, 3]);
-
-        let restore =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore);
-    }
-
-    #[test]
-    fn string_view_mut_drain_drop() {
-        let s = String::from("Hello World");
-        let mut ms = ManuallyDrop::new(s);
-        let mut ptr = Unalign::new(unsafe { ms.as_mut_vec().as_mut_ptr().expose_provenance() });
-        let mut len = Unalign::new(ms.len());
-        let mut cap = Unalign::new(ms.capacity());
-        let mut view = unsafe { StringViewMut::new(&mut ptr, &mut len, &mut cap) };
-
-        view.drain_drop(5..6); // remove space
-        assert_eq!(view.decode().to_string(), "HelloWorld");
-
-        let restore_vec =
-            unsafe { std::vec::Vec::from_raw_parts(ptr.get() as *mut u8, len.get(), cap.get()) };
-        drop(restore_vec);
     }
 }

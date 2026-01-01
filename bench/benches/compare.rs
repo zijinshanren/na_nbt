@@ -6,6 +6,7 @@ use std::{
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use flate2::read::GzDecoder;
+use na_nbt::Writable;
 
 fn bench_read_file(filename: &str, c: &mut Criterion) {
     let mut file = File::open(format!("tests/{filename}")).unwrap();
@@ -113,7 +114,7 @@ fn bench_read_file(filename: &str, c: &mut Criterion) {
     let nbt = doc.root();
     group.bench_function("na_nbt_borrow_write", |b| {
         b.iter(|| {
-            let out = nbt.write_to_vec::<na_nbt::BigEndian>().unwrap();
+            let out = nbt.write_to_vec::<na_nbt::BigEndian>();
             black_box(out);
         })
     });
@@ -121,7 +122,7 @@ fn bench_read_file(filename: &str, c: &mut Criterion) {
     let nbt = na_nbt::read_shared::<na_nbt::BigEndian>(bytes).unwrap();
     group.bench_function("na_nbt_shared_write", |b| {
         b.iter(|| {
-            let out = nbt.write_to_vec::<na_nbt::BigEndian>().unwrap();
+            let out = nbt.write_to_vec::<na_nbt::BigEndian>();
             black_box(out);
         })
     });
@@ -129,7 +130,7 @@ fn bench_read_file(filename: &str, c: &mut Criterion) {
     let nbt = na_nbt::read_owned::<na_nbt::BigEndian, na_nbt::BigEndian>(data).unwrap();
     group.bench_function("na_nbt_owned_write", |b| {
         b.iter(|| {
-            let out = nbt.write_to_vec::<na_nbt::BigEndian>().unwrap();
+            let out = nbt.write_to_vec::<na_nbt::BigEndian>();
             black_box(out);
         })
     });

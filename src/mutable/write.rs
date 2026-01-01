@@ -1,10 +1,22 @@
-use std::{hint::unreachable_unchecked, io::Write, ptr, slice};
+use std::{any::TypeId, hint::unreachable_unchecked, io::Write, ptr, slice};
 
 use zerocopy::byteorder;
 
 use crate::{
-    ByteOrder, Error, Result, Tag, cold_path,
-    mutable::util::{SIZE_DYN, SIZE_USIZE, list_len, list_tag_id, tag_size},
+    ByteOrder, Error, StringMut, NBT, CompoundOwn, ListOwn, StringOwn, TypedListOwn, ValueOwn,
+    Result, TagID, Writable, cold_path,
+    mutable::{
+        compound_mut::MutCompound,
+        compound_ref::RefCompound,
+        list_mut::MutList,
+        list_ref::RefList,
+        size::{SIZE_DYN, SIZE_USIZE, mutable_tag_size},
+        string_ref::RefString,
+        typed_list_mut::MutTypedList,
+        typed_list_ref::RefTypedList,
+        value_mut::MutValue,
+        value_ref::RefValue,
+    },
 };
 
 macro_rules! change_endian {
@@ -13,17 +25,26 @@ macro_rules! change_endian {
     };
 }
 
-pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -> Result<()> {
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
+pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) {
     unsafe {
         let mut start = data;
 
         out.reserve(128);
 
         loop {
-            let tag_id = Tag::from_u8_unchecked(*data);
+            let tag_id = TagID::from_u8_unchecked(*data);
             data = data.add(1);
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 let raw_len = data.byte_offset_from_unsigned(start);
                 if raw_len == 1 {
@@ -34,17 +55,17 @@ pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8
                     ptr::copy_nonoverlapping(start, out.as_mut_ptr().add(old_len), raw_len);
                     out.set_len(old_len + raw_len);
                 }
-                return Ok(());
+                return;
             }
 
             let name_len = byteorder::U16::<O>::from_bytes(*data.cast()).get();
             data = data.add(2 + name_len as usize);
 
             if tag_id.is_primitive() {
-                data = data.add(tag_size(tag_id));
+                data = data.add(mutable_tag_size(tag_id));
             } else {
                 match tag_id {
-                    Tag::ByteArray => {
+                    TagID::ByteArray => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         let old_len = out.len();
 
@@ -66,7 +87,7 @@ pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8
 
                         out.set_len(old_len + raw_len + len_bytes);
                     }
-                    Tag::String => {
+                    TagID::String => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         let old_len = out.len();
 
@@ -88,25 +109,25 @@ pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8
 
                         out.set_len(old_len + raw_len + len_bytes);
                     }
-                    Tag::List => {
+                    TagID::List => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         let old_len = out.len();
                         out.reserve(raw_len);
                         ptr::copy_nonoverlapping(start, out.as_mut_ptr().add(old_len), raw_len);
                         out.set_len(old_len + raw_len);
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                        write_list::<O>(ptr, out)?;
+                        write_list::<O>(ptr, out);
                     }
-                    Tag::Compound => {
+                    TagID::Compound => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         let old_len = out.len();
                         out.reserve(raw_len);
                         ptr::copy_nonoverlapping(start, out.as_mut_ptr().add(old_len), raw_len);
                         out.set_len(old_len + raw_len);
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                        write_compound::<O>(ptr, out)?;
+                        write_compound::<O>(ptr, out);
                     }
-                    Tag::IntArray => {
+                    TagID::IntArray => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         let old_len = out.len();
 
@@ -128,7 +149,7 @@ pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8
 
                         out.set_len(old_len + raw_len + len_bytes);
                     }
-                    Tag::LongArray => {
+                    TagID::LongArray => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         let old_len = out.len();
 
@@ -159,17 +180,29 @@ pub unsafe fn write_compound<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8
     }
 }
 
-pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -> Result<()> {
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
+pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) {
     unsafe {
-        let tag_id = list_tag_id(data);
-        let len = list_len::<O>(data);
+        let tag_id = TagID::from_u8_unchecked(*data);
+        let len = byteorder::U32::<O>::from_bytes(*data.add(1).cast()).get() as usize;
         if tag_id.is_primitive() {
-            out.extend_from_slice(slice::from_raw_parts(data, 1 + 4 + tag_size(tag_id) * len));
+            out.extend_from_slice(slice::from_raw_parts(
+                data,
+                1 + 4 + mutable_tag_size(tag_id) * len,
+            ));
         } else {
             out.extend_from_slice(slice::from_raw_parts(data, 1 + 4));
             data = data.add(1 + 4);
             match tag_id {
-                Tag::ByteArray => {
+                TagID::ByteArray => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -186,7 +219,7 @@ pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::String => {
+                TagID::String => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -203,21 +236,21 @@ pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::List => {
+                TagID::List => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                        write_list::<O>(ptr, out)?;
+                        write_list::<O>(ptr, out);
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::Compound => {
+                TagID::Compound => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                        write_compound::<O>(ptr, out)?;
+                        write_compound::<O>(ptr, out);
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::IntArray => {
+                TagID::IntArray => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -234,7 +267,7 @@ pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::LongArray => {
+                TagID::LongArray => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -254,34 +287,42 @@ pub unsafe fn write_list<O: ByteOrder>(mut data: *const u8, out: &mut Vec<u8>) -
                 _ => unreachable_unchecked(),
             }
         }
-        Ok(())
     }
 }
 
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
 pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
     mut data: *const u8,
     out: &mut Vec<u8>,
-) -> Result<()> {
+) {
     out.reserve(128);
 
     unsafe {
         loop {
             let start = data;
-            let tag_id = Tag::from_u8_unchecked(*data);
+            let tag_id = TagID::from_u8_unchecked(*data);
             data = data.add(1);
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 out.push(0);
-                return Ok(());
+                return;
             }
 
             let name_len = byteorder::U16::<O>::from_bytes(*data.cast()).get() as usize;
             data = data.add(2 + name_len);
 
             match tag_id {
-                Tag::End => unreachable_unchecked(),
-                Tag::Byte => {
+                TagID::End => unreachable_unchecked(),
+                TagID::Byte => {
                     let old_len = out.len();
                     let head_len = 1 + 2 + name_len;
                     out.reserve(head_len + 1);
@@ -294,7 +335,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     out.set_len(old_len + head_len + 1);
                     data = data.add(1);
                 }
-                Tag::Short => {
+                TagID::Short => {
                     let old_len = out.len();
                     let head_len = 1 + 2 + name_len;
                     out.reserve(head_len + 2);
@@ -311,7 +352,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     out.set_len(old_len + head_len + 2);
                     data = data.add(2);
                 }
-                Tag::Int | Tag::Float => {
+                TagID::Int | TagID::Float => {
                     let old_len = out.len();
                     let head_len = 1 + 2 + name_len;
                     out.reserve(head_len + 4);
@@ -328,7 +369,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     out.set_len(old_len + head_len + 4);
                     data = data.add(4);
                 }
-                Tag::Long | Tag::Double => {
+                TagID::Long | TagID::Double => {
                     let old_len = out.len();
                     let head_len = 1 + 2 + name_len;
                     out.reserve(head_len + 8);
@@ -345,7 +386,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     out.set_len(old_len + head_len + 8);
                     data = data.add(8);
                 }
-                Tag::ByteArray => {
+                TagID::ByteArray => {
                     let head_len = 1 + 2 + name_len;
                     let old_len = out.len();
 
@@ -370,7 +411,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     out.set_len(old_len + head_len + len_bytes);
                     data = data.add(SIZE_DYN);
                 }
-                Tag::String => {
+                TagID::String => {
                     let head_len = 1 + 2 + name_len;
                     let old_len = out.len();
 
@@ -395,7 +436,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     out.set_len(old_len + head_len + len_bytes);
                     data = data.add(SIZE_DYN);
                 }
-                Tag::List => {
+                TagID::List => {
                     let old_len = out.len();
                     let head_len = 1 + 2 + name_len;
                     out.reserve(head_len);
@@ -407,10 +448,10 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     );
                     out.set_len(old_len + head_len);
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                    write_list_fallback::<O, R>(ptr, out)?;
+                    write_list_fallback::<O, R>(ptr, out);
                     data = data.add(SIZE_DYN);
                 }
-                Tag::Compound => {
+                TagID::Compound => {
                     let old_len = out.len();
                     let head_len = 1 + 2 + name_len;
                     out.reserve(head_len);
@@ -422,10 +463,10 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     );
                     out.set_len(old_len + head_len);
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                    write_compound_fallback::<O, R>(ptr, out)?;
+                    write_compound_fallback::<O, R>(ptr, out);
                     data = data.add(SIZE_DYN);
                 }
-                Tag::IntArray => {
+                TagID::IntArray => {
                     let head_len = 1 + 2 + name_len;
                     let old_len = out.len();
 
@@ -454,7 +495,7 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
                     out.set_len(old_len + head_len + len_bytes);
                     data = data.add(SIZE_DYN);
                 }
-                Tag::LongArray => {
+                TagID::LongArray => {
                     let head_len = 1 + 2 + name_len;
                     let old_len = out.len();
 
@@ -488,13 +529,22 @@ pub unsafe fn write_compound_fallback<O: ByteOrder, R: ByteOrder>(
     }
 }
 
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
 pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
     mut data: *const u8,
     out: &mut Vec<u8>,
-) -> Result<()> {
+) {
     unsafe {
-        let tag_id = list_tag_id(data);
-        let len = list_len::<O>(data);
+        let tag_id = TagID::from_u8_unchecked(*data);
+        let len = byteorder::U32::<O>::from_bytes(*data.add(1).cast()).get() as usize;
 
         macro_rules! write_head {
             () => {{
@@ -512,7 +562,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
         }
 
         match tag_id {
-            Tag::End => {
+            TagID::End => {
                 let old_len = out.len();
                 out.reserve(1 + 4);
                 let write_ptr = out.as_mut_ptr().add(old_len);
@@ -523,7 +573,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                 );
                 out.set_len(old_len + 1 + 4);
             }
-            Tag::Byte => {
+            TagID::Byte => {
                 let old_len = out.len();
                 let len_bytes = 1 + 4 + len;
                 out.reserve(len_bytes);
@@ -536,7 +586,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                 ptr::copy_nonoverlapping(data.add(1 + 4), write_ptr.add(1 + 4), len);
                 out.set_len(old_len + len_bytes);
             }
-            Tag::Short => {
+            TagID::Short => {
                 let old_len = out.len();
                 let len_bytes = 1 + 4 + len * 2;
                 out.reserve(len_bytes);
@@ -553,7 +603,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }
                 out.set_len(old_len + len_bytes);
             }
-            Tag::Int | Tag::Float => {
+            TagID::Int | TagID::Float => {
                 let old_len = out.len();
                 let len_bytes = 1 + 4 + len * 4;
                 out.reserve(len_bytes);
@@ -570,7 +620,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }
                 out.set_len(old_len + len_bytes);
             }
-            Tag::Long | Tag::Double => {
+            TagID::Long | TagID::Double => {
                 let old_len = out.len();
                 let len_bytes = 1 + 4 + len * 8;
                 out.reserve(len_bytes);
@@ -587,7 +637,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }
                 out.set_len(old_len + len_bytes);
             }
-            Tag::ByteArray => {
+            TagID::ByteArray => {
                 write_head!();
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
@@ -605,7 +655,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::String => {
+            TagID::String => {
                 write_head!();
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
@@ -623,23 +673,23 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::List => {
+            TagID::List => {
                 write_head!();
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                    write_list_fallback::<O, R>(ptr, out)?;
+                    write_list_fallback::<O, R>(ptr, out);
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::Compound => {
+            TagID::Compound => {
                 write_head!();
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
-                    write_compound_fallback::<O, R>(ptr, out)?;
+                    write_compound_fallback::<O, R>(ptr, out);
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::IntArray => {
+            TagID::IntArray => {
                 write_head!();
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
@@ -661,7 +711,7 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::LongArray => {
+            TagID::LongArray => {
                 write_head!();
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
@@ -684,10 +734,18 @@ pub unsafe fn write_list_fallback<O: ByteOrder, R: ByteOrder>(
                 }
             }
         }
-        Ok(())
     }
 }
 
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
 pub unsafe fn write_compound_to_writer<O: ByteOrder>(
     mut data: *const u8,
     writer: &mut impl Write,
@@ -696,10 +754,10 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
         let mut start = data;
 
         loop {
-            let tag_id = Tag::from_u8_unchecked(*data);
+            let tag_id = TagID::from_u8_unchecked(*data);
             data = data.add(1);
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 let raw_len = data.byte_offset_from_unsigned(start);
                 writer
@@ -712,10 +770,10 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
             data = data.add(2 + name_len as usize);
 
             if tag_id.is_primitive() {
-                data = data.add(tag_size(tag_id));
+                data = data.add(mutable_tag_size(tag_id));
             } else {
                 match tag_id {
-                    Tag::ByteArray => {
+                    TagID::ByteArray => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         writer
                             .write_all(slice::from_raw_parts(start, raw_len))
@@ -731,7 +789,7 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
                             .write_all(slice::from_raw_parts(ptr, len))
                             .map_err(Error::IO)?;
                     }
-                    Tag::String => {
+                    TagID::String => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         writer
                             .write_all(slice::from_raw_parts(start, raw_len))
@@ -747,7 +805,7 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
                             .write_all(slice::from_raw_parts(ptr, len))
                             .map_err(Error::IO)?;
                     }
-                    Tag::List => {
+                    TagID::List => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         writer
                             .write_all(slice::from_raw_parts(start, raw_len))
@@ -755,7 +813,7 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         write_list_to_writer::<O>(ptr, writer)?;
                     }
-                    Tag::Compound => {
+                    TagID::Compound => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         writer
                             .write_all(slice::from_raw_parts(start, raw_len))
@@ -763,7 +821,7 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         write_compound_to_writer::<O>(ptr, writer)?;
                     }
-                    Tag::IntArray => {
+                    TagID::IntArray => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         writer
                             .write_all(slice::from_raw_parts(start, raw_len))
@@ -779,7 +837,7 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
                             .write_all(slice::from_raw_parts(ptr, len * 4))
                             .map_err(Error::IO)?;
                     }
-                    Tag::LongArray => {
+                    TagID::LongArray => {
                         let raw_len = data.byte_offset_from_unsigned(start);
                         writer
                             .write_all(slice::from_raw_parts(start, raw_len))
@@ -804,16 +862,28 @@ pub unsafe fn write_compound_to_writer<O: ByteOrder>(
     }
 }
 
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
 pub unsafe fn write_list_to_writer<O: ByteOrder>(
     mut data: *const u8,
     writer: &mut impl Write,
 ) -> Result<()> {
     unsafe {
-        let tag_id = list_tag_id(data);
-        let len = list_len::<O>(data);
+        let tag_id = TagID::from_u8_unchecked(*data);
+        let len = byteorder::U32::<O>::from_bytes(*data.add(1).cast()).get() as usize;
         if tag_id.is_primitive() {
             writer
-                .write_all(slice::from_raw_parts(data, 1 + 4 + tag_size(tag_id) * len))
+                .write_all(slice::from_raw_parts(
+                    data,
+                    1 + 4 + mutable_tag_size(tag_id) * len,
+                ))
                 .map_err(Error::IO)?;
         } else {
             writer
@@ -821,7 +891,7 @@ pub unsafe fn write_list_to_writer<O: ByteOrder>(
                 .map_err(Error::IO)?;
             data = data.add(1 + 4);
             match tag_id {
-                Tag::ByteArray => {
+                TagID::ByteArray => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -834,7 +904,7 @@ pub unsafe fn write_list_to_writer<O: ByteOrder>(
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::String => {
+                TagID::String => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -847,21 +917,21 @@ pub unsafe fn write_list_to_writer<O: ByteOrder>(
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::List => {
+                TagID::List => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         write_list_to_writer::<O>(ptr, writer)?;
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::Compound => {
+                TagID::Compound => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         write_compound_to_writer::<O>(ptr, writer)?;
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::IntArray => {
+                TagID::IntArray => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -874,7 +944,7 @@ pub unsafe fn write_list_to_writer<O: ByteOrder>(
                         data = data.add(SIZE_DYN);
                     }
                 }
-                Tag::LongArray => {
+                TagID::LongArray => {
                     for _ in 0..len {
                         let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                         let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -894,6 +964,15 @@ pub unsafe fn write_list_to_writer<O: ByteOrder>(
     }
 }
 
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
 pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
     mut data: *const u8,
     writer: &mut impl Write,
@@ -901,10 +980,10 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
     unsafe {
         loop {
             let start = data;
-            let tag_id = Tag::from_u8_unchecked(*data);
+            let tag_id = TagID::from_u8_unchecked(*data);
             data = data.add(1);
 
-            if tag_id == Tag::End {
+            if tag_id == TagID::End {
                 cold_path();
                 writer.write_all(&[0]).map_err(Error::IO)?;
                 return Ok(());
@@ -925,32 +1004,32 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                 .map_err(Error::IO)?;
 
             match tag_id {
-                Tag::End => unreachable_unchecked(),
-                Tag::Byte => {
+                TagID::End => unreachable_unchecked(),
+                TagID::Byte => {
                     writer
                         .write_all(slice::from_raw_parts(data, 1))
                         .map_err(Error::IO)?;
                     data = data.add(1);
                 }
-                Tag::Short => {
+                TagID::Short => {
                     writer
                         .write_all(&change_endian!(*data.cast(), U16, O, R).to_bytes())
                         .map_err(Error::IO)?;
                     data = data.add(2);
                 }
-                Tag::Int | Tag::Float => {
+                TagID::Int | TagID::Float => {
                     writer
                         .write_all(&change_endian!(*data.cast(), U32, O, R).to_bytes())
                         .map_err(Error::IO)?;
                     data = data.add(4);
                 }
-                Tag::Long | Tag::Double => {
+                TagID::Long | TagID::Double => {
                     writer
                         .write_all(&change_endian!(*data.cast(), U64, O, R).to_bytes())
                         .map_err(Error::IO)?;
                     data = data.add(8);
                 }
-                Tag::ByteArray => {
+                TagID::ByteArray => {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
                     writer
@@ -961,7 +1040,7 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                         .map_err(Error::IO)?;
                     data = data.add(SIZE_DYN);
                 }
-                Tag::String => {
+                TagID::String => {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
                     writer
@@ -972,17 +1051,17 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                         .map_err(Error::IO)?;
                     data = data.add(SIZE_DYN);
                 }
-                Tag::List => {
+                TagID::List => {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     write_list_to_writer_fallback::<O, R>(ptr, writer)?;
                     data = data.add(SIZE_DYN);
                 }
-                Tag::Compound => {
+                TagID::Compound => {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     write_compound_to_writer_fallback::<O, R>(ptr, writer)?;
                     data = data.add(SIZE_DYN);
                 }
-                Tag::IntArray => {
+                TagID::IntArray => {
                     let ptr =
                         ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
                     let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -997,7 +1076,7 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                     }
                     data = data.add(SIZE_DYN);
                 }
-                Tag::LongArray => {
+                TagID::LongArray => {
                     let ptr =
                         ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
                     let len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -1017,13 +1096,22 @@ pub unsafe fn write_compound_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
     }
 }
 
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if .
+///
+/// # Safety
+///
+/// .
 pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
     mut data: *const u8,
     writer: &mut impl Write,
 ) -> Result<()> {
     unsafe {
-        let tag_id = list_tag_id(data);
-        let len = list_len::<O>(data);
+        let tag_id = TagID::from_u8_unchecked(*data);
+        let len = byteorder::U32::<O>::from_bytes(*data.add(1).cast()).get() as usize;
 
         let mut temp = [0u8; 1 + 4];
         ptr::write(temp.as_mut_ptr(), tag_id as u8);
@@ -1035,13 +1123,13 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
         data = data.add(1 + 4);
 
         match tag_id {
-            Tag::End => {}
-            Tag::Byte => {
+            TagID::End => {}
+            TagID::Byte => {
                 writer
                     .write_all(slice::from_raw_parts(data, len))
                     .map_err(Error::IO)?;
             }
-            Tag::Short => {
+            TagID::Short => {
                 let s = slice::from_raw_parts(data.cast(), len);
                 for element in s {
                     writer
@@ -1049,7 +1137,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                         .map_err(Error::IO)?;
                 }
             }
-            Tag::Int | Tag::Float => {
+            TagID::Int | TagID::Float => {
                 let s = slice::from_raw_parts(data.cast(), len);
                 for element in s {
                     writer
@@ -1057,7 +1145,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                         .map_err(Error::IO)?;
                 }
             }
-            Tag::Long | Tag::Double => {
+            TagID::Long | TagID::Double => {
                 let s = slice::from_raw_parts(data.cast(), len);
                 for element in s {
                     writer
@@ -1065,7 +1153,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                         .map_err(Error::IO)?;
                 }
             }
-            Tag::ByteArray => {
+            TagID::ByteArray => {
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     let arr_len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -1078,7 +1166,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::String => {
+            TagID::String => {
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     let str_len = usize::from_ne_bytes(*data.add(SIZE_USIZE).cast());
@@ -1091,21 +1179,21 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::List => {
+            TagID::List => {
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     write_list_to_writer_fallback::<O, R>(ptr, writer)?;
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::Compound => {
+            TagID::Compound => {
                 for _ in 0..len {
                     let ptr = ptr::with_exposed_provenance(usize::from_ne_bytes(*data.cast()));
                     write_compound_to_writer_fallback::<O, R>(ptr, writer)?;
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::IntArray => {
+            TagID::IntArray => {
                 for _ in 0..len {
                     let ptr =
                         ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
@@ -1122,7 +1210,7 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
                     data = data.add(SIZE_DYN);
                 }
             }
-            Tag::LongArray => {
+            TagID::LongArray => {
                 for _ in 0..len {
                     let ptr =
                         ptr::with_exposed_provenance::<u8>(usize::from_ne_bytes(*data.cast()));
@@ -1141,5 +1229,434 @@ pub unsafe fn write_list_to_writer_fallback<O: ByteOrder, R: ByteOrder>(
             }
         }
         Ok(())
+    }
+}
+
+impl<'s> Writable for RefString<'s> {
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        self.data.write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.data.write_to_writer::<TARGET>(writer)
+    }
+}
+
+impl<'s, O: ByteOrder> Writable for RefValue<'s, O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        match self {
+            RefValue::End(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Byte(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Short(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Int(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Long(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Float(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Double(v) => v.write_to_vec::<TARGET>(),
+            RefValue::ByteArray(v) => v.write_to_vec::<TARGET>(),
+            RefValue::String(v) => v.write_to_vec::<TARGET>(),
+            RefValue::List(v) => v.write_to_vec::<TARGET>(),
+            RefValue::Compound(v) => v.write_to_vec::<TARGET>(),
+            RefValue::IntArray(v) => v.write_to_vec::<TARGET>(),
+            RefValue::LongArray(v) => v.write_to_vec::<TARGET>(),
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        match self {
+            RefValue::End(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::Byte(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::Short(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::Int(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::Long(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::Float(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::Double(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::ByteArray(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::String(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::List(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::Compound(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::IntArray(v) => v.write_to_writer::<TARGET>(writer),
+            RefValue::LongArray(v) => v.write_to_writer::<TARGET>(writer),
+        }
+    }
+}
+
+impl<'s, O: ByteOrder> Writable for RefList<'s, O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data;
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list::<TARGET>(payload, &mut buf);
+            } else {
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::List as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list_to_writer::<TARGET>(self.data, &mut writer)
+            } else {
+                write_list_to_writer_fallback::<O, TARGET>(self.data, &mut writer)
+            }
+        }
+    }
+}
+
+impl<'s, O: ByteOrder, T: NBT> Writable for RefTypedList<'s, O, T> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data;
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list::<TARGET>(payload, &mut buf);
+            } else {
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::List as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list_to_writer::<TARGET>(self.data, &mut writer)
+            } else {
+                write_list_to_writer_fallback::<O, TARGET>(self.data, &mut writer)
+            }
+        }
+    }
+}
+
+impl<'s, O: ByteOrder> Writable for RefCompound<'s, O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data;
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_compound::<TARGET>(payload, &mut buf);
+            } else {
+                write_compound_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::Compound as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_compound_to_writer::<TARGET>(self.data, &mut writer)
+            } else {
+                write_compound_to_writer_fallback::<O, TARGET>(self.data, &mut writer)
+            }
+        }
+    }
+}
+
+impl<'s> Writable for StringMut<'s> {
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        self.as_mutf8_str().write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.as_mutf8_str().write_to_writer::<TARGET>(writer)
+    }
+}
+
+impl<'s, O: ByteOrder> Writable for MutValue<'s, O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        match self {
+            MutValue::End(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Byte(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Short(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Int(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Long(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Float(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Double(v) => v.write_to_vec::<TARGET>(),
+            MutValue::ByteArray(v) => v.write_to_vec::<TARGET>(),
+            MutValue::String(v) => v.write_to_vec::<TARGET>(),
+            MutValue::List(v) => v.write_to_vec::<TARGET>(),
+            MutValue::Compound(v) => v.write_to_vec::<TARGET>(),
+            MutValue::IntArray(v) => v.write_to_vec::<TARGET>(),
+            MutValue::LongArray(v) => v.write_to_vec::<TARGET>(),
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        match self {
+            MutValue::End(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::Byte(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::Short(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::Int(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::Long(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::Float(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::Double(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::ByteArray(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::String(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::List(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::Compound(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::IntArray(v) => v.write_to_writer::<TARGET>(writer),
+            MutValue::LongArray(v) => v.write_to_writer::<TARGET>(writer),
+        }
+    }
+}
+
+impl<'s, O: ByteOrder> Writable for MutList<'s, O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data.as_ptr();
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list::<TARGET>(payload, &mut buf);
+            } else {
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::List as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list_to_writer::<TARGET>(self.data.as_ptr(), &mut writer)
+            } else {
+                write_list_to_writer_fallback::<O, TARGET>(self.data.as_ptr(), &mut writer)
+            }
+        }
+    }
+}
+
+impl<'s, O: ByteOrder, T: NBT> Writable for MutTypedList<'s, O, T> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data.as_ptr();
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list::<TARGET>(payload, &mut buf);
+            } else {
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::List as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list_to_writer::<TARGET>(self.data.as_ptr(), &mut writer)
+            } else {
+                write_list_to_writer_fallback::<O, TARGET>(self.data.as_ptr(), &mut writer)
+            }
+        }
+    }
+}
+
+impl<'s, O: ByteOrder> Writable for MutCompound<'s, O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data.as_ptr();
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_compound::<TARGET>(payload, &mut buf);
+            } else {
+                write_compound_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::Compound as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_compound_to_writer::<TARGET>(self.data.as_ptr(), &mut writer)
+            } else {
+                write_compound_to_writer_fallback::<O, TARGET>(self.data.as_ptr(), &mut writer)
+            }
+        }
+    }
+}
+
+impl Writable for StringOwn {
+    #[inline]
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        self.as_mutf8_str().write_to_vec::<TARGET>()
+    }
+
+    #[inline]
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        self.as_mutf8_str().write_to_writer::<TARGET>(writer)
+    }
+}
+
+impl<O: ByteOrder> Writable for ValueOwn<O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        match self {
+            ValueOwn::End(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Byte(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Short(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Int(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Long(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Float(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Double(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::ByteArray(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::String(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::List(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::Compound(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::IntArray(v) => v.write_to_vec::<TARGET>(),
+            ValueOwn::LongArray(v) => v.write_to_vec::<TARGET>(),
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, writer: impl Write) -> Result<()> {
+        match self {
+            ValueOwn::End(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Byte(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Short(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Int(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Long(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Float(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Double(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::ByteArray(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::String(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::List(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::Compound(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::IntArray(v) => v.write_to_writer::<TARGET>(writer),
+            ValueOwn::LongArray(v) => v.write_to_writer::<TARGET>(writer),
+        }
+    }
+}
+
+impl<O: ByteOrder> Writable for ListOwn<O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data.as_ptr();
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list::<TARGET>(payload, &mut buf);
+            } else {
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::List as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list_to_writer::<TARGET>(self.data.as_ptr(), &mut writer)
+            } else {
+                write_list_to_writer_fallback::<O, TARGET>(self.data.as_ptr(), &mut writer)
+            }
+        }
+    }
+}
+
+impl<O: ByteOrder, T: NBT> Writable for TypedListOwn<O, T> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data.as_ptr();
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::List as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list::<TARGET>(payload, &mut buf);
+            } else {
+                write_list_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::List as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_list_to_writer::<TARGET>(self.data.as_ptr(), &mut writer)
+            } else {
+                write_list_to_writer_fallback::<O, TARGET>(self.data.as_ptr(), &mut writer)
+            }
+        }
+    }
+}
+
+impl<O: ByteOrder> Writable for CompoundOwn<O> {
+    fn write_to_vec<TARGET: ByteOrder>(&self) -> Vec<u8> {
+        unsafe {
+            let payload = self.data.as_ptr();
+            let mut buf = Vec::<u8>::with_capacity(1 + 2 + 4 + 128);
+            let buf_ptr = buf.as_mut_ptr();
+            ptr::write(buf_ptr.cast(), [TagID::Compound as u8, 0u8, 0u8]);
+            buf.set_len(1 + 2);
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_compound::<TARGET>(payload, &mut buf);
+            } else {
+                write_compound_fallback::<O, TARGET>(payload, &mut buf);
+            }
+            buf
+        }
+    }
+
+    fn write_to_writer<TARGET: ByteOrder>(&self, mut writer: impl Write) -> Result<()> {
+        unsafe {
+            writer
+                .write_all(&[TagID::Compound as u8, 0u8, 0u8])
+                .map_err(Error::IO)?;
+            if TypeId::of::<O>() == TypeId::of::<TARGET>() {
+                write_compound_to_writer::<TARGET>(self.data.as_ptr(), &mut writer)
+            } else {
+                write_compound_to_writer_fallback::<O, TARGET>(self.data.as_ptr(), &mut writer)
+            }
+        }
     }
 }

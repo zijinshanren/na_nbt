@@ -1,42 +1,107 @@
-//! Utility types and functions.
-//!
-//! This module contains utility types used throughout the crate.
-//!
-//! # ByteOrder Trait
-//!
-//! The [`ByteOrder`] trait is a convenience trait that combines [`zerocopy::ByteOrder`]
-//! with `Send + Sync + 'static` bounds. Use this trait when you need to accept
-//! any byte order in generic code.
-//!
-//! ```
-//! use na_nbt::ByteOrder;
-//! use zerocopy::byteorder::{BigEndian, LittleEndian};
-//!
-//! fn process_nbt<O: ByteOrder>(data: &[u8]) {
-//!     // Works with any byte order
-//! }
-//!
-//! // Can be called with either endianness
-//! # let data = [];
-//! process_nbt::<BigEndian>(&data);
-//! process_nbt::<LittleEndian>(&data);
-//! ```
+use std::{
+    borrow::{Borrow, Cow},
+    mem,
+};
+
+use simd_cesu8::DecodingError;
+
+use crate::StringOwn;
 
 #[inline(always)]
 #[cold]
-pub(crate) fn cold_path() {}
+pub(crate) const fn cold_path() {}
 
-/// A trait for byte order types.
-///
-/// This trait is automatically implemented for all types that implement
-/// [`zerocopy::ByteOrder`] and are `Send + Sync + 'static`.
-///
-/// The two main implementations are:
-/// - [`BigEndian`](zerocopy::byteorder::BigEndian) - Used by Minecraft Java Edition
-/// - [`LittleEndian`](zerocopy::byteorder::LittleEndian) - Used by Minecraft Bedrock Edition
 pub trait ByteOrder: zerocopy::ByteOrder + Send + Sync + 'static {}
 
 impl<T: zerocopy::ByteOrder + Send + Sync + 'static> ByteOrder for T {}
 
 pub(crate) static EMPTY_LIST: [u8; 5] = [0; 5];
 pub(crate) static EMPTY_COMPOUND: [u8; 1] = [0];
+
+/// A MUTF-8 (Modified UTF-8) encoded string slice.
+///
+/// MUTF-8 is an encoding used by Java.
+///
+/// This type is used for NBT string values and keys, which are encoded in MUTF-8.
+#[repr(transparent)]
+pub struct MUTF8Str([u8]);
+
+impl Default for &MUTF8Str {
+    #[inline]
+    fn default() -> Self {
+        unsafe { MUTF8Str::from_mutf8_unchecked(&[]) }
+    }
+}
+
+impl Borrow<MUTF8Str> for StringOwn {
+    fn borrow(&self) -> &MUTF8Str {
+        self.as_mutf8_str()
+    }
+}
+
+impl ToOwned for MUTF8Str {
+    type Owned = StringOwn;
+
+    fn to_owned(&self) -> Self::Owned {
+        StringOwn::from(self)
+    }
+}
+
+impl MUTF8Str {
+    /// Creates a `&MUTF8Str` from a byte slice without validation.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `bytes` contains valid MUTF-8 encoded data.
+    ///
+    /// MUTF-8 (Modified UTF-8) is an encoding used by Java.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use na_nbt::MUTF8Str;
+    ///
+    /// // Valid MUTF-8: standard ASCII
+    /// let valid = b"hello";
+    /// let s = unsafe { MUTF8Str::from_mutf8_unchecked(valid) };
+    /// ```
+    #[inline]
+    pub const unsafe fn from_mutf8_unchecked(bytes: &[u8]) -> &Self {
+        unsafe { mem::transmute(bytes) }
+    }
+
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    /// see [`simd_cesu8::mutf8::decode_lossy`]
+    #[inline]
+    pub fn decode_lossy(&self) -> Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy(&self.0)
+    }
+
+    /// see [`simd_cesu8::mutf8::decode_strict`]
+    #[inline]
+    pub fn decode_strict(&self) -> Result<Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode_strict(&self.0)
+    }
+
+    /// see [`simd_cesu8::mutf8::decode`]
+    #[inline]
+    pub fn decode(&self) -> Result<Cow<'_, str>, DecodingError> {
+        simd_cesu8::mutf8::decode(&self.0)
+    }
+
+    /// see [`simd_cesu8::mutf8::decode_lossy_strict`]
+    #[inline]
+    pub fn decode_lossy_strict(&self) -> Cow<'_, str> {
+        simd_cesu8::mutf8::decode_lossy_strict(&self.0)
+    }
+
+    /// Calls [`Self::decode_lossy`] and converts the result to a [`String`].
+    #[inline]
+    pub fn to_utf8_string(&self) -> String {
+        self.decode_lossy().into_owned()
+    }
+}
