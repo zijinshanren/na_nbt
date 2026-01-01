@@ -70,8 +70,6 @@ fn test_serialize() {
     };
 
     let vec_be = to_vec_be(&value).unwrap();
-    let file_name = "test_serialize.nbt";
-    fs::write(file_name, vec_be).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
