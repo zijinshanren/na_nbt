@@ -1,10 +1,10 @@
 use std::{io::Write, marker::PhantomData, ptr};
 
 use base64ct::Encoding;
-use serde::{Serialize, ser};
+use serde::{ser, Serialize};
 use zerocopy::byteorder;
 
-use crate::{ByteOrder, Error, Result, TagID, cold_path, tag_of};
+use crate::{cold_path, tag_of, ByteOrder, Error, Result, TagID};
 
 /// Serializes a value to a byte vector in NBT format.
 ///
@@ -443,11 +443,11 @@ impl<'a, O: ByteOrder> ser::Serializer for &'a mut Serializer<O> {
 
     // List [ Compound { "" : <value> }, ... ]
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
-        if let Some(len) = len
-            && len > u32::MAX as usize
-        {
-            cold_path();
-            return Err(Error::LEN(len));
+        if let Some(len) = len {
+            if len > u32::MAX as usize {
+                cold_path();
+                return Err(Error::LEN(len));
+            }
         }
         let list_len = len.map_or(Some(0), |_| None);
         unsafe {
